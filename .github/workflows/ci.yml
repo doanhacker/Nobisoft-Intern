@@ -19,6 +19,9 @@ jobs:
       - name: Get source code
         uses: actions/checkout@v4
 
+      - name: Create environment file
+        run: cp .env.example .env
+
       - name: Check Docker Compose config
         run: docker compose --env-file .env.example config
 
@@ -40,7 +43,7 @@ jobs:
 
       - name: Install frontend dependencies
         working-directory: frontend
-        run: npm install
+        run: npm ci
 
       - name: Build frontend
         working-directory: frontend
