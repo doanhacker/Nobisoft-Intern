@@ -194,7 +194,7 @@
 }
 
 /* ============================================================
-   DARK MODE — reserved for future implementation
+   DARK MODE — Indigo/Violet Brand (Dark)
    ============================================================ */
 
 .dark {
@@ -260,6 +260,11 @@
   html {
     @apply font-sans;
     scroll-behavior: smooth;
+    /* Smooth theme transition — applies to bg/text/border color changes */
+    transition:
+      background-color var(--duration-normal) var(--ease-in-out),
+      color var(--duration-fast) var(--ease-in-out),
+      border-color var(--duration-fast) var(--ease-in-out);
   }
 
   /* Typography baseline */
@@ -304,12 +309,25 @@
     background: linear-gradient(135deg, oklch(0.52 0.22 268), oklch(0.55 0.22 290));
   }
 
+  /* Dark: slightly brighter gradient for contrast on dark bg */
+  .dark .gradient-brand {
+    background: linear-gradient(135deg, oklch(0.65 0.20 268), oklch(0.68 0.20 290));
+  }
+
   .gradient-brand-subtle {
     background: linear-gradient(135deg, oklch(0.94 0.04 275), oklch(0.92 0.06 290));
   }
 
+  .dark .gradient-brand-subtle {
+    background: linear-gradient(135deg, oklch(0.20 0.05 275), oklch(0.22 0.07 290));
+  }
+
   .gradient-brand-radial {
     background: radial-gradient(ellipse at top, oklch(0.52 0.22 268 / 0.15), transparent 70%);
+  }
+
+  .dark .gradient-brand-radial {
+    background: radial-gradient(ellipse at top, oklch(0.70 0.18 268 / 0.20), transparent 70%);
   }
 
   /* --- Gradient text --- */
@@ -338,11 +356,21 @@
     border: 1px solid oklch(0.88 0.025 270 / 0.5);
   }
 
+  .dark .glass {
+    background: oklch(0.14 0.025 270 / 0.75);
+    border-color: oklch(1 0 0 / 0.1);
+  }
+
   .glass-brand {
     background: oklch(0.52 0.22 268 / 0.08);
     backdrop-filter: blur(12px);
     -webkit-backdrop-filter: blur(12px);
     border: 1px solid oklch(0.52 0.22 268 / 0.2);
+  }
+
+  .dark .glass-brand {
+    background: oklch(0.70 0.18 268 / 0.12);
+    border-color: oklch(0.70 0.18 268 / 0.25);
   }
 
   /* --- Surface elevation shadows --- */

@@ -1,45 +1,112 @@
-import { createRootRoute, Link, Outlet } from '@tanstack/react-router';
-import { TanStackRouterDevtools } from '@tanstack/router-devtools';
-import { TooltipProvider } from '@/components/ui/tooltip';
+import { createRootRoute, Link, Outlet, useNavigate } from '@tanstack/react-router'
+import { TanStackRouterDevtools } from '@tanstack/router-devtools'
+import { LogIn, LogOut, UserCircle2 } from 'lucide-react'
+import { TooltipProvider } from '@/components/ui/tooltip'
+import { ThemeProvider } from '@/context/ThemeContext'
+import { AuthProvider } from '@/context/AuthContext'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
+import { Button } from '@/components/ui/button'
+import { useAuth } from '@/hooks/useAuth'
 
 export const Route = createRootRoute({
   component: RootComponent,
-});
+})
 
-function RootComponent() {
+// ── Inner component (needs AuthProvider above it to use useAuth) ──
+function AppShell() {
+  const { isAuthenticated, user, logout } = useAuth()
+  const navigate = useNavigate()
+
+  const handleLogout = () => {
+    logout()
+    navigate({ to: '/login' })
+  }
+
   return (
-    <TooltipProvider>
-      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
-        {/* Premium Glassmorphic Header */}
-      <header className="sticky top-0 z-50 backdrop-blur-md bg-slate-900/80 border-b border-slate-800/80 px-6 py-4 shadow-lg shadow-slate-950/20">
+    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans selection:bg-primary/30 selection:text-primary-foreground">
+      {/* Premium Glassmorphic Header */}
+      <header className="sticky top-0 z-[var(--z-sticky)] backdrop-blur-md bg-background/80 border-b border-border/60 px-6 py-3 shadow-sm">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-500 via-purple-500 to-pink-500 flex items-center justify-center font-bold text-lg text-white shadow-lg shadow-indigo-500/30">
-              TS
+          {/* Brand */}
+          <Link to="/" className="flex items-center gap-3 group">
+            <div className="h-9 w-9 rounded-xl gradient-brand flex items-center justify-center font-bold text-base text-white shadow-brand transition-transform group-hover:scale-105">
+              N
             </div>
             <div>
-              <span className="font-extrabold text-xl bg-gradient-to-r from-indigo-400 via-purple-400 to-pink-400 bg-clip-text text-transparent tracking-wide">
-                TanStack
+              <span className="font-extrabold text-lg text-gradient-brand tracking-wide">
+                Nobisoft
               </span>
-              <span className="text-xs block text-slate-400 font-semibold tracking-wider uppercase -mt-1">
-                Router App
+              <span className="text-[10px] block text-muted-foreground font-semibold tracking-wider uppercase -mt-0.5">
+                Visual Search
               </span>
             </div>
-          </div>
+          </Link>
 
+          {/* Nav + Theme Toggle */}
           <nav className="flex items-center gap-2">
             <Link
               to="/style-guide"
-              activeProps={{
-                className: 'bg-indigo-600/30 text-indigo-400 border-indigo-500/50 shadow-inner',
-              }}
+              activeProps={{ className: 'bg-primary/10 text-primary border-primary/30' }}
               inactiveProps={{
-                className: 'text-slate-300 hover:text-white hover:bg-slate-800/50 border-transparent',
+                className:
+                  'text-muted-foreground hover:text-foreground hover:bg-muted border-transparent',
               }}
-              className="px-4 py-2 rounded-lg text-sm font-semibold tracking-wide border transition-all duration-300 ease-in-out cursor-pointer flex items-center gap-1.5"
+              className="px-3 py-1.5 rounded-lg text-sm font-semibold tracking-wide border transition-all duration-200 cursor-pointer flex items-center gap-1.5"
             >
               <span>🎨</span> Style Guide
             </Link>
+
+            {/* Auth-aware nav */}
+            {isAuthenticated ? (
+              <>
+                <Link
+                  to="/dashboard"
+                  activeProps={{ className: 'bg-primary/10 text-primary border-primary/30' }}
+                  inactiveProps={{
+                    className:
+                      'text-muted-foreground hover:text-foreground hover:bg-muted border-transparent',
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-sm font-semibold tracking-wide border transition-all duration-200 cursor-pointer flex items-center gap-1.5"
+                >
+                  <UserCircle2 className="size-3.5" />
+                  {user?.name?.split(' ').at(-1) ?? 'Dashboard'}
+                </Link>
+                <Button
+                  id="header-logout"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="text-muted-foreground hover:text-foreground gap-1.5"
+                >
+                  <LogOut className="size-3.5" />
+                  Đăng xuất
+                </Button>
+              </>
+            ) : (
+              <>
+                <Link
+                  to="/login"
+                  activeProps={{ className: 'bg-primary/10 text-primary border-primary/30' }}
+                  inactiveProps={{
+                    className:
+                      'text-muted-foreground hover:text-foreground hover:bg-muted border-transparent',
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-sm font-semibold tracking-wide border transition-all duration-200 cursor-pointer flex items-center gap-1.5"
+                >
+                  <LogIn className="size-3.5" />
+                  Đăng nhập
+                </Link>
+                <Button id="header-register" variant="brand" size="sm" asChild>
+                  <Link to="/register">Đăng ký</Link>
+                </Button>
+              </>
+            )}
+
+            {/* Divider */}
+            <div className="w-px h-5 bg-border mx-1" />
+
+            {/* Theme Toggle */}
+            <ThemeToggle />
           </nav>
         </div>
       </header>
@@ -50,13 +117,27 @@ function RootComponent() {
       </main>
 
       {/* Footer */}
-      <footer className="border-t border-slate-900 bg-slate-950 py-6 text-center text-xs text-slate-500">
-        <p>&copy; {new Date().getFullYear()} TanStack Router Setup. Built with React & Vite.</p>
+      <footer className="border-t border-border bg-muted/30 py-5 text-center text-xs text-muted-foreground">
+        <p>
+          &copy; {new Date().getFullYear()} Nobisoft. Visual Search Engine — Built with React &amp;
+          Vite.
+        </p>
       </footer>
 
       {/* Devtools */}
       <TanStackRouterDevtools position="bottom-right" />
     </div>
-    </TooltipProvider>
-  );
+  )
+}
+
+function RootComponent() {
+  return (
+    <ThemeProvider defaultTheme="system">
+      <AuthProvider>
+        <TooltipProvider>
+          <AppShell />
+        </TooltipProvider>
+      </AuthProvider>
+    </ThemeProvider>
+  )
 }
