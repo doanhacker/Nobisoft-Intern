@@ -1,5 +1,6 @@
 import { createRootRoute, Link, Outlet } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/router-devtools';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 export const Route = createRootRoute({
   component: RootComponent,
@@ -7,8 +8,9 @@ export const Route = createRootRoute({
 
 function RootComponent() {
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
-      {/* Premium Glassmorphic Header */}
+    <TooltipProvider>
+      <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-indigo-500 selection:text-white">
+        {/* Premium Glassmorphic Header */}
       <header className="sticky top-0 z-50 backdrop-blur-md bg-slate-900/80 border-b border-slate-800/80 px-6 py-4 shadow-lg shadow-slate-950/20">
         <div className="max-w-6xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -27,7 +29,7 @@ function RootComponent() {
 
           <nav className="flex items-center gap-2">
             <Link
-              to="/"
+              to="/style-guide"
               activeProps={{
                 className: 'bg-indigo-600/30 text-indigo-400 border-indigo-500/50 shadow-inner',
               }}
@@ -36,20 +38,7 @@ function RootComponent() {
               }}
               className="px-4 py-2 rounded-lg text-sm font-semibold tracking-wide border transition-all duration-300 ease-in-out cursor-pointer flex items-center gap-1.5"
             >
-              <span>🏠</span> Trang chủ
-            </Link>
-
-            <Link
-              to="/about"
-              activeProps={{
-                className: 'bg-purple-600/30 text-purple-400 border-purple-500/50 shadow-inner',
-              }}
-              inactiveProps={{
-                className: 'text-slate-300 hover:text-white hover:bg-slate-800/50 border-transparent',
-              }}
-              className="px-4 py-2 rounded-lg text-sm font-semibold tracking-wide border transition-all duration-300 ease-in-out cursor-pointer flex items-center gap-1.5"
-            >
-              <span>ℹ️</span> Giới thiệu
+              <span>🎨</span> Style Guide
             </Link>
           </nav>
         </div>
@@ -68,5 +57,6 @@ function RootComponent() {
       {/* Devtools */}
       <TanStackRouterDevtools position="bottom-right" />
     </div>
+    </TooltipProvider>
   );
 }
