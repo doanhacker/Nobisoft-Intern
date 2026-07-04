@@ -5,6 +5,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Separator } from "@/components/ui/separator"
 import { Skeleton } from "@/components/ui/skeleton"
+import { ThemeToggle } from "@/components/ui/ThemeToggle"
+import { useTheme } from "@/hooks/useTheme"
 import { SearchModeToggle, type SearchMode } from "@/components/search/SearchModeToggle"
 import { SimilarityBadge } from "@/components/search/SimilarityBadge"
 import { DropZone } from "@/components/search/DropZone"
@@ -21,6 +23,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 export function StyleGuide() {
   const [searchMode, setSearchMode] = React.useState<SearchMode>("image")
+  const { theme, resolvedTheme } = useTheme()
 
   return (
     <div className="min-h-screen bg-background text-foreground p-8 pb-20">
@@ -28,9 +31,59 @@ export function StyleGuide() {
         <header className="space-y-4">
           <h1 className="text-display font-bold text-gradient-brand">Design System</h1>
           <p className="text-lg text-muted-foreground">
-            Visual Search Engine — W1 UI Components & Tokens (Light Mode - Indigo/Violet)
+            Visual Search Engine — W1 UI Components & Tokens (Indigo/Violet)
           </p>
         </header>
+
+        <Separator />
+
+        {/* --- Theme --- */}
+        <section className="space-y-6">
+          <h2 className="text-2xl font-semibold">0. Theme System</h2>
+          <div className="grid md:grid-cols-2 gap-6">
+            {/* Live toggle demo */}
+            <div className="bg-card border border-border rounded-xl p-6 space-y-5 shadow-card">
+              <div className="space-y-1">
+                <h3 className="text-lg font-semibold">Live Theme Toggle</h3>
+                <p className="text-sm text-muted-foreground">
+                  Switch between Light, Dark, and System (follows OS setting).
+                  Selection persists via <code className="text-xs bg-muted px-1.5 py-0.5 rounded">localStorage</code>.
+                </p>
+              </div>
+              <div className="flex items-center gap-4">
+                <ThemeToggle />
+                <div className="text-sm">
+                  <span className="text-muted-foreground">Selected: </span>
+                  <span className="font-semibold text-foreground capitalize">{theme}</span>
+                  {theme === "system" && (
+                    <span className="text-muted-foreground"> → resolved as{" "}
+                      <span className="font-semibold text-foreground capitalize">{resolvedTheme}</span>
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Theme info */}
+            <div className="bg-card border border-border rounded-xl p-6 space-y-4 shadow-card">
+              <h3 className="text-lg font-semibold">Implementation</h3>
+              <ul className="space-y-2 text-sm">
+                {[
+                  ["ThemeProvider", "Context + localStorage + OS media query"],
+                  ["useTheme()", "Hook — access theme, resolvedTheme, setTheme"],
+                  ["ThemeToggle", "Icon button dropdown — Sun / Moon / Monitor"],
+                  [".dark class", "Applied to <html> — triggers all CSS vars"],
+                  ["Transition", "250ms ease on bg/text/border (html level)"],
+                ].map(([key, val]) => (
+                  <li key={key} className="flex gap-2">
+                    <code className="text-xs bg-primary/10 text-primary px-1.5 py-0.5 rounded shrink-0">{key}</code>
+                    <span className="text-muted-foreground">{val}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
 
         <Separator />
 
