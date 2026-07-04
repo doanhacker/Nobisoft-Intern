@@ -25,7 +25,7 @@ export function LoginPage() {
     setError(null)
     try {
       await login({ email, password })
-      navigate({ to: '/dashboard' })
+      navigate({ to: '/search' })
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { detail?: string; message?: string } } })?.response?.data

@@ -44,7 +44,7 @@ export function RegisterPage() {
 
     try {
       await register({ name, email, password })
-      navigate({ to: '/dashboard' })
+      navigate({ to: '/search' })
     } catch (err: unknown) {
       const msg =
         (err as { response?: { data?: { detail?: string; message?: string } } })?.response?.data
