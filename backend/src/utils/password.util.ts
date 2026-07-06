@@ -5,12 +5,15 @@ const PASSWORD_SALT_ROUNDS = 10;
 
 export const strongPasswordSchema = z
   .string()
-  .min(8, 'Mật khẩu phải có ít nhất 8 ký tự')
-  .regex(/[a-z]/, 'Mật khẩu phải có ít nhất 1 chữ thường')
-  .regex(/[A-Z]/, 'Mật khẩu phải có ít nhất 1 chữ hoa')
-  .regex(/[0-9]/, 'Mật khẩu phải có ít nhất 1 chữ số')
-  .regex(/[^A-Za-z0-9]/, 'Mật khẩu phải có ít nhất 1 ký tự đặc biệt');
+  .regex(
+    /^(?=.*[a-z])(?=.*[A-Z])(?=.*[0-9])(?=.*[^A-Za-z0-9]).{8,}$/,
+    'Mật khẩu phải tối thiểu 8 ký tự bao gồm chữ hoa, chữ thường, chữ số và ký tự đặc biệt',
+  );
 
 export function hashPassword(password: string) {
   return bcrypt.hash(password, PASSWORD_SALT_ROUNDS);
+}
+
+export function comparePassword(password: string, hashedPassword: string) {
+  return bcrypt.compare(password, hashedPassword);
 }

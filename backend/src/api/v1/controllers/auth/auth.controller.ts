@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import { registerUser } from '../../services/auth.service.js';
+import { loginUser, registerUser } from '../../services/auth.service.js';
 
 export async function register(req: Request, res: Response) {
   try {
@@ -21,6 +21,31 @@ export async function register(req: Request, res: Response) {
 
     res.status(500).json({
       message: 'Đăng ký thất bại',
+    });
+  }
+}
+
+export async function login(req: Request, res: Response) {
+  try {
+    const result = await loginUser(req.body);
+
+    if (!result.success) {
+      res.status(401).json({
+        message: result.message,
+      });
+      return;
+    }
+
+    res.status(200).json({
+      message: 'Đăng nhập thành công',
+      accessToken: result.accessToken,
+      user: result.user,
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+
+    res.status(500).json({
+      message: 'Đăng nhập thất bại',
     });
   }
 }

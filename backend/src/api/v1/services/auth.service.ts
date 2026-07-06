@@ -1,6 +1,7 @@
 import { prisma } from '../../../config/prisma.js';
-import { hashPassword } from '../../../utils/password.util.js';
-import type { RegisterInput } from '../validators/auth/auth.validate.js';
+import { generateAccessToken } from '../../../utils/jwt.util.js';
+import { comparePassword, hashPassword } from '../../../utils/password.util.js';
+import type { LoginInput, RegisterInput } from '../validators/auth/auth.validate.js';
 
 export async function registerUser(input: RegisterInput) {
   const existingUser = await prisma.user.findUnique({
@@ -36,5 +37,53 @@ export async function registerUser(input: RegisterInput) {
   return {
     success: true,
     user,
+  };
+}
+
+export async function loginUser(input: LoginInput) {
+  const user = await prisma.user.findUnique({
+    where: {
+      email: input.email,
+    },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      password: true,
+      role: true,
+    },
+  });
+
+  if (!user) {
+    return {
+      success: false,
+      message: 'Email hoặc mật khẩu không đúng',
+    };
+  }
+
+  const isPasswordValid = await comparePassword(input.password, user.password);
+
+  if (!isPasswordValid) {
+    return {
+      success: false,
+      message: 'Email hoặc mật khẩu không đúng',
+    };
+  }
+
+  const accessToken = generateAccessToken({
+    userId: user.id,
+    email: user.email,
+    role: user.role,
+  });
+
+  return {
+    success: true,
+    accessToken,
+    user: {
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      role: user.role,
+    },
   };
 }
