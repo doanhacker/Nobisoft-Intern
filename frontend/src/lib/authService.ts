@@ -101,10 +101,21 @@ export function isAuthenticated(): boolean {
  * Persists token and user to localStorage on success.
  */
 export async function loginApi(payload: LoginPayload): Promise<AuthResponse> {
-  const { data } = await axiosClient.post<AuthResponse>('/auth/login', payload)
-  setToken(data.access_token)
-  setUser(data.user)
-  return data
+  // MOCK: Simulate network delay and successful response
+  await new Promise((resolve) => setTimeout(resolve, 800))
+  
+  const mockData: AuthResponse = {
+    access_token: 'mock_jwt_token_123456789',
+    user: {
+      id: 'usr_001',
+      name: payload.email.split('@')[0],
+      email: payload.email,
+    },
+  }
+  
+  setToken(mockData.access_token)
+  setUser(mockData.user)
+  return mockData
 }
 
 /**
@@ -112,10 +123,21 @@ export async function loginApi(payload: LoginPayload): Promise<AuthResponse> {
  * Persists token and user to localStorage on success.
  */
 export async function registerApi(payload: RegisterPayload): Promise<AuthResponse> {
-  const { data } = await axiosClient.post<AuthResponse>('/auth/register', payload)
-  setToken(data.access_token)
-  setUser(data.user)
-  return data
+  // MOCK: Simulate network delay and successful response
+  await new Promise((resolve) => setTimeout(resolve, 800))
+  
+  const mockData: AuthResponse = {
+    access_token: 'mock_jwt_token_987654321',
+    user: {
+      id: 'usr_002',
+      name: payload.name,
+      email: payload.email,
+    },
+  }
+  
+  setToken(mockData.access_token)
+  setUser(mockData.user)
+  return mockData
 }
 
 /**
