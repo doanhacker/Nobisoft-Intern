@@ -34,7 +34,7 @@ export function validateUserListQuery(req: Request, res: Response, next: NextFun
     return;
   }
 
-  req.query = result.data as unknown as typeof req.query;
+  res.locals.query = result.data;
   next();
 }
 
@@ -63,6 +63,6 @@ export function validateSearchHistoryQuery(req: Request, res: Response, next: Ne
     return;
   }
 
-  req.query = queryResult.data as unknown as typeof req.query;
+  res.locals.query = queryResult.data;
   next();
 }

@@ -6,7 +6,7 @@ import { getUserList, getUserSearchHistory } from '../../services/user.service.j
 
 export async function getUsers(req: Request, res: Response) {
   try {
-    const query = req.query as unknown as UserListQuery;
+    const query = res.locals.query as UserListQuery;
     const result = await getUserList(query);
 
     if (!result.success) {
@@ -50,7 +50,7 @@ export async function getUsers(req: Request, res: Response) {
 export async function getSearchHistory(req: Request, res: Response) {
   try {
     const userId = req.params.userId as string;
-    const query = req.query as unknown as SearchHistoryQuery;
+    const query = res.locals.query as SearchHistoryQuery;
     const result = await getUserSearchHistory(userId, query);
 
     if (!result.success) {
