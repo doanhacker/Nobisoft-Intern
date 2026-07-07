@@ -1,4 +1,6 @@
 import type { Request, Response } from 'express';
+import type { LoginResponse, RegisterResponse } from '../../../../types/auth.type.js';
+import type { ApiResponse } from '../../../../types/apiResponse.js';
 import { loginUser, registerUser } from '../../services/auth.service.js';
 
 export async function register(req: Request, res: Response) {
@@ -6,22 +8,33 @@ export async function register(req: Request, res: Response) {
     const result = await registerUser(req.body);
 
     if (!result.success) {
-      res.status(409).json({
+      const response: ApiResponse = {
+        success: false,
         message: result.message,
-      });
+      };
+
+      res.status(409).json(response);
       return;
     }
 
-    res.status(201).json({
+    const response: ApiResponse<RegisterResponse> = {
+      success: true,
       message: 'Đăng ký thành công',
-      user: result.user,
-    });
+      data: {
+        user: result.user,
+      },
+    };
+
+    res.status(201).json(response);
   } catch (error) {
     console.error('Register error:', error);
 
-    res.status(500).json({
+    const response: ApiResponse = {
+      success: false,
       message: 'Đăng ký thất bại',
-    });
+    };
+
+    res.status(500).json(response);
   }
 }
 
@@ -30,22 +43,33 @@ export async function login(req: Request, res: Response) {
     const result = await loginUser(req.body);
 
     if (!result.success) {
-      res.status(401).json({
+      const response: ApiResponse = {
+        success: false,
         message: result.message,
-      });
+      };
+
+      res.status(401).json(response);
       return;
     }
 
-    res.status(200).json({
+    const response: ApiResponse<LoginResponse> = {
+      success: true,
       message: 'Đăng nhập thành công',
-      accessToken: result.accessToken,
-      user: result.user,
-    });
+      data: {
+        accessToken: result.accessToken,
+        user: result.user,
+      },
+    };
+
+    res.status(200).json(response);
   } catch (error) {
     console.error('Login error:', error);
 
-    res.status(500).json({
+    const response: ApiResponse = {
+      success: false,
       message: 'Đăng nhập thất bại',
-    });
+    };
+
+    res.status(500).json(response);
   }
 }

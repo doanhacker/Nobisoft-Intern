@@ -1,9 +1,10 @@
 import { prisma } from '../../../config/prisma.js';
+import type { LoginServiceResult, RegisterServiceResult } from '../../../types/auth.type.js';
 import { generateAccessToken } from '../../../utils/jwt.util.js';
 import { comparePassword, hashPassword } from '../../../utils/password.util.js';
 import type { LoginInput, RegisterInput } from '../validators/auth/auth.validate.js';
 
-export async function registerUser(input: RegisterInput) {
+export async function registerUser(input: RegisterInput): Promise<RegisterServiceResult> {
   const existingUser = await prisma.user.findUnique({
     where: {
       email: input.email,
@@ -40,7 +41,7 @@ export async function registerUser(input: RegisterInput) {
   };
 }
 
-export async function loginUser(input: LoginInput) {
+export async function loginUser(input: LoginInput): Promise<LoginServiceResult> {
   const user = await prisma.user.findUnique({
     where: {
       email: input.email,
