@@ -1,9 +1,10 @@
+
 import app from './app.js';
 import http from 'http';
 import { connectDatabase } from './config/prisma.js';
 
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8000;
 
 const server = http.createServer(app);
 
