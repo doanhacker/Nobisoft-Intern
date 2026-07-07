@@ -37,7 +37,9 @@ export async function registerUser(input: RegisterInput): Promise<RegisterServic
 
   return {
     success: true,
-    user,
+    data: {
+      user,
+    },
   };
 }
 
@@ -72,19 +74,21 @@ export async function loginUser(input: LoginInput): Promise<LoginServiceResult> 
   }
 
   const accessToken = generateAccessToken({
-    userId: user.id,
+    id: user.id,
     email: user.email,
     role: user.role,
   });
 
   return {
     success: true,
-    accessToken,
-    user: {
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      role: user.role,
+    data: {
+      accessToken,
+      user: {
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+      },
     },
   };
 }

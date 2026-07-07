@@ -13,7 +13,10 @@ services:
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
       - JWT_ACCESS_EXPIRES_IN=${JWT_ACCESS_EXPIRES_IN}
       - CORS_ORIGIN=*
-    command: sh -c "npx prisma db push && npm start"
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_NAME=${ADMIN_NAME}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+    command: sh -c "npx prisma db push && npm run seed:admin && npm start"
     depends_on:
       database:
         condition: service_healthy

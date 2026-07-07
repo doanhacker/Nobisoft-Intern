@@ -1,9 +1,17 @@
+import type { ApiResponse } from './apiResponse.js';
+
 export type AuthRole = 'USER' | 'ADMIN';
 
 export interface AuthUser {
   id: string;
   email: string;
   name: string;
+  role: AuthRole;
+}
+
+export interface JwtPayload {
+  id: string;
+  email: string;
   role: AuthRole;
 }
 
@@ -29,10 +37,19 @@ export interface LoginResponse {
   user: AuthUser;
 }
 
+export type AuthCheckResponse = null;
+
+export type AdminDashboardResponse = null;
+
+export type RegisterApiResponse = ApiResponse<RegisterResponse>;
+export type LoginApiResponse = ApiResponse<LoginResponse>;
+export type AuthCheckApiResponse = ApiResponse<AuthCheckResponse>;
+export type AdminDashboardApiResponse = ApiResponse<AdminDashboardResponse>;
+
 export type RegisterServiceResult =
   | {
       success: true;
-      user: RegisterResponse['user'];
+      data: RegisterResponse;
     }
   | {
       success: false;
@@ -42,8 +59,7 @@ export type RegisterServiceResult =
 export type LoginServiceResult =
   | {
       success: true;
-      accessToken: string;
-      user: AuthUser;
+      data: LoginResponse;
     }
   | {
       success: false;
