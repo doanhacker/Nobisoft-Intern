@@ -1,5 +1,5 @@
 import type { Request, Response } from 'express';
-import type { LoginResponse, RegisterResponse } from '../../../../types/auth.type.js';
+import type { LoginApiResponse, RegisterApiResponse } from '../../../../types/auth.type.js';
 import type { ApiResponse } from '../../../../types/apiResponse.js';
 import { loginUser, registerUser } from '../../services/auth.service.js';
 
@@ -17,12 +17,10 @@ export async function register(req: Request, res: Response) {
       return;
     }
 
-    const response: ApiResponse<RegisterResponse> = {
+    const response: RegisterApiResponse = {
       success: true,
       message: 'Đăng ký thành công',
-      data: {
-        user: result.user,
-      },
+      data: result.data,
     };
 
     res.status(201).json(response);
@@ -52,13 +50,10 @@ export async function login(req: Request, res: Response) {
       return;
     }
 
-    const response: ApiResponse<LoginResponse> = {
+    const response: LoginApiResponse = {
       success: true,
       message: 'Đăng nhập thành công',
-      data: {
-        accessToken: result.accessToken,
-        user: result.user,
-      },
+      data: result.data,
     };
 
     res.status(200).json(response);

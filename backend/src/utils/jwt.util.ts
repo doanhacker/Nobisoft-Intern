@@ -1,12 +1,7 @@
 import jwt from 'jsonwebtoken';
+import type { JwtPayload } from '../types/auth.type.js';
 
-interface AccessTokenPayload {
-  userId: string;
-  email: string;
-  role: string;
-}
-
-export function generateAccessToken(payload: AccessTokenPayload) {
+export function generateAccessToken(payload: JwtPayload) {
   const secret = process.env.JWT_ACCESS_SECRET;
   const expiresIn = (process.env.JWT_ACCESS_EXPIRES_IN ?? '24h') as Exclude<
     jwt.SignOptions['expiresIn'],
