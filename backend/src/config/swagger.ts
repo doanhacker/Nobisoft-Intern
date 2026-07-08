@@ -46,7 +46,12 @@ const options: swaggerJsdoc.Options = {
           properties: {
             email: { type: 'string', format: 'email', example: 'user@example.com' },
             name: { type: 'string', example: 'Nguyễn Văn A' },
-            password: { type: 'string', format: 'password', example: 'StrongP@ss1' },
+            password: {
+              type: 'string',
+              format: 'password',
+              example: 'StrongP@ss1',
+              description: 'Mật khẩu phải tối thiểu 8 ký tự bao gồm chữ hoa, chữ thường, chữ số và ký tự đặc biệt',
+            },
           },
         },
         LoginRequest: {

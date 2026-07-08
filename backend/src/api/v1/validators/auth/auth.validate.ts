@@ -1,6 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
 import { strongPasswordSchema } from '../../../../utils/password.util.js';
+import type { ApiResponse } from '../../../../types/apiResponse.js';
 
 export const registerSchema = z.object({
   email: z
@@ -12,7 +13,7 @@ export const registerSchema = z.object({
     .string()
     .trim()
     .min(1, 'Tên không được để trống')
-    .transform((name) => name.replace(/\s+/g, ' ')), // Chuẩn hóa nhiều khoảng trắng thành 1 khoảng trắng.
+    .transform((name) => name.replace(/\s+/g, ' ')),
   password: strongPasswordSchema,
 });
 
@@ -28,15 +29,20 @@ export const loginSchema = z.object({
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 
+function buildValidationErrorResponse(error: z.ZodError, fallbackMessage: string): ApiResponse {
+  return {
+    success: false,
+    message: error.issues[0]?.message ?? fallbackMessage,
+  };
+}
+
 export function validateRegister(req: Request, res: Response, next: NextFunction) {
   const result = registerSchema.safeParse(req.body);
 
   if (!result.success) {
-    const message = result.error.issues[0]?.message ?? 'Dữ liệu đăng ký không hợp lệ';
+    const response = buildValidationErrorResponse(result.error, 'Dữ liệu đăng ký không hợp lệ');
 
-    res.status(400).json({
-      message,
-    });
+    res.status(400).json(response);
     return;
   }
 
@@ -48,11 +54,9 @@ export function validateLogin(req: Request, res: Response, next: NextFunction) {
   const result = loginSchema.safeParse(req.body);
 
   if (!result.success) {
-    const message = result.error.issues[0]?.message ?? 'Dữ liệu đăng nhập không hợp lệ';
+    const response = buildValidationErrorResponse(result.error, 'Dữ liệu đăng nhập không hợp lệ');
 
-    res.status(400).json({
-      message,
-    });
+    res.status(400).json(response);
     return;
   }
 
