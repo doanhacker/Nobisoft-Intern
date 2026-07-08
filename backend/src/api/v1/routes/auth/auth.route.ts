@@ -57,13 +57,13 @@ authRouter.post('/register', validateRegister, authController.register);
  *             schema:
  *               $ref: '#/components/schemas/LoginResponse'
  *       400:
- *         description: Sai email hoặc mật khẩu
+ *         description: Dữ liệu đăng nhập không hợp lệ
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
- *         description: Chưa đăng nhập
+ *         description: Email hoặc mật khẩu không đúng
  *         content:
  *           application/json:
  *             schema:
