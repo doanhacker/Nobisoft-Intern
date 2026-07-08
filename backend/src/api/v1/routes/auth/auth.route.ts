@@ -29,6 +29,17 @@ const authRouter = Router();
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *             examples:
+ *               invalidPasswordFormat:
+ *                 summary: Mật khẩu không đúng định dạng
+ *                 value:
+ *                   success: false
+ *                   message: Mật khẩu phải tối thiểu 8 ký tự bao gồm chữ hoa, chữ thường, chữ số và ký tự đặc biệt
+ *               passwordTooLong:
+ *                 summary: Mật khẩu vượt quá độ dài cho phép
+ *                 value:
+ *                   success: false
+ *                   message: Mật khẩu vượt quá độ dài cho phép
  *       409:
  *         description: Email đã tồn tại
  *         content:
