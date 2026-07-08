@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getUsers, getSearchHistory } from '../../controllers/admin/user.controller.js';
+import * as userController from '../../controllers/admin/user.controller.js';
 import { validateUserListQuery, validateSearchHistoryQuery } from '../../validators/admin/user.validate.js';
 
 const userRouter = Router();
@@ -67,7 +67,7 @@ const userRouter = Router();
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-userRouter.get('/', validateUserListQuery, getUsers);
+userRouter.get('/', validateUserListQuery, userController.getUsers);
 
 /**
  * @swagger
@@ -145,6 +145,6 @@ userRouter.get('/', validateUserListQuery, getUsers);
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-userRouter.get('/:userId/search-history', validateSearchHistoryQuery, getSearchHistory);
+userRouter.get('/:userId/search-history', validateSearchHistoryQuery, userController.getSearchHistory);
 
 export default userRouter;
