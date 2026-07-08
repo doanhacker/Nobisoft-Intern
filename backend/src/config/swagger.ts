@@ -50,7 +50,7 @@ const options: swaggerJsdoc.Options = {
               type: 'string',
               format: 'password',
               example: 'StrongP@ss1',
-              description: 'Mật khẩu phải tối thiểu 8 ký tự bao gồm chữ hoa, chữ thường, chữ số và ký tự đặc biệt',
+              description: 'Mật khẩu phải tối thiểu 8 ký tự, bao gồm chữ hoa, chữ thường, chữ số, ký tự đặc biệt và không vượt quá độ dài cho phép',
             },
           },
         },
