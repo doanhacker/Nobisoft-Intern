@@ -70,7 +70,7 @@ function DropZone({
   return (
     <div
       className={cn(
-        "relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-10 text-center transition-all duration-200",
+        "relative flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-6 sm:p-10 text-center transition-all duration-200",
         isDragging
           ? "border-primary bg-primary/5 scale-[1.01]"
           : "border-border bg-muted/30 hover:bg-muted/50 hover:border-primary/50",
@@ -101,20 +101,20 @@ function DropZone({
       />
       
       <div className={cn(
-        "rounded-full p-4 mb-4 transition-colors",
+        "rounded-full p-3 sm:p-4 mb-3 sm:mb-4 transition-colors",
         isDragging ? "bg-primary/20 text-primary" : "bg-background shadow-sm text-muted-foreground"
       )}>
-        <UploadCloud className="size-8" />
+        <UploadCloud className="size-6 sm:size-8" />
       </div>
       
-      <h3 className="text-lg font-semibold mb-1">
+      <h3 className="text-base sm:text-lg font-semibold mb-1">
         Kéo thả ảnh vào đây
       </h3>
-      <p className="text-sm text-muted-foreground mb-6">
-        hoặc click để chọn từ thiết bị (JPG, PNG, WebP &lt; {maxSizeMB}MB)
+      <p className="text-xs sm:text-sm text-muted-foreground mb-4 sm:mb-6">
+        hoặc click để chọn — JPG, PNG, WebP &lt; {maxSizeMB}MB
       </p>
 
-      <Button variant={isDragging ? "brand" : "secondary"} className="pointer-events-none">
+      <Button variant={isDragging ? "brand" : "secondary"} className="pointer-events-none" size="sm">
         Chọn tệp
       </Button>
 

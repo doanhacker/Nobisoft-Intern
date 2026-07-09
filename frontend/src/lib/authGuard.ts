@@ -1,5 +1,5 @@
 import { redirect } from '@tanstack/react-router'
-import { isAuthenticated } from './authService'
+import { isAuthenticated } from '../services/authService'
 
 // ============================================================
 // Auth guard helpers for TanStack Router `beforeLoad`

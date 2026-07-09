@@ -60,7 +60,9 @@ function SearchModeToggle({
       role="tablist"
       aria-label="Chế độ tìm kiếm"
       className={cn(
-        "inline-flex items-center rounded-xl bg-muted/70 p-1 gap-0.5",
+        "flex items-center rounded-xl bg-muted/70 p-1 gap-0.5",
+        // On mobile: stretch full width so tabs split evenly; from sm: shrink to content
+        "w-full sm:w-auto sm:inline-flex",
         className
       )}
     >
@@ -79,7 +81,8 @@ function SearchModeToggle({
             title={mode.description}
             className={cn(
               // Base styles
-              "relative inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm font-medium",
+              "relative inline-flex flex-1 sm:flex-none items-center justify-center gap-1.5 sm:gap-2",
+              "rounded-lg px-2 sm:px-3 py-1.5 text-sm font-medium",
               "transition-all duration-150 outline-none select-none",
               "focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1",
               // Inactive
@@ -89,8 +92,8 @@ function SearchModeToggle({
                 "bg-white text-primary shadow-sm",
                 "shadow-[0_1px_3px_oklch(0.52_0.22_268/0.15),0_0_0_1px_oklch(0.88_0.025_270)]",
               ],
-              // Compact mode: hide label on mobile
-              compact && "px-2.5"
+              // Compact mode override
+              compact && "px-2"
             )}
           >
             <Icon
@@ -99,8 +102,12 @@ function SearchModeToggle({
                 isActive ? "text-primary" : "text-muted-foreground"
               )}
             />
-            <span className={cn(compact && "hidden sm:inline")}>
-              {compact ? mode.shortLabel : mode.label}
+            {/* Mobile: shortLabel always visible; sm+: respect compact prop */}
+            <span className="inline sm:hidden text-xs">
+              {mode.shortLabel}
+            </span>
+            <span className={cn("hidden sm:inline", compact && "sm:hidden")}>
+              {mode.label}
             </span>
             {/* Active indicator dot */}
             {isActive && (

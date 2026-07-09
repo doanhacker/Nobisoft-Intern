@@ -20,17 +20,47 @@ import {
   CardTitle,
 } from "@/components/ui/card"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog"
+import { Spinner } from "@/components/ui/spinner"
+import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip"
+import { AnimatedBackground } from "@/components/ui/AnimatedBackground"
+import { ImageUploadZone } from "@/components/search/ImageUploadZone"
+import { SearchBar } from "@/components/search/SearchBar"
+import { TextSearchInput } from "@/components/search/TextSearchInput"
+import { ImageDetailModal } from "@/components/results/ImageDetailModal"
+import { ImageResultCard } from "@/components/results/ImageResultCard"
+import { MasonryGrid, type SearchResult } from "@/components/results/MasonryGrid"
+import { SkeletonGrid } from "@/components/results/SkeletonGrid"
+
+const mockResult: SearchResult = {
+  id: '1',
+  thumbnailUrl: 'https://images.unsplash.com/photo-1682687220742-aba13b6e50ba?w=500&q=80',
+  fullUrl: 'https://images.unsplash.com/photo-1682687220742-aba13b6e50ba',
+  title: 'Beautiful mountain landscape at sunset',
+  similarityScore: 0.95,
+  aspectRatio: '1.5',
+  ocrText: 'Sunset 2023',
+  source: 'Unsplash'
+}
+
+const mockResults: SearchResult[] = [
+  mockResult,
+  { ...mockResult, id: '2', similarityScore: 0.7, aspectRatio: '0.8', title: 'Vertical image' },
+  { ...mockResult, id: '3', similarityScore: 0.4, aspectRatio: '1.2', title: 'Another landscape' }
+]
 
 export function StyleGuide() {
   const [searchMode, setSearchMode] = React.useState<SearchMode>("image")
+  const [isModalOpen, setIsModalOpen] = React.useState(false)
   const { theme, resolvedTheme } = useTheme()
 
   return (
-    <div className="min-h-screen bg-background text-foreground p-8 pb-20">
-      <div className="max-w-5xl mx-auto space-y-16">
+    <div className="min-h-screen bg-background text-foreground p-4 sm:p-8 pb-20 relative overflow-hidden">
+      <AnimatedBackground subtle />
+      <div className="max-w-5xl mx-auto space-y-12 sm:space-y-16 relative z-10">
         <header className="space-y-4">
-          <h1 className="text-display font-bold text-gradient-brand">Design System</h1>
-          <p className="text-lg text-muted-foreground">
+          <h1 className="text-4xl sm:text-5xl lg:text-display font-bold text-gradient-brand">Design System</h1>
+          <p className="text-base sm:text-lg text-muted-foreground">
             Visual Search Engine — W1 UI Components & Tokens (Indigo/Violet)
           </p>
         </header>
@@ -106,34 +136,34 @@ export function StyleGuide() {
         {/* --- Typography --- */}
         <section className="space-y-6">
           <h2 className="text-2xl font-semibold">2. Typography (Geist Variable)</h2>
-          <div className="space-y-4 bg-card border border-border rounded-xl p-6">
-            <div className="flex items-baseline gap-4">
-              <span className="w-24 text-sm text-muted-foreground">Display</span>
-              <span className="text-display font-bold">Search Beyond Words</span>
+          <div className="space-y-4 bg-card border border-border rounded-xl p-4 sm:p-6">
+            <div className="flex flex-wrap items-baseline gap-2 sm:gap-4">
+              <span className="w-16 sm:w-24 text-xs sm:text-sm text-muted-foreground shrink-0">Display</span>
+              <span className="text-2xl sm:text-display font-bold">Search Beyond Words</span>
             </div>
-            <div className="flex items-baseline gap-4">
-              <span className="w-24 text-sm text-muted-foreground">H1</span>
-              <h1 className="text-4xl font-semibold">Visual Search Engine</h1>
+            <div className="flex flex-wrap items-baseline gap-2 sm:gap-4">
+              <span className="w-16 sm:w-24 text-xs sm:text-sm text-muted-foreground shrink-0">H1</span>
+              <h1 className="text-2xl sm:text-4xl font-semibold">Visual Search Engine</h1>
             </div>
-            <div className="flex items-baseline gap-4">
-              <span className="w-24 text-sm text-muted-foreground">H2</span>
-              <h2 className="text-3xl font-semibold">Kết quả tìm kiếm</h2>
+            <div className="flex flex-wrap items-baseline gap-2 sm:gap-4">
+              <span className="w-16 sm:w-24 text-xs sm:text-sm text-muted-foreground shrink-0">H2</span>
+              <h2 className="text-xl sm:text-3xl font-semibold">Kết quả tìm kiếm</h2>
             </div>
-            <div className="flex items-baseline gap-4">
-              <span className="w-24 text-sm text-muted-foreground">H3</span>
-              <h3 className="text-2xl font-medium">Chi tiết hình ảnh</h3>
+            <div className="flex flex-wrap items-baseline gap-2 sm:gap-4">
+              <span className="w-16 sm:w-24 text-xs sm:text-sm text-muted-foreground shrink-0">H3</span>
+              <h3 className="text-lg sm:text-2xl font-medium">Chi tiết hình ảnh</h3>
             </div>
-            <div className="flex items-baseline gap-4">
-              <span className="w-24 text-sm text-muted-foreground">Body Lg</span>
-              <p className="text-lg">Khám phá hàng triệu hình ảnh tương tự chỉ bằng một cú click.</p>
+            <div className="flex flex-wrap items-baseline gap-2 sm:gap-4">
+              <span className="w-16 sm:w-24 text-xs sm:text-sm text-muted-foreground shrink-0">Body Lg</span>
+              <p className="text-base sm:text-lg">Khám phá hàng triệu hình ảnh tương tự chỉ bằng một cú click.</p>
             </div>
-            <div className="flex items-baseline gap-4">
-              <span className="w-24 text-sm text-muted-foreground">Body</span>
-              <p className="text-base">Hệ thống hỗ trợ tìm kiếm bằng hình ảnh, ngữ nghĩa và nhận dạng chữ (OCR).</p>
+            <div className="flex flex-wrap items-baseline gap-2 sm:gap-4">
+              <span className="w-16 sm:w-24 text-xs sm:text-sm text-muted-foreground shrink-0">Body</span>
+              <p className="text-sm sm:text-base">Hệ thống hỗ trợ tìm kiếm bằng hình ảnh, ngữ nghĩa và nhận dạng chữ (OCR).</p>
             </div>
-            <div className="flex items-baseline gap-4">
-              <span className="w-24 text-sm text-muted-foreground">Caption</span>
-              <span className="text-sm text-muted-foreground">JPG, PNG, WebP &lt; 10MB</span>
+            <div className="flex flex-wrap items-baseline gap-2 sm:gap-4">
+              <span className="w-16 sm:w-24 text-xs sm:text-sm text-muted-foreground shrink-0">Caption</span>
+              <span className="text-xs sm:text-sm text-muted-foreground">JPG, PNG, WebP &lt; 10MB</span>
             </div>
           </div>
         </section>
@@ -203,9 +233,126 @@ export function StyleGuide() {
           </div>
         </section>
 
+        {/* --- Advanced UI Components --- */}
+        <section className="space-y-6">
+          <h2 className="text-2xl font-semibold">5. Advanced UI Components</h2>
+          
+          <div className="grid md:grid-cols-2 gap-8">
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Dialog</h3>
+              <Dialog>
+                <DialogTrigger asChild>
+                  <Button>Open Dialog</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Example Dialog</DialogTitle>
+                    <DialogDescription>
+                      This is an example dialog to show the design pattern.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="py-4">Dialog content goes here.</div>
+                  <DialogFooter>
+                    <Button variant="outline">Cancel</Button>
+                    <Button>Save</Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Tooltip & Spinner</h3>
+              <div className="flex items-center gap-6">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline">Hover me</Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>This is a tooltip</p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+
+                <div className="flex items-center gap-2 bg-card border border-border p-3 rounded-lg shadow-sm">
+                  <Spinner size="md" />
+                  <span className="text-sm font-medium">Loading...</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <Separator />
+
+        {/* --- Full Search Components --- */}
+        <section className="space-y-6">
+          <h2 className="text-2xl font-semibold">6. Full Search Components</h2>
+          
+          <div className="space-y-8">
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Search Bar (Master Component)</h3>
+              <SearchBar onSearch={(state) => console.log('Search:', state)} />
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-8">
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Image Upload Zone</h3>
+                <ImageUploadZone onImageSelect={(file, url) => console.log(file, url)} onClear={() => {}} />
+              </div>
+              <div className="space-y-4">
+                <h3 className="text-lg font-medium">Text Search Input</h3>
+                <TextSearchInput mode="semantic" value="" onChange={() => {}} onSearch={() => {}} />
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <Separator />
+
+        {/* --- Results Components --- */}
+        <section className="space-y-6">
+          <h2 className="text-2xl font-semibold">7. Results Components</h2>
+          
+          <div className="space-y-8">
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Image Result Card</h3>
+              <div className="w-64">
+                <ImageResultCard 
+                  result={mockResult} 
+                  onClick={() => setIsModalOpen(true)} 
+                  onSearchSimilar={() => {}} 
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Masonry Grid</h3>
+              <MasonryGrid 
+                results={mockResults} 
+                onCardClick={() => setIsModalOpen(true)} 
+                onSearchSimilar={() => {}} 
+              />
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Skeleton Grid (Loading State)</h3>
+              <SkeletonGrid count={8} />
+            </div>
+            
+            <ImageDetailModal 
+              result={isModalOpen ? mockResult : null} 
+              onClose={() => setIsModalOpen(false)} 
+              onSearchSimilar={() => setIsModalOpen(false)} 
+            />
+          </div>
+        </section>
+
+        <Separator />
+
         {/* --- Base Components --- */}
         <section className="space-y-6">
-          <h2 className="text-2xl font-semibold">5. Data Display & Inputs</h2>
+          <h2 className="text-2xl font-semibold">8. Data Display & Inputs</h2>
           
           <div className="grid md:grid-cols-2 gap-8">
             <Card className="shadow-card-hover interactive">
