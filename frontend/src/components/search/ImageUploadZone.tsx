@@ -93,7 +93,7 @@ export function ImageUploadZone({
           <img
             src={preview}
             alt="Preview"
-            className="w-full max-h-64 object-contain bg-muted/30"
+            className="w-full max-h-48 sm:max-h-64 object-contain bg-muted/30"
           />
           {/* Overlay on hover */}
           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-3">
@@ -109,14 +109,14 @@ export function ImageUploadZone({
 
         {/* File info bar */}
         <div className="mt-2 flex items-center justify-between px-1">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <CheckCircle2 className="size-3.5 text-green-500" />
-            <span className="truncate max-w-[200px]">{fileName}</span>
+          <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+            <CheckCircle2 className="size-3.5 text-green-500 shrink-0" />
+            <span className="truncate">{fileName}</span>
           </div>
           <button
             type="button"
             onClick={handleClear}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-destructive transition-colors shrink-0 ml-2"
           >
             <X className="size-3.5" /> Xoá
           </button>
@@ -140,8 +140,8 @@ export function ImageUploadZone({
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         className={cn(
-          'relative flex flex-col items-center justify-center gap-4 rounded-2xl border-2 border-dashed',
-          'min-h-[200px] cursor-pointer transition-all duration-300',
+          'relative flex flex-col items-center justify-center gap-3 sm:gap-4 rounded-2xl border-2 border-dashed',
+          'min-h-[160px] sm:min-h-[200px] cursor-pointer transition-all duration-300',
           'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
           !disabled && 'hover:border-primary/60 hover:bg-primary/3',
           isDragging && 'upload-zone-active',
@@ -158,21 +158,21 @@ export function ImageUploadZone({
         {/* Icon */}
         <div
           className={cn(
-            'relative h-16 w-16 rounded-2xl flex items-center justify-center transition-all duration-300',
+            'relative h-12 w-12 sm:h-16 sm:w-16 rounded-2xl flex items-center justify-center transition-all duration-300',
             isDragging
               ? 'gradient-brand scale-110 shadow-brand glow-brand'
               : 'bg-muted border border-border/60',
           )}
         >
           {isDragging ? (
-            <CloudUpload className="size-8 text-white animate-bounce" />
+            <CloudUpload className="size-6 sm:size-8 text-white animate-bounce" />
           ) : (
-            <ImageIcon className="size-8 text-muted-foreground" />
+            <ImageIcon className="size-6 sm:size-8 text-muted-foreground" />
           )}
         </div>
 
         {/* Text */}
-        <div className="text-center space-y-1 px-4">
+        <div className="text-center space-y-1 px-3 sm:px-4">
           {isDragging ? (
             <p className="text-base font-semibold text-primary animate-fade-in">
               Thả ảnh vào đây!

@@ -8,7 +8,7 @@ import {
   type LoginPayload,
   type RegisterPayload,
   type User,
-} from '@/lib/authService'
+} from '@/services/authService'
 
 // ============================================================
 // Types

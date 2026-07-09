@@ -76,12 +76,14 @@ export function SearchBar({ onSearch, isLoading = false, className, compact = fa
         }}
       />
 
-      <div className="relative z-10 flex flex-col gap-6">
+      <div className="relative z-10 flex flex-col gap-4 sm:gap-6">
         {/* ── Mode toggle ── */}
-        <SearchModeToggle value={mode} onChange={handleModeChange} />
+        <div className="overflow-x-auto -mx-1 px-1">
+          <SearchModeToggle value={mode} onChange={handleModeChange} />
+        </div>
 
         {/* ── Input area (animated transition) ── */}
-        <div className="min-h-[120px]">
+        <div className="min-h-[100px] sm:min-h-[120px]">
           {mode === 'image' ? (
             <div className="animate-fade-in" key="image-zone">
               <ImageUploadZone
@@ -96,8 +98,8 @@ export function SearchBar({ onSearch, isLoading = false, className, compact = fa
                   onClick={handleSearch}
                   disabled={!canSearch || isLoading}
                   className={cn(
-                    'mt-4 w-full flex items-center justify-center gap-2 py-3 px-6 rounded-xl',
-                    'font-semibold text-base transition-all duration-200',
+                    'mt-4 w-full flex items-center justify-center gap-2 py-2.5 sm:py-3 px-6 rounded-xl',
+                    'font-semibold text-sm sm:text-base transition-all duration-200',
                     'gradient-brand text-white glow-brand',
                     'hover:shadow-[0_0_28px_oklch(0.52_0.22_268/0.5)]',
                     'active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed',
