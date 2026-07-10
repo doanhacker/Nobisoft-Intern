@@ -18,7 +18,7 @@ export interface User {
 }
 
 export interface AuthResponse {
-  access_token: string
+  accessToken: string
   user: User
 }
 
@@ -96,26 +96,31 @@ export function isAuthenticated(): boolean {
 // API calls
 // ============================================================
 
+export interface LoginApiResponse {
+  success: boolean
+  message: string
+  data: AuthResponse
+}
+
+export interface RegisterApiResponse {
+  success: boolean
+  message: string
+  data: {
+    user: User
+  }
+}
+
 /**
  * Login with email + password.
  * Persists token and user to localStorage on success.
  */
 export async function loginApi(payload: LoginPayload): Promise<AuthResponse> {
-  // MOCK: Simulate network delay and successful response
-  await new Promise((resolve) => setTimeout(resolve, 800))
+  const response = await axiosClient.post<LoginApiResponse>('/auth/login', payload)
+  const data = response.data.data
   
-  const mockData: AuthResponse = {
-    access_token: 'mock_jwt_token_123456789',
-    user: {
-      id: 'usr_001',
-      name: payload.email.split('@')[0],
-      email: payload.email,
-    },
-  }
-  
-  setToken(mockData.access_token)
-  setUser(mockData.user)
-  return mockData
+  setToken(data.accessToken)
+  setUser(data.user)
+  return data
 }
 
 /**
@@ -123,21 +128,9 @@ export async function loginApi(payload: LoginPayload): Promise<AuthResponse> {
  * Persists token and user to localStorage on success.
  */
 export async function registerApi(payload: RegisterPayload): Promise<AuthResponse> {
-  // MOCK: Simulate network delay and successful response
-  await new Promise((resolve) => setTimeout(resolve, 800))
+  await axiosClient.post<RegisterApiResponse>('/auth/register', payload)
   
-  const mockData: AuthResponse = {
-    access_token: 'mock_jwt_token_987654321',
-    user: {
-      id: 'usr_002',
-      name: payload.name,
-      email: payload.email,
-    },
-  }
-  
-  setToken(mockData.access_token)
-  setUser(mockData.user)
-  return mockData
+  return loginApi({ email: payload.email, password: payload.password })
 }
 
 /**

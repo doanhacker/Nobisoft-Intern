@@ -5,6 +5,8 @@ import {
   loginApi,
   logoutService,
   registerApi,
+  setToken as setTokenStorage,
+  setUser as setUserStorage,
   type LoginPayload,
   type RegisterPayload,
   type User,
@@ -22,6 +24,7 @@ interface AuthContextValue {
   login: (payload: LoginPayload) => Promise<void>
   register: (payload: RegisterPayload) => Promise<void>
   logout: () => void
+  loginAsGuest: () => void
 }
 
 // ============================================================
@@ -52,11 +55,28 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsLoading(true)
     try {
       const data = await loginApi(payload)
-      setToken(data.access_token)
+      setToken(data.accessToken)
       setUser(data.user)
     } finally {
       setIsLoading(false)
     }
+  }, [])
+
+  // ------------------------------------------------------------------
+  // loginAsGuest (bypass backend auth)
+  // ------------------------------------------------------------------
+  const loginAsGuest = React.useCallback(() => {
+    const mockUser: User = {
+      id: 'guest',
+      name: 'Guest User',
+      email: 'guest@nobisoft.com',
+    }
+    const mockToken = 'mock-guest-token'
+
+    setTokenStorage(mockToken)
+    setUserStorage(mockUser)
+    setToken(mockToken)
+    setUser(mockUser)
   }, [])
 
   // ------------------------------------------------------------------
@@ -66,7 +86,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setIsLoading(true)
     try {
       const data = await registerApi(payload)
-      setToken(data.access_token)
+      setToken(data.accessToken)
       setUser(data.user)
     } finally {
       setIsLoading(false)
@@ -91,8 +111,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       login,
       register,
       logout,
+      loginAsGuest,
     }),
-    [user, token, isAuthenticatedState, isLoading, login, register, logout],
+    [user, token, isAuthenticatedState, isLoading, login, register, logout, loginAsGuest],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
