@@ -17,11 +17,13 @@
     "dev": "tsx watch --env-file=.env src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "seed:admin": "tsx src/scripts/seed-admin.ts"
+    "seed:admin": "tsx src/scripts/seed-admin.ts",
+    "init:qdrant": "tsx src/scripts/init-qdrant.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
     "@prisma/client": "^7.8.0",
+    "@qdrant/js-client-rest": "^1.18.0",
     "bcrypt": "^6.0.0",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
