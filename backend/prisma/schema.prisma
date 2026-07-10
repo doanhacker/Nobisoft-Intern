@@ -40,6 +40,7 @@ model ImageMetadata {
   fileSize   Int
   fileFormat String   @db.VarChar(20)
   createdAt  DateTime @default(now()) @db.Timestamptz()
+  updatedAt  DateTime @updatedAt @db.Timestamptz()
 
   ocrResults      ImageOcr[]
   searchHistories SearchHistory[]
@@ -52,7 +53,7 @@ model ImageOcr {
   id              String @id @default(uuid()) @db.Uuid
   imageId         String @db.Uuid
   rawText         String @db.Text
-  language        String @db.VarChar(10)
+  normalizedText  String @db.Text
   confidenceScore Float
   boundingBoxes   Json?  @db.JsonB
 
@@ -77,6 +78,7 @@ model SearchHistory {
   queryText      String?    @db.Text
   clickedImageId String?    @db.Uuid
   createdAt      DateTime   @default(now()) @db.Timestamptz()
+  updatedAt      DateTime   @updatedAt @db.Timestamptz()
 
   user         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
   clickedImage ImageMetadata? @relation(fields: [clickedImageId], references: [id], onDelete: SetNull)
