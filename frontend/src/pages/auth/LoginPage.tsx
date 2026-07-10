@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { Eye, EyeOff, Loader2, LogIn, Sparkles } from 'lucide-react'
+import { Eye, EyeOff, Loader2, LogIn, Sparkles, Unlock } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 // ============================================================
 
 export function LoginPage() {
-  const { login, isLoading } = useAuth()
+  const { login, loginAsGuest, isLoading } = useAuth()
   const navigate = useNavigate()
 
   const [email, setEmail] = React.useState('')
@@ -34,6 +34,11 @@ export function LoginPage() {
         'Email hoặc mật khẩu không đúng. Vui lòng thử lại.'
       setError(msg)
     }
+  }
+
+  const handleBypassLogin = () => {
+    loginAsGuest()
+    navigate({ to: '/search' })
   }
 
   return (
@@ -192,6 +197,18 @@ export function LoginPage() {
               <span className="bg-background px-3 text-muted-foreground">hoặc</span>
             </div>
           </div>
+
+          {/* Bypass login button */}
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="w-full border-dashed border-primary/45 text-primary hover:bg-primary/5 hover:text-primary transition-all duration-200 gap-2"
+            onClick={handleBypassLogin}
+          >
+            <Unlock className="size-4" />
+            Vào không cần đăng nhập (Chế độ Demo)
+          </Button>
 
           {/* Register link */}
           <p className="text-center text-sm text-muted-foreground">
