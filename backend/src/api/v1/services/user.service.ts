@@ -1,4 +1,5 @@
 import { prisma } from '../../../config/prisma.js';
+import { removeVietnameseDiacritics } from '../../../utils/normalize.util.js';
 import type { UserListServiceResult, SearchHistoryServiceResult } from '../../../types/user.type.js';
 import type { UserListQuery, SearchHistoryQuery } from '../validators/admin/user.validate.js';
 
@@ -6,13 +7,15 @@ export async function getUserList(query: UserListQuery): Promise<UserListService
   const { page, limit, search } = query;
   const skip = (page - 1) * limit;
 
+  const normalizedSearch = search ? removeVietnameseDiacritics(search) : undefined;
+
   const where = {
     deletedAt: null as null,
-    ...(search
+    ...(normalizedSearch
       ? {
         OR: [
-          { email: { contains: search, mode: 'insensitive' as const } },
-          { name: { contains: search, mode: 'insensitive' as const } },
+          { email: { contains: normalizedSearch } },
+          { nameSearch: { contains: normalizedSearch } },
         ],
       }
       : {}),
