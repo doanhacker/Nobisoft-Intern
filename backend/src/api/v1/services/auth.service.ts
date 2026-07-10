@@ -1,6 +1,7 @@
 import { prisma } from '../../../config/prisma.js';
 import type { LoginServiceResult, RegisterServiceResult } from '../../../types/auth.type.js';
 import { generateAccessToken } from '../../../utils/jwt.util.js';
+import { removeVietnameseDiacritics } from '../../../utils/normalize.util.js';
 import { comparePassword, hashPassword } from '../../../utils/password.util.js';
 import type { LoginInput, RegisterInput } from '../validators/auth/auth.validate.js';
 
@@ -24,6 +25,7 @@ export async function registerUser(input: RegisterInput): Promise<RegisterServic
     data: {
       email: input.email,
       name: input.name,
+      nameSearch: removeVietnameseDiacritics(input.name),
       password: hashedPassword,
     },
     select: {
