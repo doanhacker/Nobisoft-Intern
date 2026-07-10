@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma.js';
 import { hashPassword } from '../utils/password.util.js';
+import { removeVietnameseDiacritics } from '../utils/normalize.util.js';
 
 const adminEmail = process.env.ADMIN_EMAIL?.trim().toLowerCase() || 'admin@gmail.com';
 const adminName = process.env.ADMIN_NAME?.trim() || 'Admin';
@@ -27,6 +28,7 @@ async function seedAdmin() {
     data: {
       email: adminEmail,
       name: adminName,
+      nameSearch: removeVietnameseDiacritics(adminName),
       password: hashedPassword,
       role: 'ADMIN',
     },

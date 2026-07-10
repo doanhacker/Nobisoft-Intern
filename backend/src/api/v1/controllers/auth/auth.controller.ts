@@ -31,7 +31,7 @@ export async function register(req: Request, res: Response) {
       success: false,
       message: 'Đăng ký thất bại',
     };
-
+    
     res.status(500).json(response);
   }
 }
