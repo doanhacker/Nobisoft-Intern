@@ -9,6 +9,7 @@ services:
       - NODE_ENV=production
       - DATABASE_URL=${DATABASE_URL}
       - AI_SERVICE_URL=${AI_SERVICE_URL}
+      - QDRANT_URL=${QDRANT_URL}
       - STORAGE_DIR=${STORAGE_DIR}
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
       - JWT_ACCESS_EXPIRES_IN=${JWT_ACCESS_EXPIRES_IN}
@@ -22,6 +23,8 @@ services:
         condition: service_healthy
       ai-service:
         condition: service_started
+      qdrant:
+        condition: service_healthy
     restart: unless-stopped
     volumes:
       - ./storage:/app/storage
@@ -62,6 +65,22 @@ services:
       timeout: 5s
       retries: 5
 
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: [ "CMD-SHELL", "bash -c ':> /dev/tcp/localhost/6333'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
 volumes:
   postgres_data:
+  qdrant_data:
   storage:
