@@ -27,10 +27,10 @@ export async function indexImages(files: IndexingFileInput[]): Promise<IndexingR
 
 async function indexSingleImage(file: IndexingFileInput): Promise<IndexingResult> {
   // 1. Gọi AI service → embedding + OCR + processDurationMs
-  const aiResponse = await processImage(file.buffer, file.originalname);
+  const aiResponse = await processImage(file.buffer, file.originalname, file.mimetype);
 
-  if (!aiResponse.success) {
-    throw new Error('AI service returned unsuccessful response');
+  if (!aiResponse.success || !aiResponse.data) {
+    throw new Error(aiResponse.error_message || 'AI service returned unsuccessful response');
   }
 
   const { embedding, ocrLines, processDurationMs } = aiResponse.data;

@@ -1,5 +1,6 @@
 import type { Request, Response } from 'express';
 import type { ApiResponse } from '../../../../types/apiResponse.js';
+import type { ImageListApiResponse, ImageDetailApiResponse } from '../../../../types/image.type.js';
 import type { ImageListQuery } from '../../validators/admin/image.validate.js';
 import * as imageService from '../../services/image.service.js';
 
@@ -8,7 +9,7 @@ export async function listImages(req: Request, res: Response) {
     const query = res.locals.query as ImageListQuery;
     const { images, total } = await imageService.getIndexedImages(query);
 
-    const response: ApiResponse<typeof images> = {
+    const response: ImageListApiResponse = {
       success: true,
       message: 'Lấy danh sách ảnh thành công',
       data: images,
@@ -46,7 +47,7 @@ export async function getImage(req: Request, res: Response) {
       return;
     }
 
-    const response: ApiResponse<typeof image> = {
+    const response: ImageDetailApiResponse = {
       success: true,
       message: 'Lấy chi tiết ảnh thành công',
       data: image,
