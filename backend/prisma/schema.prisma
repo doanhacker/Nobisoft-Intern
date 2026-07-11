@@ -18,49 +18,57 @@ model User {
   email      String    @unique @db.VarChar(50)
   password   String    @db.VarChar(255)
   name       String    @db.VarChar(50)
-  nameSearch String    @db.VarChar(50) // Tên không dấu, lowercase — dùng cho tìm kiếm
+  nameSearch String    @db.VarChar(50)
   role       Role      @default(USER)
   createdAt  DateTime  @default(now()) @db.Timestamptz()
   updatedAt  DateTime  @updatedAt @db.Timestamptz()
   deletedAt  DateTime? @db.Timestamptz()
 
   searchHistories SearchHistory[]
-  apiTrackings    ApiTracking[]
 
   @@index([nameSearch])
   @@map("users")
 }
 
-// Bảng lưu thông tin chi tiết của ảnh
-model ImageMetadata {
-  id                  String   @id @default(uuid()) @db.Uuid
-  path                String   @db.VarChar(500)
-  width               Int
-  height              Int
-  fileSize            Int
-  fileFormat          String   @db.VarChar(20)
-  embeddingDurationMs Int?
-  createdAt           DateTime @default(now()) @db.Timestamptz()
-  updatedAt           DateTime @updatedAt @db.Timestamptz()
+model Image {
+  id         String   @id @default(uuid()) @db.Uuid
+  path       String   @db.VarChar(500)
+  width      Int
+  height     Int
+  fileSize   Int
+  fileFormat String   @db.VarChar(20)
+  createdAt  DateTime @default(now()) @db.Timestamptz()
 
-  ocrResults      ImageOcr[]
+  imageIndex      ImageIndex?
   searchHistories SearchHistory[]
+  searchClicks    SearchClick[]
 
-  @@map("image_metadata")
+  @@map("images")
 }
 
-// Bảng lưu văn bản trích xuất (OCR) từ ảnh
+model ImageIndex {
+  id                String   @id @default(uuid()) @db.Uuid
+  imageId           String   @unique @db.Uuid
+  processDurationMs Int?
+  createdAt         DateTime @default(now()) @db.Timestamptz()
+
+  image    Image      @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  ocrLines ImageOcr[]
+
+  @@map("image_index")
+}
+
 model ImageOcr {
   id              String @id @default(uuid()) @db.Uuid
-  imageId         String @db.Uuid
+  imageIndexId    String @db.Uuid
   rawText         String @db.Text
   normalizedText  String @db.Text
   confidenceScore Float
   boundingBoxes   Json?  @db.JsonB
 
-  image ImageMetadata @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  imageIndex ImageIndex @relation(fields: [imageIndexId], references: [id], onDelete: Cascade)
 
-  @@index([imageId])
+  @@index([imageIndexId])
   @@map("image_ocr")
 }
 
@@ -70,19 +78,17 @@ enum SearchType {
   TEXT_OCR
 }
 
-// Lịch sử tìm kiếm & tương tác người dùng
 model SearchHistory {
-  id             String     @id @default(uuid()) @db.Uuid
-  userId         String?    @db.Uuid
-  searchType     SearchType
-  queryImagePath String?    @db.VarChar(500)
-  queryText      String?    @db.Text
-  clickedImageId String?    @db.Uuid
-  createdAt      DateTime   @default(now()) @db.Timestamptz()
-  updatedAt      DateTime   @updatedAt @db.Timestamptz()
+  id           String     @id @default(uuid()) @db.Uuid
+  userId       String?    @db.Uuid
+  searchType   SearchType
+  queryImageId String?    @db.Uuid
+  queryText    String?    @db.Text
+  createdAt    DateTime   @default(now()) @db.Timestamptz()
 
-  user         User?          @relation(fields: [userId], references: [id], onDelete: SetNull)
-  clickedImage ImageMetadata? @relation(fields: [clickedImageId], references: [id], onDelete: SetNull)
+  user       User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
+  queryImage Image?        @relation(fields: [queryImageId], references: [id], onDelete: SetNull)
+  clicks     SearchClick[]
 
   @@index([userId])
   @@index([searchType])
@@ -90,26 +96,16 @@ model SearchHistory {
   @@map("search_history")
 }
 
-// Bảng theo dõi hiệu suất hệ thống
-model ApiTracking {
-  id             String   @id @default(uuid()) @db.Uuid
-  method         String   @db.VarChar(10)
-  path           String   @db.VarChar(500)
-  statusCode     Int
-  responseTimeMs Int
-  ipAddress      String?  @db.VarChar(45)
-  userAgent      String?  @db.VarChar(500)
-  userId         String?  @db.Uuid
-  requestBody    Json?    @db.JsonB
-  responseBody   Json?    @db.JsonB
-  errorMessage   String?  @db.Text
-  createdAt      DateTime @default(now()) @db.Timestamptz()
+model SearchClick {
+  id              String   @id @default(uuid()) @db.Uuid
+  searchHistoryId String   @db.Uuid
+  clickedImageId  String   @db.Uuid
+  createdAt       DateTime @default(now()) @db.Timestamptz()
 
-  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+  searchHistory SearchHistory @relation(fields: [searchHistoryId], references: [id], onDelete: Cascade)
+  clickedImage  Image         @relation(fields: [clickedImageId], references: [id], onDelete: Cascade)
 
-  @@index([statusCode])
-  @@index([createdAt])
-  @@index([userId])
-  @@index([ipAddress])
-  @@map("api_tracking")
+  @@index([searchHistoryId])
+  @@index([clickedImageId])
+  @@map("search_clicks")
 }
