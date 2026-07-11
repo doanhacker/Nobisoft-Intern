@@ -15,6 +15,7 @@ export interface AiProcessImageResponse {
   data: {
     embedding: number[];
     ocrLines: AiOcrLine[];
+    processDurationMs: number;
   };
 }
 
