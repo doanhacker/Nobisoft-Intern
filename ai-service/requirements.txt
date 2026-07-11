@@ -1,5 +1,16 @@
+# === Web Framework ===
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
 pydantic-settings==2.7.1
+python-multipart>=0.0.9
+
+# === AI / CLIP ===
+torch>=2.1.0
+transformers>=4.36.0
+
+# === OCR ===
+easyocr>=1.7.0
+
+# === Image Processing ===
 numpy==2.2.1
 pillow==11.1.0
