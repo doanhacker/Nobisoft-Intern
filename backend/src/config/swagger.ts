@@ -14,6 +14,8 @@ const options: swaggerJsdoc.Options = {
     tags: [
       { name: 'Auth', description: 'Authentication (register / login)' },
       { name: 'Admin - Users', description: 'Admin user management' },
+      { name: 'Admin - Indexing', description: 'Admin image indexing' },
+      { name: 'Admin - Images', description: 'Admin image management' },
       { name: 'Client', description: 'Client-side endpoints' },
     ],
     components: {
@@ -144,6 +146,62 @@ const options: swaggerJsdoc.Options = {
               },
             },
             createdAt: { type: 'string', format: 'date-time' },
+          },
+        },
+
+        // ─── Admin - Indexing ───
+        IndexingResult: {
+          type: 'object',
+          properties: {
+            filename: { type: 'string', example: 'photo1.jpg' },
+            success: { type: 'boolean', example: true },
+            imageId: { type: 'string', format: 'uuid', nullable: true },
+            error: { type: 'string', nullable: true },
+          },
+        },
+
+        // ─── Admin - Images ───
+        ImageListItem: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            path: { type: 'string', example: 'storage/images/index/uuid.jpg' },
+            width: { type: 'integer', example: 1920 },
+            height: { type: 'integer', example: 1080 },
+            fileSize: { type: 'integer', example: 245760 },
+            fileFormat: { type: 'string', example: 'jpg' },
+            createdAt: { type: 'string', format: 'date-time' },
+            imageIndex: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                id: { type: 'string', format: 'uuid' },
+                processDurationMs: { type: 'integer', nullable: true, example: 1250 },
+                indexedAt: { type: 'string', format: 'date-time' },
+                ocrLines: {
+                  type: 'array',
+                  description: 'Preview (max 3 dòng)',
+                  items: { $ref: '#/components/schemas/OcrLinePreview' },
+                },
+              },
+            },
+          },
+        },
+        OcrLinePreview: {
+          type: 'object',
+          properties: {
+            rawText: { type: 'string', example: 'NOBISOFT TECHNOLOGY' },
+            confidenceScore: { type: 'number', example: 0.98 },
+          },
+        },
+        OcrLine: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            rawText: { type: 'string' },
+            normalizedText: { type: 'string' },
+            confidenceScore: { type: 'number' },
+            boundingBoxes: { type: 'object', nullable: true },
           },
         },
 
