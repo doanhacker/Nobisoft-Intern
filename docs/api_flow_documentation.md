@@ -1,6 +1,6 @@
 # 📘 Visual Search Engine — API & Flow Documentation
 
-> Tài liệu mô tả chi tiết 4 luồng use case chính, bao gồm API contract (JSON) giữa Frontend ↔ Backend ↔ AI Service ↔ Qdrant.
+> Tài liệu mô tả chi tiết các API endpoint và luồng use case chính, bao gồm API contract (JSON) giữa Frontend ↔ Backend ↔ AI Service ↔ Qdrant.
 
 ---
 
@@ -32,7 +32,44 @@
 
 ---
 
-## Use Case 1: Admin Indexing (Upload & Index ảnh)
+## 📋 Tổng hợp API Endpoints
+
+### Admin APIs (yêu cầu Admin JWT)
+
+| Method | Endpoint | Mô tả |
+|--------|----------|-------|
+| `POST` | `/admin/indexing` | Upload & index batch ảnh (tối đa 20 file) |
+| `GET` | `/admin/images` | Danh sách ảnh đã index (phân trang, filter) |
+| `GET` | `/admin/images/:id` | Chi tiết 1 ảnh (full OCR data) |
+| `DELETE` | `/admin/images/:id` | Xoá ảnh (cascade: PG + Qdrant + file) |
+| `GET` | `/admin/users` | Danh sách người dùng |
+| `GET` | `/admin/users/:userId/search-history` | Lịch sử tìm kiếm của user |
+
+### Auth APIs
+
+| Method | Endpoint | Mô tả |
+|--------|----------|-------|
+| `POST` | `/auth/register` | Đăng ký tài khoản |
+| `POST` | `/auth/login` | Đăng nhập, nhận JWT |
+
+### Search APIs (sẽ triển khai)
+
+| Method | Endpoint | Mô tả |
+|--------|----------|-------|
+| `POST` | `/search/by-image` | Tìm ảnh tương tự bằng ảnh (IMAGE_ONLY) |
+| `POST` | `/search/by-text` | Tìm ảnh bằng text (TEXT_SEMANTIC / TEXT_OCR) |
+
+### Internal APIs (Backend → AI Service)
+
+| Method | Endpoint | Khi nào dùng | Output |
+|--------|----------|-------------|--------|
+| `POST` | `/api/process-image` | Indexing | embedding + OCR + processDurationMs |
+| `POST` | `/api/embed-image` | Search by Image | embedding only |
+| `POST` | `/api/embed-text` | Search by Text Semantic | embedding only |
+
+---
+
+## Use Case 1: Admin Batch Indexing
 
 ### Sequence Diagram
 
@@ -46,70 +83,59 @@ sequenceDiagram
     participant QD as Qdrant
     participant FS as Local Disk
 
-    Admin->>FE: 1. Chọn file ảnh
-    FE->>BE: 2. POST /api/admin/indexing
-    Note over FE,BE: multipart/form-data
+    Admin->>FE: 1. Chọn nhiều file ảnh
+    FE->>BE: 2. POST /admin/indexing
+    Note over FE,BE: multipart/form-data (field: images)
 
-    BE->>BE: 3. Validate file (type, size)
-    BE->>AI: 4. POST /api/process-image
-    Note over BE,AI: multipart/form-data (forward ảnh)
-    AI-->>BE: 5. JSON { embedding, ocr }
+    loop Mỗi ảnh trong batch
+        BE->>AI: 3. POST /api/process-image
+        AI-->>BE: 4. { embedding, ocrLines, processDurationMs }
+        BE->>FS: 5. Lưu file → storage/images/index/{uuid}.ext
+        BE->>PG: 6. INSERT images + image_index + image_ocr[]
+        BE->>QD: 7. Upsert vector + payload
+    end
 
-    BE->>FS: 6. Lưu file → storage/images/{uuid}.jpg
-    BE->>PG: 7. INSERT image_metadata
-    BE->>PG: 8. INSERT image_ocr
-    BE->>QD: 9. PUT /collections/images/points
-    Note over BE,QD: Upsert vector + payload
-
-    BE-->>FE: 10. 201 Created
-    FE-->>Admin: 11. Hiển thị kết quả
+    BE-->>FE: 8. 201 Created (per-file results)
+    FE-->>Admin: 9. Hiển thị kết quả
 ```
 
 ### API: Frontend → Backend
 
 ```
-POST /api/admin/indexing
+POST /admin/indexing
 Authorization: Bearer <admin_jwt_token>
 Content-Type: multipart/form-data
 ```
 
 **Request (form-data):**
 
-```
-┌─────────────────────────────────────────────┐
-│ Field    │ Type   │ Required │ Description  │
-├──────────┼────────┼──────────┼──────────────┤
-│ image    │ File   │ ✅       │ File ảnh     │
-│          │        │          │ (jpg/png/webp│
-│          │        │          │ max 10MB)    │
-└─────────────────────────────────────────────┘
-```
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| images | File[] | ✅ | Danh sách ảnh (tối đa 20 file, mỗi file max 10MB, chấp nhận jpg/png/webp) |
 
 **Response — 201 Created:**
 
 ```json
 {
   "success": true,
-  "message": "Indexing thành công",
-  "data": {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "path": "storage/images/550e8400.jpg",
-    "width": 1920,
-    "height": 1080,
-    "fileSize": 245760,
-    "fileFormat": "jpg",
-    "indexedAt": "2026-07-10T08:30:00.000Z",
-    "ocrLines": [
-      {
-        "rawText": "NOBISOFT TECHNOLOGY CO., LTD",
-        "confidenceScore": 0.98
-      },
-      {
-        "rawText": "123 Nguyen Hue, District 1, HCMC",
-        "confidenceScore": 0.93
-      }
-    ]
-  }
+  "message": "Indexing hoàn tất: 3 thành công, 1 thất bại",
+  "data": [
+    {
+      "filename": "photo1.jpg",
+      "success": true,
+      "imageId": "550e8400-e29b-41d4-a716-446655440000"
+    },
+    {
+      "filename": "photo2.png",
+      "success": true,
+      "imageId": "660f9500-f30c-52e5-b827-557766550000"
+    },
+    {
+      "filename": "corrupted.jpg",
+      "success": false,
+      "error": "AI process-image failed: 422 Unprocessable Entity"
+    }
+  ]
 }
 ```
 
@@ -118,7 +144,7 @@ Content-Type: multipart/form-data
 ```json
 {
   "success": false,
-  "message": "File không hợp lệ. Chỉ chấp nhận jpg, png, webp (tối đa 10MB)"
+  "message": "Vui lòng chọn ít nhất 1 ảnh"
 }
 ```
 
@@ -131,21 +157,17 @@ Content-Type: multipart/form-data
 
 **Request (form-data):**
 
-```
-┌─────────────────────────────────────────────┐
-│ Field    │ Type   │ Required │ Description  │
-├──────────┼────────┼──────────┼──────────────┤
-│ image    │ File   │ ✅       │ Binary ảnh   │
-└─────────────────────────────────────────────┘
-```
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| image | File | ✅ | Binary ảnh |
 
-**Response — 200 OK (AI trả về):**
+**Response — 200 OK:**
 
 ```json
 {
   "success": true,
   "data": {
-    "embedding": [0.0123, -0.0456, 0.0789, "... (512 or 768 floats)"],
+    "embedding": [0.0123, -0.0456, 0.0789, "... (512 floats)"],
     "ocrLines": [
       {
         "rawText": "NOBISOFT TECHNOLOGY CO., LTD",
@@ -157,65 +179,145 @@ Content-Type: multipart/form-data
         "confidenceScore": 0.93,
         "boundingBox": { "x": 100, "y": 90, "width": 480, "height": 28 }
       }
-    ]
+    ],
+    "processDurationMs": 1250
   }
 }
 ```
 
 > [!NOTE]
 >
-> - `embedding`: Mảng float được tạo bởi model CLIP/ResNet — kích thước cố định (512 hoặc 768 tùy model, cần thống nhất với AI team).
-> - `ocrLines`: Mỗi phần tử tương ứng với **1 dòng text** trên ảnh (không phải 1 từ). Mỗi dòng có `boundingBox` riêng để highlight.
-> - 1 dòng OCR → 1 record `image_ocr` trong PostgreSQL.
-> - Nếu ảnh không có text, `ocrLines` sẽ là mảng rỗng `[]`.
+> - `embedding`: Mảng float từ model CLIP — kích thước cố định (512).
+> - `ocrLines`: Mỗi phần tử = **1 dòng text** trên ảnh. Nếu ảnh không có text → `[]`.
+> - `processDurationMs`: Thời gian AI xử lý (ms), lưu vào DB để tracking performance.
 
-### API: Backend → Qdrant (Upsert Vector)
+### Dữ liệu lưu trữ
+
+| Nơi lưu | Bảng/Collection | Dữ liệu |
+|---------|----------------|---------|
+| **PostgreSQL** | `images` | id, path, width, height, fileSize, fileFormat |
+| **PostgreSQL** | `image_index` | imageId, processDurationMs, indexedAt |
+| **PostgreSQL** | `image_ocr` | rawText, normalizedText, confidence, boundingBoxes |
+| **Qdrant** | `images` | vector + payload (imageId, path, fileFormat, hasOcr) |
+| **Local Disk** | `storage/images/index/` | File ảnh gốc |
+
+---
+
+## Admin Image Management
+
+### GET /admin/images — Danh sách ảnh đã index
 
 ```
-PUT http://qdrant:6333/collections/images/points
-Content-Type: application/json
+GET /admin/images?page=1&limit=20&fileFormat=jpg&fromDate=2026-01-01&toDate=2026-12-31
+Authorization: Bearer <admin_jwt_token>
 ```
 
-**Request:**
+**Query Parameters:**
+
+| Param | Type | Default | Description |
+|-------|------|---------|-------------|
+| page | integer | 1 | Số trang |
+| limit | integer | 20 | Số kết quả/trang (max 100) |
+| fileFormat | string | — | Lọc theo format: jpg, png, webp |
+| fromDate | date | — | Lọc từ ngày |
+| toDate | date | — | Lọc đến ngày |
+
+**Response — 200 OK:**
 
 ```json
 {
-  "points": [
+  "success": true,
+  "message": "Lấy danh sách ảnh thành công",
+  "data": [
     {
       "id": "550e8400-e29b-41d4-a716-446655440000",
-      "vector": [0.0123, -0.0456, 0.0789, "... (512 floats)"],
-      "payload": {
-        "imageId": "550e8400-e29b-41d4-a716-446655440000",
-        "path": "storage/images/550e8400.jpg",
-        "fileFormat": "jpg",
-        "hasOcr": true
+      "path": "storage/images/index/550e8400.jpg",
+      "width": 1920,
+      "height": 1080,
+      "fileSize": 245760,
+      "fileFormat": "jpg",
+      "createdAt": "2026-07-10T08:30:00.000Z",
+      "imageIndex": {
+        "id": "770g0600-g50e-62f6-c928-668877660000",
+        "processDurationMs": 1250,
+        "indexedAt": "2026-07-10T08:30:01.000Z",
+        "ocrLines": [
+          { "rawText": "NOBISOFT TECHNOLOGY", "confidenceScore": 0.98 },
+          { "rawText": "123 Nguyen Hue", "confidenceScore": 0.93 }
+        ]
       }
     }
-  ]
+  ],
+  "meta": {
+    "page": 1,
+    "limit": 20,
+    "totalDocs": 150,
+    "totalPages": 8
+  }
 }
+```
+
+> [!NOTE]
+> `ocrLines` trong list chỉ preview tối đa 3 dòng. Dùng GET /:id để xem đầy đủ.
+
+### GET /admin/images/:id — Chi tiết ảnh
+
+```
+GET /admin/images/550e8400-e29b-41d4-a716-446655440000
+Authorization: Bearer <admin_jwt_token>
 ```
 
 **Response — 200 OK:**
 
 ```json
 {
-  "result": {
-    "operation_id": 42,
-    "status": "completed"
-  },
-  "status": "ok",
-  "time": 0.003
+  "success": true,
+  "message": "Lấy chi tiết ảnh thành công",
+  "data": {
+    "id": "550e8400-e29b-41d4-a716-446655440000",
+    "path": "storage/images/index/550e8400.jpg",
+    "width": 1920,
+    "height": 1080,
+    "fileSize": 245760,
+    "fileFormat": "jpg",
+    "createdAt": "2026-07-10T08:30:00.000Z",
+    "imageIndex": {
+      "id": "770g0600-g50e-62f6-c928-668877660000",
+      "processDurationMs": 1250,
+      "indexedAt": "2026-07-10T08:30:01.000Z",
+      "ocrLines": [
+        {
+          "id": "880h0700-h61f-73g7-d039-779988770000",
+          "rawText": "NOBISOFT TECHNOLOGY CO., LTD",
+          "normalizedText": "nobisoft technology co., ltd",
+          "confidenceScore": 0.98,
+          "boundingBoxes": { "x": 100, "y": 50, "width": 520, "height": 30 }
+        }
+      ]
+    }
+  }
 }
 ```
 
-### Dữ liệu lưu trữ
+### DELETE /admin/images/:id — Xoá ảnh
 
-| Nơi lưu | Dữ liệu | Mục đích |
-|---------|---------|---------|
-| **PostgreSQL** `image_metadata` | id, path, width, height, fileSize, fileFormat, indexedAt | Tra cứu metadata |
-| **PostgreSQL** `image_ocr` | rawText, normalizedText, confidence, boundingBoxes (mỗi record = 1 dòng) | Phục vụ TEXT_OCR search |
-| **Qdrant** `images` collection | vector + payload (imageId, path) | Phục vụ IMAGE_ONLY & TEXT_SEMANTIC search |
-| **Local Disk** `storage/images/` | File ảnh gốc | Phục vụ hiển thị ảnh cho user |
+```
+DELETE /admin/images/550e8400-e29b-41d4-a716-446655440000
+Authorization: Bearer <admin_jwt_token>
+```
+
+**Response — 200 OK:**
+
+```json
+{
+  "success": true,
+  "message": "Xoá ảnh thành công",
+  "data": null
+}
+```
+
+> [!WARNING]
+> Cascade xoá: PostgreSQL (images + image_index + image_ocr) → Qdrant (vector) → Local Disk (file).
 
 ---
 
@@ -233,7 +335,7 @@ sequenceDiagram
     participant PG as PostgreSQL
 
     User->>FE: 1. Upload ảnh query
-    FE->>BE: 2. POST /api/search/by-image
+    FE->>BE: 2. POST /search/by-image
     Note over FE,BE: multipart/form-data
 
     BE->>AI: 3. POST /api/embed-image
@@ -245,7 +347,7 @@ sequenceDiagram
     QD-->>BE: 6. Top-K similar points + scores
 
     BE->>PG: 7. Lấy metadata của các ảnh kết quả
-    PG-->>BE: 8. image_metadata records
+    PG-->>BE: 8. image records
 
     BE->>PG: 9. Ghi search_history (async)
 
@@ -256,21 +358,15 @@ sequenceDiagram
 ### API: Frontend → Backend
 
 ```
-POST /api/v1/search/by-image
+POST /search/by-image
 Content-Type: multipart/form-data
 ```
 
-**Request (form-data):**
-
-```
-┌─────────────────────────────────────────────────────┐
-│ Field    │ Type    │ Required │ Description          │
-├──────────┼─────────┼──────────┼──────────────────────┤
-│ image    │ File    │ ✅       │ Ảnh query            │
-│ limit    │ Integer │ ❌       │ Số kết quả (mặc định 20) │
-│ page     │ Integer │ ❌       │ Trang (mặc định 1)   │
-└─────────────────────────────────────────────────────┘
-```
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| image | File | ✅ | Ảnh query |
+| limit | Integer | ❌ | Số kết quả (mặc định 20) |
+| page | Integer | ❌ | Trang (mặc định 1) |
 
 **Response — 200 OK:**
 
@@ -282,24 +378,15 @@ Content-Type: multipart/form-data
     "results": [
       {
         "id": "img-uuid-001",
-        "path": "storage/images/img-001.jpg",
+        "path": "storage/images/index/img-001.jpg",
         "width": 1920,
         "height": 1080,
         "fileFormat": "jpg",
         "similarityScore": 0.97,
         "createdAt": "2026-07-09T10:00:00.000Z"
-      },
-      {
-        "id": "img-uuid-002",
-        "path": "storage/images/img-002.png",
-        "width": 800,
-        "height": 600,
-        "fileFormat": "png",
-        "similarityScore": 0.91,
-        "createdAt": "2026-07-08T14:30:00.000Z"
       }
     ],
-    "total": 2,
+    "total": 1,
     "page": 1,
     "limit": 20
   }
@@ -312,8 +399,6 @@ Content-Type: multipart/form-data
 POST http://ai-service:9000/api/embed-image
 Content-Type: multipart/form-data
 ```
-
-**Request:** File ảnh (binary)
 
 **Response — 200 OK:**
 
@@ -328,56 +413,6 @@ Content-Type: multipart/form-data
 
 > [!TIP]
 > Endpoint này **chỉ trả embedding**, không chạy OCR — nhanh hơn `/process-image`. Dùng cho search, không phải indexing.
-
-### API: Backend → Qdrant (Vector Search)
-
-```
-POST http://qdrant:6333/collections/images/points/query
-Content-Type: application/json
-```
-
-**Request:**
-
-```json
-{
-  "query": [0.0123, -0.0456, 0.0789, "... (512 floats)"],
-  "limit": 20,
-  "with_payload": true
-}
-```
-
-**Response — 200 OK:**
-
-```json
-{
-  "result": {
-    "points": [
-      {
-        "id": "img-uuid-001",
-        "version": 1,
-        "score": 0.97,
-        "payload": {
-          "imageId": "img-uuid-001",
-          "path": "storage/images/img-001.jpg",
-          "fileFormat": "jpg"
-        }
-      },
-      {
-        "id": "img-uuid-002",
-        "version": 1,
-        "score": 0.91,
-        "payload": {
-          "imageId": "img-uuid-002",
-          "path": "storage/images/img-002.png",
-          "fileFormat": "png"
-        }
-      }
-    ]
-  },
-  "status": "ok",
-  "time": 0.012
-}
-```
 
 ---
 
@@ -395,7 +430,7 @@ sequenceDiagram
     participant PG as PostgreSQL
 
     User->>FE: 1. Nhập "sunset on the beach"
-    FE->>BE: 2. POST /api/search/by-text
+    FE->>BE: 2. POST /search/by-text
 
     BE->>AI: 3. POST /api/embed-text
     Note over BE,AI: Text → Vector (CLIP text encoder)
@@ -422,12 +457,12 @@ sequenceDiagram
 | Qdrant query | Giống nhau | Giống nhau |
 
 > [!IMPORTANT]
-> CLIP model có 2 encoder cùng output ra **cùng không gian vector** — nên vector từ text và vector từ image có thể so sánh trực tiếp bằng cosine similarity. Đây là cốt lõi của cross-modal search.
+> CLIP model có 2 encoder cùng output ra **cùng không gian vector** — nên vector từ text và vector từ image có thể so sánh trực tiếp bằng cosine similarity.
 
 ### API: Frontend → Backend
 
 ```
-POST /api/v1/search/by-text
+POST /search/by-text
 Content-Type: application/json
 ```
 
@@ -442,30 +477,7 @@ Content-Type: application/json
 }
 ```
 
-**Response — 200 OK:**
-
-```json
-{
-  "success": true,
-  "data": {
-    "searchType": "TEXT_SEMANTIC",
-    "results": [
-      {
-        "id": "img-uuid-099",
-        "path": "storage/images/img-099.jpg",
-        "width": 3840,
-        "height": 2160,
-        "fileFormat": "jpg",
-        "similarityScore": 0.89,
-        "createdAt": "2026-07-05T16:00:00.000Z"
-      }
-    ],
-    "total": 1,
-    "page": 1,
-    "limit": 20
-  }
-}
-```
+**Response — 200 OK:** Giống format response của IMAGE_ONLY, với `searchType: "TEXT_SEMANTIC"`.
 
 ### API: Backend → AI Service (Embed Text)
 
@@ -493,13 +505,6 @@ Content-Type: application/json
 }
 ```
 
-> [!NOTE]
-> Vector trả về cùng dimension (512) với image embedding — vì cả 2 dùng chung CLIP model. Điều này cho phép so sánh cross-modal trong Qdrant.
-
-### Qdrant Query: Giống hệt IMAGE_ONLY
-
-Backend gửi vector (dù từ text hay image) đến Qdrant theo cùng API — Qdrant không quan tâm nguồn gốc vector.
-
 ---
 
 ## Use Case 4: Search by Text OCR (TEXT_OCR)
@@ -514,7 +519,7 @@ sequenceDiagram
     participant PG as PostgreSQL
 
     User->>FE: 1. Nhập "Nobisoft"
-    FE->>BE: 2. POST /api/search/by-text
+    FE->>BE: 2. POST /search/by-text
 
     Note over BE: 3. Normalize query<br/>("nobisoft" — lowercase, bỏ dấu)
     
@@ -546,7 +551,7 @@ sequenceDiagram
 ### API: Frontend → Backend
 
 ```
-POST /api/search/by-text
+POST /search/by-text
 Content-Type: application/json
 ```
 
@@ -562,7 +567,7 @@ Content-Type: application/json
 ```
 
 > [!NOTE]
-> Dùng **cùng endpoint** `/search/by-text` với `TEXT_SEMANTIC` — Backend phân biệt qua field `searchType` để chọn luồng xử lý phù hợp.
+> Dùng **cùng endpoint** `/search/by-text` với `TEXT_SEMANTIC` — Backend phân biệt qua field `searchType`.
 
 **Response — 200 OK:**
 
@@ -574,7 +579,7 @@ Content-Type: application/json
     "results": [
       {
         "id": "img-uuid-042",
-        "path": "storage/images/img-042.jpg",
+        "path": "storage/images/index/img-042.jpg",
         "width": 1280,
         "height": 720,
         "fileFormat": "jpg",
@@ -593,55 +598,6 @@ Content-Type: application/json
   }
 }
 ```
-
-### Backend xử lý nội bộ (Không gọi service ngoài)
-
-```
-Input: "Nobisoft"
-  │
-  ├── 1. Normalize → "nobisoft"
-  │
-  ├── 2. PostgreSQL Full-Text Search (mỗi record = 1 dòng OCR)
-  │       SELECT im.*, ocr.raw_text, ts_rank(...)
-  │       FROM image_ocr ocr
-  │       JOIN image_metadata im ON ocr.image_id = im.id
-  │       WHERE ocr.normalized_text_tsv @@ plainto_tsquery('simple', 'nobisoft')
-  │       ORDER BY ts_rank DESC
-  │
-  ├── 3. Nếu 0 kết quả → Fallback pg_trgm
-  │       WHERE ocr.normalized_text % 'nobisoft'
-  │         OR ocr.normalized_text ILIKE '%nobisoft%'
-  │
-  └── 4. Return results (group by image)
-```
-
----
-
-## Tổng hợp: API Endpoints Map
-
-### Public APIs (Frontend → Backend)
-
-| Method | Endpoint | Auth | Use Case | Input |
-|--------|----------|------|----------|-------|
-| `POST` | `/api/admin/indexing` | Admin JWT | Indexing | `multipart/form-data` (image file) |
-| `POST` | `/api/search/by-image` | Optional JWT | IMAGE_ONLY | `multipart/form-data` (image file) |
-| `POST` | `/api/search/by-text` | Optional JWT | TEXT_SEMANTIC / TEXT_OCR | `application/json` |
-
-### Internal APIs (Backend → AI Service)
-
-| Method | Endpoint | Khi nào dùng | Input | Output |
-|--------|----------|-------------|-------|--------|
-| `POST` | `/api/process-image` | Indexing | Image file | embedding + OCR + metadata |
-| `POST` | `/api/embed-image` | Search by Image | Image file | embedding only |
-| `POST` | `/api/embed-text` | Search by Text Semantic | JSON text | embedding only |
-
-### Internal APIs (Backend → Qdrant)
-
-| Method | Endpoint | Khi nào dùng | Input |
-|--------|----------|-------------|-------|
-| `PUT` | `/collections/images/points` | Indexing | vector + payload |
-| `POST` | `/collections/images/points/query` | IMAGE_ONLY, TEXT_SEMANTIC | query vector + limit |
-| `DELETE` | `/collections/images/points/delete` | Xóa ảnh | point IDs |
 
 ---
 
@@ -680,4 +636,4 @@ graph LR
 | Dùng PostgreSQL | ✅ Write | ✅ Read meta | ✅ Read meta | ✅ **Full-text search** |
 | Lưu Local Disk | ✅ | ❌ | ❌ | ❌ |
 | Auth required | Admin | Optional | Optional | Optional |
-| Input type | File | File | JSON text | JSON text |
+| Input type | File[] | File | JSON text | JSON text |

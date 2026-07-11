@@ -8,9 +8,9 @@ if (!AI_SERVICE_URL) {
 }
 
 // POST /api/process-image 
-export async function processImage(imageBuffer: Buffer, filename: string): Promise<AiProcessImageResponse> {
+export async function processImage(imageBuffer: Buffer, filename: string, mimetype: string): Promise<AiProcessImageResponse> {
   const formData = new FormData();
-  formData.append('image', new Blob([new Uint8Array(imageBuffer)]), filename);
+  formData.append('image', new Blob([new Uint8Array(imageBuffer)], { type: mimetype }), filename);
 
   const response = await fetchWithTimeout(`${AI_SERVICE_URL}/api/process-image`, {
     method: 'POST',
@@ -21,7 +21,11 @@ export async function processImage(imageBuffer: Buffer, filename: string): Promi
     throw new Error(`AI process-image failed: ${response.status} ${response.statusText}`);
   }
 
-  return response.json() as Promise<AiProcessImageResponse>;
+  const json = await response.json();
+  if (json.success && json.data) {
+    json.data.processDurationMs = json.processing_time_ms;
+  }
+  return json as AiProcessImageResponse;
 }
 
 // Fetch with timeout
