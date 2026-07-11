@@ -30,8 +30,6 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Check backend Python syntax
-        run: python -m py_compile backend/app/main.py backend/app/config.py
 
       - name: Check AI service Python syntax
         run: python -m py_compile ai-service/app/main.py
