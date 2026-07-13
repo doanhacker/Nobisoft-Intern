@@ -98,9 +98,32 @@ export async function getUserSearchHistory(
     prisma.searchHistory.count({ where }),
   ]);
 
+  const formattedHistories = histories.map((history) => {
+    const clickedImage = history.clickedImage as any;
+    if (!clickedImage) return history;
+    const { path, ...restClickedImage } = clickedImage;
+    return {
+      ...history,
+      clickedImage: {
+        ...restClickedImage,
+        imageUrl: resolveImageUrl(path),
+      },
+    };
+  });
+
   return {
     success: true,
-    data: histories,
+    data: formattedHistories as any,
     total,
   };
+}
+
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
+
+function resolveImageUrl(imagePath: string): string {
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
+  }
+  const cleanPath = imagePath.replace(/\\/g, '/').replace(/^\//, '');
+  return `${BACKEND_URL}/${cleanPath}`;
 }

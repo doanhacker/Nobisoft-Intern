@@ -141,7 +141,7 @@ const options: swaggerJsdoc.Options = {
               type: 'object',
               properties: {
                 id: { type: 'string', format: 'uuid' },
-                path: { type: 'string' },
+                imageUrl: { type: 'string', example: 'http://localhost:8000/storage/images/index/uuid.jpg' },
                 width: { type: 'integer' },
                 height: { type: 'integer' },
               },
@@ -166,7 +166,7 @@ const options: swaggerJsdoc.Options = {
           type: 'object',
           properties: {
             id: { type: 'string', format: 'uuid' },
-            path: { type: 'string', example: 'storage/images/index/uuid.jpg' },
+            imageUrl: { type: 'string', example: 'http://localhost:8000/storage/images/index/uuid.jpg' },
             width: { type: 'integer', example: 1920 },
             height: { type: 'integer', example: 1080 },
             fileSize: { type: 'integer', example: 245760 },
@@ -211,7 +211,7 @@ const options: swaggerJsdoc.Options = {
           type: 'object',
           properties: {
             id: { type: 'string', format: 'uuid' },
-            path: { type: 'string', example: 'storage/images/index/uuid.jpg' },
+            imageUrl: { type: 'string', example: 'http://localhost:8000/storage/images/index/uuid.jpg' },
             width: { type: 'integer', example: 1920 },
             height: { type: 'integer', example: 1080 },
             fileSize: { type: 'integer', example: 245760 },

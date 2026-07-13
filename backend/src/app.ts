@@ -10,6 +10,8 @@ import { swaggerSpec } from './config/swagger.js';
 import { routesApiVer1 } from './api/v1/routes/index.route.js';
 
 
+import path from 'path';
+
 const app: Express = express();
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
@@ -28,6 +30,9 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Serve ảnh local (storage/images/...) — browser load trực tiếp, không qua DB
+app.use('/storage', express.static(path.resolve(process.env.STORAGE_DIR || './storage')));
 
 // ─── Swagger UI ───
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {

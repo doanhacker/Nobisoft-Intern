@@ -42,7 +42,13 @@ export async function searchImagesByImage(input: SearchImageInput): Promise<Sear
 
   const results = vectorResult.points.flatMap((point) => {
     const image = imageMap.get(point.imageId);
-    return image ? [{ ...image, similarityScore: point.score }] : [];
+    if (!image) return [];
+    const { path, ...rest } = image;
+    return [{
+      ...rest,
+      imageUrl: resolveImageUrl(path),
+      similarityScore: point.score,
+    }];
   });
 
   return {
@@ -51,4 +57,14 @@ export async function searchImagesByImage(input: SearchImageInput): Promise<Sear
     page: input.page,
     limit: input.limit,
   };
+}
+
+const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
+
+function resolveImageUrl(imagePath: string): string {
+  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+    return imagePath;
+  }
+  const cleanPath = imagePath.replace(/\\/g, '/').replace(/^\//, '');
+  return `${BACKEND_URL}/${cleanPath}`;
 }

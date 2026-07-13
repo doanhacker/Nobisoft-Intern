@@ -33,7 +33,7 @@ export type SearchTypeValue = 'IMAGE_ONLY' | 'TEXT_SEMANTIC' | 'TEXT_OCR';
 
 export interface SearchHistoryClickedImage {
   id: string;
-  path: string;
+  imageUrl: string;
   width: number;
   height: number;
 }
