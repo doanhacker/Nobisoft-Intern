@@ -1,16 +1,3 @@
-/**
- * Import Unsplash Research Dataset
- *
- * Parse photos.tsv000, fetch ảnh từ Unsplash CDN, gọi AI service để lấy
- * embedding + OCR, lưu vào PostgreSQL + Qdrant.
- *
- * Cách chạy:
- *   docker exec -it backend npx tsx src/scripts/import-unsplash.ts
- *   docker exec -e IMPORT_LIMIT=500 -it backend npx tsx src/scripts/import-unsplash.ts
- *
- * Resume: chạy lại lệnh, script tự skip ảnh có URL đã tồn tại trong DB.
- */
-
 import fs from 'fs';
 import { prisma } from '../config/prisma.js';
 import { Prisma } from '../generated/prisma/client.js';
@@ -54,7 +41,7 @@ async function main() {
     // 1. Clear PostgreSQL
     const deleted = await prisma.image.deleteMany({});
     console.log(`   [SUCCESS] Đã xóa ${deleted.count} ảnh từ PostgreSQL`);
-    
+
     // 2. Clear Qdrant
     const collections = await qdrantClient.getCollections();
     const exists = collections.collections.some(

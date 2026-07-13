@@ -1,25 +1,3 @@
-/**
- * Import dữ liệu đã export từ PostgreSQL và Qdrant
- *
- * Dùng khi bạn đã index xong trên 1 máy và muốn chuyển dữ liệu sang máy khác
- * mà không cần chạy lại AI service.
- *
- * Chuẩn bị:
- *   1. Export PostgreSQL: Dùng DataGrip export 3 bảng images, image_index, image_ocr
- *      thành file JSON → đặt trong datasets/exported-data/
- *   2. Export Qdrant: Dùng Qdrant API scroll → lưu thành JSON
- *
- * Cách chạy:
- *   docker exec -it backend npx tsx src/scripts/import-data.ts
- *
- * Cấu trúc thư mục cần:
- *   datasets/exported-data/
- *   ├── images.json           (export từ bảng images)
- *   ├── image_index.json      (export từ bảng image_index)
- *   ├── image_ocr.json        (export từ bảng image_ocr)
- *   └── qdrant_vectors.json   (export từ Qdrant API)
- */
-
 import fs from 'fs';
 import { prisma } from '../config/prisma.js';
 import {
@@ -85,7 +63,7 @@ async function main() {
     console.log(`[WARNING] Phát hiện cờ --clear. Đang tiến hành dọn dẹp hệ thống...`);
     const deleted = await prisma.image.deleteMany({});
     console.log(`   [SUCCESS] Đã xóa ${deleted.count} ảnh từ PostgreSQL`);
-    
+
     const collections = await qdrantClient.getCollections();
     const exists = collections.collections.some(
       (col) => col.name === QDRANT_COLLECTION_NAME,
@@ -109,7 +87,7 @@ async function main() {
 
   // Bỏ qua kiểm tra trùng lặp theo yêu cầu
   const newImages = images;
-  
+
   if (newImages.length > 0) {
     const newImageIds = new Set(newImages.map((img) => img.id));
 

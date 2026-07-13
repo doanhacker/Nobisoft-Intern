@@ -1,639 +1,135 @@
-# 📘 Visual Search Engine — API & Flow Documentation
+# 📘 Visual Search Engine — System Documentation
 
-> Tài liệu mô tả chi tiết các API endpoint và luồng use case chính, bao gồm API contract (JSON) giữa Frontend ↔ Backend ↔ AI Service ↔ Qdrant.
+Tài liệu này cung cấp hướng dẫn khởi chạy dự án, danh sách các API đang hoạt động và mô tả chi tiết các luồng nghiệp vụ chính trong hệ thống Visual Search Engine.
 
 ---
 
-## Tổng quan kiến trúc
+## 1. Hướng dẫn khởi chạy dự án
 
-```
-┌──────────┐     HTTP/REST     ┌──────────┐     HTTP/REST     ┌────────────┐
-│ Frontend │ ◄──────────────► │ Backend  │ ◄──────────────► │ AI Service │
-│ (React)  │                   │ (Node.js)│                   │ (FastAPI)  │
-└──────────┘                   └────┬─────┘                   └────────────┘
-                                    │
-                        ┌───────────┼───────────┐
-                        ▼           ▼           ▼
-                   ┌─────────┐ ┌────────┐ ┌──────────┐
-                   │PostgreSQL│ │ Qdrant │ │Local Disk│
-                   │(metadata,│ │(vectors)│ │ (images) │
-                   │OCR, etc) │ └────────┘ └──────────┘
-                   └─────────┘
+Để đảm bảo hệ thống chạy trơn tru và có sẵn dữ liệu mẫu (tránh các lỗi xung đột database từ những lần chạy trước), vui lòng làm đúng theo các bước sau:
+
+**Bước 1: Dọn dẹp môi trường cũ (Rất quan trọng)**
+Lệnh này sẽ xóa sạch các container và volume dữ liệu cũ (PostgreSQL, Qdrant) để khởi tạo lại từ đầu một cách an toàn:
+
+```bash
+docker compose down -v
 ```
 
-### Service URLs (Docker)
+**Bước 2: Build và khởi động các services**
 
-| Service | Internal URL | External URL |
-|---------|-------------|--------------|
-| Backend | `http://backend:8000` | `http://localhost:8000` |
-| AI Service | `http://ai-service:9000` | `http://localhost:9000` |
-| Qdrant | `http://qdrant:6333` | `http://localhost:6333` |
-| PostgreSQL | `database:5432` | `localhost:5432` |
+```bash
+docker compose up -d --build
+```
 
----
+*Hệ thống sẽ khởi chạy 4 container: Backend (Port 8000), AI Service (Port 9000), Database PostgreSQL (Port 5432) và Vector DB Qdrant (Port 6333).*
 
-## 📋 Tổng hợp API Endpoints
+**Bước 3: Nạp dữ liệu mẫu (Migration)**
+Chúng tôi đã chuẩn bị sẵn bộ dữ liệu đã được AI xử lý (PostgreSQL JSON + Qdrant vectors) trong thư mục `datasets/exported-data`. Để nạp dữ liệu này vào hệ thống mới chạy:
 
-### Admin APIs (yêu cầu Admin JWT)
+```bash
+docker exec -it backend npx tsx src/scripts/import-data.ts --clear
+```
 
-| Method | Endpoint | Mô tả |
-|--------|----------|-------|
-| `POST` | `/admin/indexing` | Upload & index batch ảnh (tối đa 20 file) |
-| `GET` | `/admin/images` | Danh sách ảnh đã index (phân trang, filter) |
-| `GET` | `/admin/images/:id` | Chi tiết 1 ảnh (full OCR data) |
-| `DELETE` | `/admin/images/:id` | Xoá ảnh (cascade: PG + Qdrant + file) |
-| `GET` | `/admin/users` | Danh sách người dùng |
-| `GET` | `/admin/users/:userId/search-history` | Lịch sử tìm kiếm của user |
-
-### Auth APIs
-
-| Method | Endpoint | Mô tả |
-|--------|----------|-------|
-| `POST` | `/auth/register` | Đăng ký tài khoản |
-| `POST` | `/auth/login` | Đăng nhập, nhận JWT |
-
-### Search APIs (sẽ triển khai)
-
-| Method | Endpoint | Mô tả |
-|--------|----------|-------|
-| `POST` | `/search/by-image` | Tìm ảnh tương tự bằng ảnh (IMAGE_ONLY) |
-| `POST` | `/search/by-text` | Tìm ảnh bằng text (TEXT_SEMANTIC / TEXT_OCR) |
-
-### Internal APIs (Backend → AI Service)
-
-| Method | Endpoint | Khi nào dùng | Output |
-|--------|----------|-------------|--------|
-| `POST` | `/api/process-image` | Indexing | embedding + OCR + processDurationMs |
-| `POST` | `/api/embed-image` | Search by Image | embedding only |
-| `POST` | `/api/embed-text` | Search by Text Semantic | embedding only |
+*(Cờ `--clear` sẽ tự động xóa sạch rác trong DB nếu có và nạp dữ liệu từ đầu. Lệnh chạy cực nhanh trong vài giây).*
 
 ---
 
-## Use Case 1: Admin Batch Indexing
+## 2. Danh sách API (API Reference)
 
-### Sequence Diagram
+Dưới đây là danh sách ~9 API chính đang hoạt động trong hệ thống. *(Chưa bao gồm các API kiểm tra sức khỏe hệ thống `/health` và tài liệu Swagger `/api-docs`)*.
+
+Chi tiết body request và response, bạn có thể xem trực tiếp giao diện Swagger UI tại: `http://localhost:8000/api-docs`
+
+### 2.1 — Nhóm Auth (Xác thực)
+
+| Method | Endpoint | Yêu cầu JWT | Mô tả |
+|--------|----------|-------------|-------|
+| `POST` | `/auth/register` | ❌ | Đăng ký tài khoản người dùng mới. |
+| `POST` | `/auth/login` | ❌ | Đăng nhập và nhận Access Token (JWT). |
+
+### 2.2 — Nhóm Client (Tìm kiếm)
+
+| Method | Endpoint | Yêu cầu JWT | Mô tả |
+|--------|----------|-------------|-------|
+| `POST` | `/search/image` | ✅ | Tìm kiếm ảnh tương tự. Nhận 1 file ảnh, gửi qua AI lấy vector và truy vấn Qdrant để tìm 20 ảnh giống nhất. |
+
+### 2.3 — Nhóm Admin (Quản lý Ảnh & User)
+
+*Tất cả API nhóm này đều yêu cầu JWT của tài khoản có Role là `ADMIN`.*
+
+| Method | Endpoint | Yêu cầu JWT | Mô tả |
+|--------|----------|-------------|-------|
+| `POST` | `/admin/indexing` | ✅ (Admin) | Upload hàng loạt ảnh (tối đa 20 file). Tự động gọi AI xử lý OCR + Embedding và lưu vào kho dữ liệu. |
+| `GET` | `/admin/images` | ✅ (Admin) | Lấy danh sách ảnh đã index (hỗ trợ phân trang, lọc theo format, ngày tháng). |
+| `GET` | `/admin/images/:id` | ✅ (Admin) | Lấy chi tiết 1 bức ảnh (bao gồm kích thước gốc và toàn bộ text OCR đã nhận diện). |
+| `DELETE` | `/admin/images/:id` | ✅ (Admin) | Xóa 1 ảnh khỏi hệ thống. Tự động xóa sạch dữ liệu liên kết trong PostgreSQL, Qdrant và file vật lý. |
+| `GET` | `/admin/users` | ✅ (Admin) | Quản lý danh sách người dùng, xem tổng số lượt tìm kiếm của từng người. |
+| `GET` | `/admin/users/:userId/search-history` | ✅ (Admin) | Theo dõi lịch sử tìm kiếm của 1 user cụ thể (họ đã tìm gì, lúc nào). |
+
+---
+
+## 3. Mô tả Luồng nghiệp vụ (Business Flow)
+
+### Luồng 1: Admin Indexing Ảnh (Thêm dữ liệu mới)
+
+Đây là trái tim của hệ thống lưu trữ, chịu trách nhiệm xử lý ảnh đầu vào thành các ma trận toán học.
 
 ```mermaid
 sequenceDiagram
     participant Admin
-    participant FE as Frontend
     participant BE as Backend
     participant AI as AI Service
     participant PG as PostgreSQL
     participant QD as Qdrant
-    participant FS as Local Disk
 
-    Admin->>FE: 1. Chọn nhiều file ảnh
-    FE->>BE: 2. POST /admin/indexing
-    Note over FE,BE: multipart/form-data (field: images)
-
-    loop Mỗi ảnh trong batch
-        BE->>AI: 3. POST /api/process-image
-        AI-->>BE: 4. { embedding, ocrLines, processDurationMs }
-        BE->>FS: 5. Lưu file → storage/images/index/{uuid}.ext
-        BE->>PG: 6. INSERT images + image_index + image_ocr[]
-        BE->>QD: 7. Upsert vector + payload
+    Admin->>BE: 1. POST /admin/indexing (Upload file)
+    loop Xử lý từng ảnh
+        BE->>AI: 2. Gửi ảnh qua AI Service
+        AI-->>BE: 3. Trả về [Vector 512 chiều] + [Dữ liệu OCR]
+        BE->>PG: 4. Lưu metadata ảnh (kích thước, size) & OCR Text
+        BE->>QD: 5. Lưu Vector 512 chiều để search
     end
-
-    BE-->>FE: 8. 201 Created (per-file results)
-    FE-->>Admin: 9. Hiển thị kết quả
+    BE-->>Admin: 6. Trả về kết quả tổng hợp
 ```
 
-### API: Frontend → Backend
+**Chi tiết:**
 
-```
-POST /admin/indexing
-Authorization: Bearer <admin_jwt_token>
-Content-Type: multipart/form-data
-```
+- Backend sẽ tạo ra URL `imageUrl` cho bức ảnh thay vì dùng đường dẫn vật lý cục bộ để Frontend dễ dàng hiển thị.
+- Tính nhất quán dữ liệu (Consistency) được đảm bảo bằng `Prisma Transaction`: Nếu quá trình lưu PostgreSQL thất bại, việc lưu Qdrant sẽ bị hủy.
 
-**Request (form-data):**
+### Luồng 2: Khách hàng tìm kiếm bằng ảnh (Visual Search)
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| images | File[] | ✅ | Danh sách ảnh (tối đa 20 file, mỗi file max 10MB, chấp nhận jpg/png/webp) |
-
-**Response — 201 Created:**
-
-```json
-{
-  "success": true,
-  "message": "Indexing hoàn tất: 3 thành công, 1 thất bại",
-  "data": [
-    {
-      "filename": "photo1.jpg",
-      "success": true,
-      "imageId": "550e8400-e29b-41d4-a716-446655440000"
-    },
-    {
-      "filename": "photo2.png",
-      "success": true,
-      "imageId": "660f9500-f30c-52e5-b827-557766550000"
-    },
-    {
-      "filename": "corrupted.jpg",
-      "success": false,
-      "error": "AI process-image failed: 422 Unprocessable Entity"
-    }
-  ]
-}
-```
-
-**Response — 400 Bad Request:**
-
-```json
-{
-  "success": false,
-  "message": "Vui lòng chọn ít nhất 1 ảnh"
-}
-```
-
-### API: Backend → AI Service
-
-```
-POST http://ai-service:9000/api/process-image
-Content-Type: multipart/form-data
-```
-
-**Request (form-data):**
-
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| image | File | ✅ | Binary ảnh |
-
-**Response — 200 OK:**
-
-```json
-{
-  "success": true,
-  "data": {
-    "embedding": [0.0123, -0.0456, 0.0789, "... (512 floats)"],
-    "ocrLines": [
-      {
-        "rawText": "NOBISOFT TECHNOLOGY CO., LTD",
-        "confidenceScore": 0.98,
-        "boundingBox": { "x": 100, "y": 50, "width": 520, "height": 30 }
-      },
-      {
-        "rawText": "123 Nguyen Hue, District 1, HCMC",
-        "confidenceScore": 0.93,
-        "boundingBox": { "x": 100, "y": 90, "width": 480, "height": 28 }
-      }
-    ],
-    "processDurationMs": 1250
-  }
-}
-```
-
-> [!NOTE]
->
-> - `embedding`: Mảng float từ model CLIP — kích thước cố định (512).
-> - `ocrLines`: Mỗi phần tử = **1 dòng text** trên ảnh. Nếu ảnh không có text → `[]`.
-> - `processDurationMs`: Thời gian AI xử lý (ms), lưu vào DB để tracking performance.
-
-### Dữ liệu lưu trữ
-
-| Nơi lưu | Bảng/Collection | Dữ liệu |
-|---------|----------------|---------|
-| **PostgreSQL** | `images` | id, path, width, height, fileSize, fileFormat |
-| **PostgreSQL** | `image_index` | imageId, processDurationMs, indexedAt |
-| **PostgreSQL** | `image_ocr` | rawText, normalizedText, confidence, boundingBoxes |
-| **Qdrant** | `images` | vector + payload (imageId, path, fileFormat, hasOcr) |
-| **Local Disk** | `storage/images/index/` | File ảnh gốc |
-
----
-
-## Admin Image Management
-
-### GET /admin/images — Danh sách ảnh đã index
-
-```
-GET /admin/images?page=1&limit=20&fileFormat=jpg&fromDate=2026-01-01&toDate=2026-12-31
-Authorization: Bearer <admin_jwt_token>
-```
-
-**Query Parameters:**
-
-| Param | Type | Default | Description |
-|-------|------|---------|-------------|
-| page | integer | 1 | Số trang |
-| limit | integer | 20 | Số kết quả/trang (max 100) |
-| fileFormat | string | — | Lọc theo format: jpg, png, webp |
-| fromDate | date | — | Lọc từ ngày |
-| toDate | date | — | Lọc đến ngày |
-
-**Response — 200 OK:**
-
-```json
-{
-  "success": true,
-  "message": "Lấy danh sách ảnh thành công",
-  "data": [
-    {
-      "id": "550e8400-e29b-41d4-a716-446655440000",
-      "path": "storage/images/index/550e8400.jpg",
-      "width": 1920,
-      "height": 1080,
-      "fileSize": 245760,
-      "fileFormat": "jpg",
-      "createdAt": "2026-07-10T08:30:00.000Z",
-      "imageIndex": {
-        "id": "770g0600-g50e-62f6-c928-668877660000",
-        "processDurationMs": 1250,
-        "indexedAt": "2026-07-10T08:30:01.000Z",
-        "ocrLines": [
-          { "rawText": "NOBISOFT TECHNOLOGY", "confidenceScore": 0.98 },
-          { "rawText": "123 Nguyen Hue", "confidenceScore": 0.93 }
-        ]
-      }
-    }
-  ],
-  "meta": {
-    "page": 1,
-    "limit": 20,
-    "totalDocs": 150,
-    "totalPages": 8
-  }
-}
-```
-
-> [!NOTE]
-> `ocrLines` trong list chỉ preview tối đa 3 dòng. Dùng GET /:id để xem đầy đủ.
-
-### GET /admin/images/:id — Chi tiết ảnh
-
-```
-GET /admin/images/550e8400-e29b-41d4-a716-446655440000
-Authorization: Bearer <admin_jwt_token>
-```
-
-**Response — 200 OK:**
-
-```json
-{
-  "success": true,
-  "message": "Lấy chi tiết ảnh thành công",
-  "data": {
-    "id": "550e8400-e29b-41d4-a716-446655440000",
-    "path": "storage/images/index/550e8400.jpg",
-    "width": 1920,
-    "height": 1080,
-    "fileSize": 245760,
-    "fileFormat": "jpg",
-    "createdAt": "2026-07-10T08:30:00.000Z",
-    "imageIndex": {
-      "id": "770g0600-g50e-62f6-c928-668877660000",
-      "processDurationMs": 1250,
-      "indexedAt": "2026-07-10T08:30:01.000Z",
-      "ocrLines": [
-        {
-          "id": "880h0700-h61f-73g7-d039-779988770000",
-          "rawText": "NOBISOFT TECHNOLOGY CO., LTD",
-          "normalizedText": "nobisoft technology co., ltd",
-          "confidenceScore": 0.98,
-          "boundingBoxes": { "x": 100, "y": 50, "width": 520, "height": 30 }
-        }
-      ]
-    }
-  }
-}
-```
-
-### DELETE /admin/images/:id — Xoá ảnh
-
-```
-DELETE /admin/images/550e8400-e29b-41d4-a716-446655440000
-Authorization: Bearer <admin_jwt_token>
-```
-
-**Response — 200 OK:**
-
-```json
-{
-  "success": true,
-  "message": "Xoá ảnh thành công",
-  "data": null
-}
-```
-
-> [!WARNING]
-> Cascade xoá: PostgreSQL (images + image_index + image_ocr) → Qdrant (vector) → Local Disk (file).
-
----
-
-## Use Case 2: Search by Image (IMAGE_ONLY)
-
-### Sequence Diagram
+Đây là luồng truy vấn tốc độ cao sử dụng công nghệ tìm kiếm láng giềng gần nhất (KNN - K-Nearest Neighbors).
 
 ```mermaid
 sequenceDiagram
     participant User
-    participant FE as Frontend
     participant BE as Backend
     participant AI as AI Service
     participant QD as Qdrant
     participant PG as PostgreSQL
 
-    User->>FE: 1. Upload ảnh query
-    FE->>BE: 2. POST /search/by-image
-    Note over FE,BE: multipart/form-data
-
-    BE->>AI: 3. POST /api/embed-image
-    Note over BE,AI: Chỉ cần embedding, không cần OCR
-    AI-->>BE: 4. JSON { embedding: float[] }
-
-    BE->>QD: 5. POST /collections/images/points/query
-    Note over BE,QD: Vector similarity search (Cosine)
-    QD-->>BE: 6. Top-K similar points + scores
-
-    BE->>PG: 7. Lấy metadata của các ảnh kết quả
-    PG-->>BE: 8. image records
-
-    BE->>PG: 9. Ghi search_history (async)
-
-    BE-->>FE: 10. JSON response
-    FE-->>User: 11. Hiển thị grid ảnh tương tự
+    User->>BE: 1. POST /search/image (Ảnh query)
+    BE->>AI: 2. Gọi AI để mã hóa ảnh
+    AI-->>BE: 3. Trả về Vector 512 chiều (Bỏ qua OCR để tăng tốc)
+    BE->>QD: 4. Cosine Similarity Search với giới hạn 20 kết quả
+    QD-->>BE: 5. Trả về danh sách Image IDs giống nhất
+    BE->>PG: 6. Truy vấn Metadata (URL ảnh, Format) từ IDs đó
+    BE->>PG: 7. Ghi lịch sử tìm kiếm của User (Chạy ngầm)
+    BE-->>User: 8. Trả về giao diện lưới 20 ảnh tương tự
 ```
 
-### API: Frontend → Backend
+**Chi tiết:**
 
-```
-POST /search/by-image
-Content-Type: multipart/form-data
-```
+- **Tối ưu tốc độ:** AI Service có 2 hàm riêng biệt. Khi tìm kiếm, BE chỉ yêu cầu AI chạy model CLIP để lấy Vector, hoàn toàn bỏ qua EasyOCR vì không cần thiết.
+- **Tính toán điểm số:** Qdrant sử dụng chuẩn **Cosine** để so sánh Vector của ảnh Query với hàng vạn vector trong kho, trả về điểm tin cậy `similarityScore` từ 0.0 đến 1.0.
 
-| Field | Type | Required | Description |
-|-------|------|----------|-------------|
-| image | File | ✅ | Ảnh query |
-| limit | Integer | ❌ | Số kết quả (mặc định 20) |
-| page | Integer | ❌ | Trang (mặc định 1) |
+### Luồng 3: Quản lý và Xóa dữ liệu (Cascade Deletion)
 
-**Response — 200 OK:**
+Khi Admin muốn xóa một bức ảnh rác hoặc lỗi ra khỏi hệ thống:
 
-```json
-{
-  "success": true,
-  "data": {
-    "searchType": "IMAGE_ONLY",
-    "results": [
-      {
-        "id": "img-uuid-001",
-        "path": "storage/images/index/img-001.jpg",
-        "width": 1920,
-        "height": 1080,
-        "fileFormat": "jpg",
-        "similarityScore": 0.97,
-        "createdAt": "2026-07-09T10:00:00.000Z"
-      }
-    ],
-    "total": 1,
-    "page": 1,
-    "limit": 20
-  }
-}
-```
-
-### API: Backend → AI Service (Embed Image)
-
-```
-POST http://ai-service:9000/api/embed-image
-Content-Type: multipart/form-data
-```
-
-**Response — 200 OK:**
-
-```json
-{
-  "success": true,
-  "data": {
-    "embedding": [0.0123, -0.0456, 0.0789, "... (512 floats)"]
-  }
-}
-```
-
-> [!TIP]
-> Endpoint này **chỉ trả embedding**, không chạy OCR — nhanh hơn `/process-image`. Dùng cho search, không phải indexing.
-
----
-
-## Use Case 3: Search by Text Semantic (TEXT_SEMANTIC)
-
-### Sequence Diagram
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant FE as Frontend
-    participant BE as Backend
-    participant AI as AI Service
-    participant QD as Qdrant
-    participant PG as PostgreSQL
-
-    User->>FE: 1. Nhập "sunset on the beach"
-    FE->>BE: 2. POST /search/by-text
-
-    BE->>AI: 3. POST /api/embed-text
-    Note over BE,AI: Text → Vector (CLIP text encoder)
-    AI-->>BE: 4. JSON { embedding: float[] }
-
-    BE->>QD: 5. POST /collections/images/points/query
-    Note over BE,QD: Tìm ảnh có vector gần nhất
-    QD-->>BE: 6. Top-K similar points
-
-    BE->>PG: 7. Lấy metadata
-    BE->>PG: 8. Ghi search_history (async)
-
-    BE-->>FE: 9. JSON response
-    FE-->>User: 10. Hiển thị ảnh hoàng hôn
-```
-
-### Điểm khác biệt so với IMAGE_ONLY
-
-| Tiêu chí | IMAGE_ONLY | TEXT_SEMANTIC |
-|----------|-----------|--------------|
-| Input từ user | File ảnh | Chuỗi text |
-| AI endpoint | `/embed-image` | `/embed-text` |
-| AI model | CLIP image encoder | CLIP **text** encoder |
-| Qdrant query | Giống nhau | Giống nhau |
-
-> [!IMPORTANT]
-> CLIP model có 2 encoder cùng output ra **cùng không gian vector** — nên vector từ text và vector từ image có thể so sánh trực tiếp bằng cosine similarity.
-
-### API: Frontend → Backend
-
-```
-POST /search/by-text
-Content-Type: application/json
-```
-
-**Request:**
-
-```json
-{
-  "query": "sunset on the beach",
-  "searchType": "TEXT_SEMANTIC",
-  "limit": 20,
-  "page": 1
-}
-```
-
-**Response — 200 OK:** Giống format response của IMAGE_ONLY, với `searchType: "TEXT_SEMANTIC"`.
-
-### API: Backend → AI Service (Embed Text)
-
-```
-POST http://ai-service:9000/api/embed-text
-Content-Type: application/json
-```
-
-**Request:**
-
-```json
-{
-  "text": "sunset on the beach"
-}
-```
-
-**Response — 200 OK:**
-
-```json
-{
-  "success": true,
-  "data": {
-    "embedding": [0.0234, -0.0567, 0.0890, "... (512 floats)"]
-  }
-}
-```
-
----
-
-## Use Case 4: Search by Text OCR (TEXT_OCR)
-
-### Sequence Diagram
-
-```mermaid
-sequenceDiagram
-    participant User
-    participant FE as Frontend
-    participant BE as Backend
-    participant PG as PostgreSQL
-
-    User->>FE: 1. Nhập "Nobisoft"
-    FE->>BE: 2. POST /search/by-text
-
-    Note over BE: 3. Normalize query<br/>("nobisoft" — lowercase, bỏ dấu)
-    
-    BE->>PG: 4. Full-Text Search trên image_ocr
-    Note over PG: tsvector @@ plainto_tsquery('nobisoft')
-    PG-->>BE: 5. Matching records + relevance score
-
-    alt Không có kết quả
-        BE->>PG: 6. Fallback: pg_trgm fuzzy search
-        PG-->>BE: 7. Fuzzy results
-    end
-
-    BE->>PG: 8. Ghi search_history (async)
-    
-    BE-->>FE: 9. JSON response
-    FE-->>User: 10. Hiển thị ảnh chứa text "Nobisoft"
-```
-
-### Điểm khác biệt: KHÔNG gọi AI, KHÔNG dùng Qdrant
-
-| Tiêu chí | TEXT_SEMANTIC | TEXT_OCR |
-|----------|-------------|---------|
-| Gọi AI? | ✅ Cần embed text | ❌ Không cần |
-| Dùng Qdrant? | ✅ Vector search | ❌ Không cần |
-| Dùng PostgreSQL? | Chỉ lấy metadata | ✅ **Full-text search trên OCR data** |
-| Tìm gì? | Ý nghĩa / ngữ nghĩa | Chuỗi ký tự chính xác |
-| Ví dụ | "ảnh hoàng hôn" → ảnh sunset | "ABC-1234" → ảnh biển số xe |
-
-### API: Frontend → Backend
-
-```
-POST /search/by-text
-Content-Type: application/json
-```
-
-**Request:**
-
-```json
-{
-  "query": "Nobisoft",
-  "searchType": "TEXT_OCR",
-  "limit": 20,
-  "page": 1
-}
-```
-
-> [!NOTE]
-> Dùng **cùng endpoint** `/search/by-text` với `TEXT_SEMANTIC` — Backend phân biệt qua field `searchType`.
-
-**Response — 200 OK:**
-
-```json
-{
-  "success": true,
-  "data": {
-    "searchType": "TEXT_OCR",
-    "results": [
-      {
-        "id": "img-uuid-042",
-        "path": "storage/images/index/img-042.jpg",
-        "width": 1280,
-        "height": 720,
-        "fileFormat": "jpg",
-        "relevanceScore": 0.95,
-        "ocrPreview": "NOBISOFT TECHNOLOGY CO., LTD — 123 Nguyen Hue...",
-        "ocrHighlight": {
-          "matchedText": "NOBISOFT",
-          "boundingBox": { "x": 100, "y": 50, "width": 200, "height": 30 }
-        },
-        "createdAt": "2026-07-09T10:00:00.000Z"
-      }
-    ],
-    "total": 1,
-    "page": 1,
-    "limit": 20
-  }
-}
-```
-
----
-
-## So sánh 4 luồng
-
-```mermaid
-graph LR
-    subgraph "Indexing"
-        I1[FE upload ảnh] --> I2[BE validate]
-        I2 --> I3[AI: embed + OCR]
-        I3 --> I4[Lưu PG + Qdrant + Disk]
-    end
-    
-    subgraph "IMAGE_ONLY"
-        S1[FE upload ảnh] --> S2[AI: embed image]
-        S2 --> S3[Qdrant: KNN search]
-        S3 --> S4[PG: get metadata]
-    end
-    
-    subgraph "TEXT_SEMANTIC"
-        T1[FE nhập text] --> T2[AI: embed text]
-        T2 --> T3[Qdrant: KNN search]
-        T3 --> T4[PG: get metadata]
-    end
-    
-    subgraph "TEXT_OCR"
-        O1[FE nhập text] --> O2[BE: normalize]
-        O2 --> O3[PG: Full-Text Search]
-    end
-```
-
-| | Indexing | IMAGE_ONLY | TEXT_SEMANTIC | TEXT_OCR |
-|---|:---:|:---:|:---:|:---:|
-| Gọi AI Service | ✅ | ✅ | ✅ | ❌ |
-| Dùng Qdrant | ✅ Write | ✅ Read | ✅ Read | ❌ |
-| Dùng PostgreSQL | ✅ Write | ✅ Read meta | ✅ Read meta | ✅ **Full-text search** |
-| Lưu Local Disk | ✅ | ❌ | ❌ | ❌ |
-| Auth required | Admin | Optional | Optional | Optional |
-| Input type | File[] | File | JSON text | JSON text |
+1. Admin gọi lệnh `DELETE /admin/images/:id`.
+2. PostgreSQL xóa bản ghi gốc. Các bảng con như `image_index` và `image_ocr` được **tự động xóa** nhờ khóa ngoại `ON DELETE CASCADE`.
+3. Backend phát tín hiệu sang Qdrant để xóa vector tương ứng.
+4. (Tuỳ chọn) Backend xóa file ảnh vật lý nằm trong thư mục `/storage`.
+Luồng này đảm bảo không bao giờ để lại "dữ liệu mồ côi" trong hệ thống tìm kiếm đa cơ sở dữ liệu.
