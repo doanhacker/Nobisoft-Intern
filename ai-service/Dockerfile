@@ -19,11 +19,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 
 # Tải trước CLIP model vào image (force re-download để fix lỗi model bị corrupt)
-RUN python -c "\
-from transformers import CLIPModel, CLIPProcessor; \
-CLIPModel.from_pretrained('openai/clip-vit-base-patch32'); \
-CLIPProcessor.from_pretrained('openai/clip-vit-base-patch32'); \
-print('CLIP model cached successfully')"
+RUN python -c "from transformers import CLIPModel, CLIPProcessor; CLIPModel.from_pretrained('openai/clip-vit-base-patch32'); CLIPProcessor.from_pretrained('openai/clip-vit-base-patch32'); print('CLIP model cached successfully')"
+
+# Tải trước EasyOCR models (English detection & recognition) vào image
+RUN python -c "import easyocr; easyocr.Reader(['en'], gpu=False); print('EasyOCR models cached successfully')"
 
 EXPOSE 9000
 

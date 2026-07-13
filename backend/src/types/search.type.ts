@@ -8,7 +8,7 @@ export interface SearchImageInput {
 
 export interface SearchImageResultItem {
   id: string;
-  path: string;
+  imageUrl: string;
   width: number;
   height: number;
   fileSize: number;

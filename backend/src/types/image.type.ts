@@ -20,7 +20,7 @@ export interface ImageIndexInfo {
 
 export interface ImageListItem {
   id: string;
-  path: string;
+  imageUrl: string;
   width: number;
   height: number;
   fileSize: number;

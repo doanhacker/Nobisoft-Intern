@@ -20,7 +20,9 @@
     "start": "node dist/server.js",
     "seed:admin": "tsx src/scripts/seed-admin.ts",
     "seed:mock-images": "tsx src/scripts/seed-mock-images.ts",
-    "init:qdrant": "tsx src/scripts/init-qdrant.ts"
+    "init:qdrant": "tsx src/scripts/init-qdrant.ts",
+    "import:unsplash": "tsx src/scripts/import-unsplash.ts",
+    "import:data": "tsx src/scripts/import-data.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
