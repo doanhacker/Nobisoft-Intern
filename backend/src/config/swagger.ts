@@ -16,6 +16,7 @@ const options: swaggerJsdoc.Options = {
       { name: 'Admin - Users', description: 'Admin user management' },
       { name: 'Admin - Indexing', description: 'Admin image indexing' },
       { name: 'Admin - Images', description: 'Admin image management' },
+      { name: 'Search', description: 'Image and text search' },
       { name: 'Client', description: 'Client-side endpoints' },
     ],
     components: {
@@ -202,6 +203,21 @@ const options: swaggerJsdoc.Options = {
             normalizedText: { type: 'string' },
             confidenceScore: { type: 'number' },
             boundingBoxes: { type: 'object', nullable: true },
+          },
+        },
+
+        // ─── Search ───
+        SearchImageResult: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            path: { type: 'string', example: 'storage/images/index/uuid.jpg' },
+            width: { type: 'integer', example: 1920 },
+            height: { type: 'integer', example: 1080 },
+            fileSize: { type: 'integer', example: 245760 },
+            fileFormat: { type: 'string', example: 'jpg' },
+            similarityScore: { type: 'number', format: 'float', example: 0.97 },
+            createdAt: { type: 'string', format: 'date-time' },
           },
         },
 
