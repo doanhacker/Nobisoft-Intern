@@ -34,6 +34,11 @@ interface TextSearchInputProps {
   className?: string
 }
 
+// Detect Vietnamese diacritics (spec 3.3 alternate path — OCR beta badge)
+function hasVietnamese(text: string): boolean {
+  return /[àáâãèéêìíòóôõùúýăđơưạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỳỵỷỹ]/i.test(text)
+}
+
 export function TextSearchInput({
   mode,
   value,
@@ -78,6 +83,7 @@ export function TextSearchInput({
   }
 
   const config = modeConfig[mode]
+  const showBetaBadge = mode === 'ocr' && value.length > 0 && hasVietnamese(value)
 
   return (
     <form
@@ -119,6 +125,13 @@ export function TextSearchInput({
           disabled={isLoading}
         />
 
+        {/* OCR Beta badge (spec 3.3 — Vietnamese diacritics detected) */}
+        {showBetaBadge && (
+          <span className="shrink-0 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-500/15 text-amber-600 border border-amber-500/30 animate-fade-in">
+            Beta
+          </span>
+        )}
+
         {/* Clear button */}
         {value && !isLoading && (
           <button
@@ -152,14 +165,19 @@ export function TextSearchInput({
         </button>
       </div>
 
-      {/* ── Mode hint ── */}
-      <div className="absolute -bottom-5 right-0">
+      {/* ── Mode hint + Beta tooltip ── */}
+      <div className="absolute -bottom-5 right-0 flex items-center gap-2">
         <span
           className="text-[11px] font-medium opacity-60"
           style={{ color: config.color }}
         >
           {config.hint}
         </span>
+        {showBetaBadge && (
+          <span className="text-[10px] text-amber-500/80 font-medium">
+            · OCR tiếng Việt chưa hỗ trợ đầy đủ
+          </span>
+        )}
       </div>
     </form>
   )
