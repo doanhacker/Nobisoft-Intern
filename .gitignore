@@ -37,3 +37,6 @@ datasets/*
 .DS_Store
 Thumbs.db
 .vscode/
+
+# Backup files
+*.back
