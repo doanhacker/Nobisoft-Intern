@@ -21,20 +21,38 @@ interface SearchBarProps {
   className?: string
   /** Compact mode — no hero headings, smaller padding */
   compact?: boolean
+  /** Seed the mode from URL (for results page compact bar) */
+  initialMode?: SearchMode
+  /** Seed the text query from URL (for results page compact bar) */
+  initialTextQuery?: string
 }
 
-export function SearchBar({ onSearch, isLoading = false, className, compact = false }: SearchBarProps) {
-  const [mode, setMode] = React.useState<SearchMode>('image')
-  const [textQuery, setTextQuery] = React.useState('')
+export function SearchBar({ onSearch, isLoading = false, className, compact = false, initialMode, initialTextQuery }: SearchBarProps) {
+  const [mode, setMode] = React.useState<SearchMode>(initialMode ?? 'image')
+  const [textQuery, setTextQuery] = React.useState(initialTextQuery ?? '')
   const [imageFile, setImageFile] = React.useState<File | null>(null)
   const [imagePreviewUrl, setImagePreviewUrl] = React.useState<string | null>(null)
 
+  // Sync with external URL changes (e.g. browser back/forward)
+  React.useEffect(() => {
+    if (initialMode) setMode(initialMode)
+  }, [initialMode])
+  React.useEffect(() => {
+    if (initialTextQuery !== undefined) setTextQuery(initialTextQuery)
+  }, [initialTextQuery])
+
   const handleModeChange = (newMode: SearchMode) => {
     setMode(newMode)
-    // Clear state when switching modes
-    setTextQuery('')
-    setImageFile(null)
-    setImagePreviewUrl(null)
+    // Spec 3.2 alternate: switching semantic ↔ ocr preserves text query
+    // Only clear text when switching TO image mode (or FROM image)
+    if (newMode === 'image') {
+      setTextQuery('')
+    }
+    // Always clear image when switching away from image mode
+    if (newMode !== 'image') {
+      setImageFile(null)
+      setImagePreviewUrl(null)
+    }
   }
 
   const handleImageSelect = (file: File, previewUrl: string) => {
@@ -78,7 +96,7 @@ export function SearchBar({ onSearch, isLoading = false, className, compact = fa
 
       <div className="relative z-10 flex flex-col gap-4 sm:gap-6">
         {/* ── Mode toggle ── */}
-        <div className="overflow-x-auto -mx-1 px-1">
+        <div className="overflow-x-auto -mx-1 px-1 flex justify-center w-full">
           <SearchModeToggle value={mode} onChange={handleModeChange} />
         </div>
 

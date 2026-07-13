@@ -9,6 +9,10 @@ import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
+import { ToastProvider } from '@/components/ui/Toast'
+
+// Routes that use their own full-page layout (no shared header/footer)
+const FULL_PAGE_ROUTES = ['/results']
 
 export const Route = createRootRoute({
   component: RootComponent,
@@ -90,6 +94,10 @@ function AppShell() {
   const [menuOpen, setMenuOpen] = React.useState(false)
   const menuRef = React.useRef<HTMLDivElement>(null)
 
+  // Detect if current route uses its own layout (no shared chrome)
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const isFullPageRoute = FULL_PAGE_ROUTES.some((r) => pathname.startsWith(r))
+
   const handleLogout = () => {
     logout()
     navigate({ to: '/login' })
@@ -116,6 +124,19 @@ function AppShell() {
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [])
+
+  // Full-page routes get only providers + outlet (no header/footer)
+  if (isFullPageRoute) {
+    return (
+      <div className="relative min-h-screen bg-background text-foreground font-sans selection:bg-primary/30 selection:text-primary-foreground">
+        <NavigationProgress />
+        <main className="relative flex-1 z-[1]">
+          <Outlet />
+        </main>
+        <TanStackRouterDevtools position="bottom-right" />
+      </div>
+    )
+  }
 
   return (
     <div className="relative min-h-screen bg-background text-foreground flex flex-col font-sans selection:bg-primary/30 selection:text-primary-foreground">
@@ -326,9 +347,11 @@ function RootComponent() {
   return (
     <ThemeProvider defaultTheme="system">
       <AuthProvider>
-        <TooltipProvider>
-          <AppShell />
-        </TooltipProvider>
+        <ToastProvider>
+          <TooltipProvider>
+            <AppShell />
+          </TooltipProvider>
+        </ToastProvider>
       </AuthProvider>
     </ThemeProvider>
   )

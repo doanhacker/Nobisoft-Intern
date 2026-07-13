@@ -6,7 +6,7 @@ import { SearchBar, type SearchState } from '@/components/search/SearchBar'
 import { useAuth } from '@/hooks/useAuth'
 
 // ============================================================
-// SearchPage — Main landing after login (Week 3 deliverable)
+// SearchPage — Main landing after login
 // ============================================================
 
 // Mock recent searches (replace with API when ready)
@@ -42,14 +42,43 @@ export function SearchPage() {
 
   const handleSearch = async (state: SearchState) => {
     setIsSearching(true)
-    // Encode params → navigate to results page
-    const params = new URLSearchParams()
-    params.set('mode', state.mode)
-    if (state.textQuery) params.set('q', state.textQuery)
+
+    // For image mode: convert the File to a base64 data URL BEFORE navigating.
+    // We must use the File object (not the blob URL) because blob: URLs are tied to the
+    // originating document and get revoked when ImageUploadZone unmounts during navigation.
+    // A data: URL is self-contained and survives cross-route navigation.
+    if (state.mode === 'image' && state.imageFile) {
+      try {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onloadend = () => resolve(reader.result as string)
+          reader.onerror = reject
+          reader.readAsDataURL(state.imageFile!)
+        })
+        sessionStorage.setItem('pendingImagePreviewUrl', dataUrl)
+      } catch {
+        // Fallback: store blob URL (may be revoked, but at least try)
+        if (state.imagePreviewUrl) {
+          sessionStorage.setItem('pendingImagePreviewUrl', state.imagePreviewUrl)
+        }
+      }
+    } else {
+      sessionStorage.removeItem('pendingImagePreviewUrl')
+    }
+
     // Simulate brief loading
     await new Promise((r) => setTimeout(r, 400))
     setIsSearching(false)
-    navigate({ to: '/results', search: { mode: state.mode, q: state.textQuery || '' } })
+
+    navigate({
+      to: '/results',
+      search: {
+        mode: state.mode,
+        q: state.textQuery || '',
+        ...(state.mode === 'image' ? { query_id: `upload-${Date.now()}` } : {}),
+        page: 1,
+      },
+    })
   }
 
   const greeting = React.useMemo(() => {

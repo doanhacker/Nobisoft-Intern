@@ -22,9 +22,11 @@ interface MasonryGridProps {
     results: SearchResult[]
     onCardClick: (result: SearchResult) => void
     onSearchSimilar: (result: SearchResult) => void
+    /** Compact mode: fewer columns for split-view (image search) layout */
+    compact?: boolean
 }
 
-const BREAKPOINTS = {
+const BREAKPOINTS_DEFAULT = {
     default: 4,
     1280: 4,
     1024: 3,
@@ -33,12 +35,22 @@ const BREAKPOINTS = {
     480: 1,
 }
 
-export function MasonryGrid({ results, onCardClick, onSearchSimilar }: MasonryGridProps) {
+const BREAKPOINTS_COMPACT = {
+    default: 3,
+    1280: 3,
+    1024: 2,
+    768: 2,
+    640: 1,
+    480: 1,
+}
+
+export function MasonryGrid({ results, onCardClick, onSearchSimilar, compact = false }: MasonryGridProps) {
+    const breakpoints = compact ? BREAKPOINTS_COMPACT : BREAKPOINTS_DEFAULT
     return (
         <Masonry
-            breakpointCols={BREAKPOINTS}
-            className="flex gap-4 w-full"
-            columnClassName="flex flex-col gap-4"
+            breakpointCols={breakpoints}
+            className="flex gap-3 w-full"
+            columnClassName="flex flex-col gap-3"
         >
             {results.map((result, i) => (
                 <div
@@ -55,4 +67,4 @@ export function MasonryGrid({ results, onCardClick, onSearchSimilar }: MasonryGr
             ))}
         </Masonry>
     )
-}
+}
