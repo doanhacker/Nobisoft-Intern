@@ -19,6 +19,7 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "seed:admin": "tsx src/scripts/seed-admin.ts",
+    "seed:mock-images": "tsx src/scripts/seed-mock-images.ts",
     "init:qdrant": "tsx src/scripts/init-qdrant.ts"
   },
   "dependencies": {

@@ -1,4 +1,4 @@
-import type { AiProcessImageResponse } from '../types/ai.type.js';
+import type { AiEmbedImageResponse, AiProcessImageResponse } from '../types/ai.type.js';
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL;
 const AI_TIMEOUT_MS = 30_000;
@@ -26,6 +26,27 @@ export async function processImage(imageBuffer: Buffer, filename: string, mimety
     json.data.processDurationMs = json.processing_time_ms;
   }
   return json as AiProcessImageResponse;
+}
+
+// POST /api/embed-image
+export async function embedImage(
+  imageBuffer: Buffer,
+  filename: string,
+  mimetype: string,
+): Promise<AiEmbedImageResponse> {
+  const formData = new FormData();
+  formData.append('image', new Blob([new Uint8Array(imageBuffer)], { type: mimetype }), filename);
+
+  const response = await fetchWithTimeout(`${AI_SERVICE_URL}/api/embed-image`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    throw new Error(`AI embed-image failed: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json() as Promise<AiEmbedImageResponse>;
 }
 
 // Fetch with timeout
