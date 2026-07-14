@@ -121,11 +121,18 @@ export function ResultsSearchBar({
         <div className="flex-1 min-w-0 relative">
           {mode === 'image' ? (
             /* Image mode: show thumbnail or placeholder button */
-            <button
-              type="button"
+            <div
+              role="button"
+              tabIndex={0}
               onClick={() => setShowImageModal(true)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault()
+                  setShowImageModal(true)
+                }
+              }}
               className={cn(
-                'w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 text-left',
+                'w-full flex items-center gap-3 px-4 py-2.5 rounded-xl transition-all duration-200 text-left cursor-pointer',
                 'border bg-background',
                 imagePreviewUrl
                   ? 'border-primary/40 hover:border-primary/60'
@@ -163,7 +170,7 @@ export function ResultsSearchBar({
                   <span className="text-sm text-muted-foreground">Click để chọn ảnh tìm kiếm...</span>
                 </>
               )}
-            </button>
+            </div>
           ) : (
             /* Text mode: regular input */
             <div className="relative">

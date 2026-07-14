@@ -15,6 +15,7 @@ import { ResultsSidebar } from '@/components/results/ResultsSidebar'
 import { ResultsSearchBar, type ResultsSearchState, type SearchMode } from '@/components/results/ResultsSearchBar'
 import { ImageSearchModal } from '@/components/results/ImageSearchModal'
 import { getMockResults } from '@/services/mockData'
+import { searchByImage, getPendingImageFile, setPendingImageFile, fetchImageAsFile } from '@/services/searchService'
 import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
 
@@ -185,6 +186,7 @@ export function ResultsPage() {
 
   // ── State ──
   const [results, setResults] = React.useState<SearchResult[]>([])
+  const [totalResults, setTotalResults] = React.useState(0)
   const [status, setStatus] = React.useState<'idle' | 'loading' | 'success' | 'error' | 'empty'>('loading')
   const [selectedResult, setSelectedResult] = React.useState<SearchResult | null>(null)
 
@@ -214,7 +216,7 @@ export function ResultsPage() {
 
   // ── Fetch results ─────────────────────────────────────────
   const fetchResults = React.useCallback(
-    async (fetchMode: SearchMode, fetchQuery: string, fetchQueryId?: string) => {
+    async (fetchMode: SearchMode, fetchQuery: string, fetchPage: number, fetchQueryId?: string, overrideFile?: File | null) => {
       if (abortRef.current) abortRef.current.abort()
       const controller = new AbortController()
       abortRef.current = controller
@@ -228,35 +230,61 @@ export function ResultsPage() {
       setResults([])
 
       try {
-        const data = await getMockResults({
-          mode: fetchMode,
-          query: fetchQuery || undefined,
-          queryId: fetchQueryId,
-          signal: controller.signal,
-        })
+        let data: SearchResult[]
+        let total = 0
+
+        if (fetchMode === 'image') {
+          // Use the overrideFile (from re-search), or the pending file stored by SearchPage,
+          // or the current queryImageFile state (e.g., user changed image from QueryImagePanel).
+          const file = overrideFile !== undefined
+            ? overrideFile
+            : getPendingImageFile() ?? queryImageFile
+
+          if (!file) {
+            // No file available (e.g. user refreshed the page directly on /results?mode=image)
+            setStatus('idle')
+            return
+          }
+
+          const response = await searchByImage({ file, page: fetchPage, signal: controller.signal })
+          data = response.results
+          total = response.total
+        } else {
+          // Text-based modes: keep using mock data until those APIs are ready
+          data = await getMockResults({
+            mode: fetchMode,
+            query: fetchQuery || undefined,
+            queryId: fetchQueryId,
+            signal: controller.signal,
+          })
+          total = data.length
+        }
+
         if (data.length === 0) {
           setStatus('empty')
         } else {
           setResults(data)
+          setTotalResults(total)
           setStatus('success')
         }
       } catch (err) {
-        if ((err as Error).name === 'AbortError') return
+        if ((err as Error).name === 'AbortError' || (err as { code?: string }).code === 'ERR_CANCELED') return
         console.error(err)
         setStatus('error')
         toastError('Không thể tải kết quả', {
           description: 'Kiểm tra kết nối mạng và thử lại.',
-          onRetry: () => fetchResults(fetchMode, fetchQuery, fetchQueryId),
+          onRetry: () => fetchResults(fetchMode, fetchQuery, fetchPage, fetchQueryId, overrideFile),
         })
       }
     },
-    [toastError],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [toastError, queryImageFile],
   )
 
   React.useEffect(() => {
-    fetchResults(mode, q, query_id)
+    fetchResults(mode, q, search.page, query_id)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, q, query_id])
+  }, [mode, q, search.page, query_id])
 
   // Sync modal from URL
   React.useEffect(() => {
@@ -275,13 +303,16 @@ export function ResultsPage() {
     if (state.imageFile) {
       params.query_id = `upload-${Date.now()}`
       delete params.q
-      // Persist query image for split view
+      // Persist query image for split view and for the next fetchResults call
       setQueryImageFile(state.imageFile)
       setQueryImagePreviewUrl(state.imagePreviewUrl)
+      // Store in module singleton so fetchResults can access it via URL-triggered effect
+      setPendingImageFile(state.imageFile)
     } else {
       // Clear image state when switching to text mode
       setQueryImageFile(null)
       setQueryImagePreviewUrl(null)
+      setPendingImageFile(null)
     }
     navigate({ to: '/results', search: params as ResultsSearch })
   }
@@ -308,15 +339,30 @@ export function ResultsPage() {
     })
   }
 
-  const handleSearchSimilar = (result: SearchResult) => {
-    navigate({
-      to: '/results',
-      search: { mode: 'image', q: '', query_id: result.id, page: 1 },
-    })
-    toastInfo(`Tìm ảnh tương tự với "${result.title ?? result.id}"`)
+  const handleSearchSimilar = async (result: SearchResult) => {
+    try {
+      setStatus('loading')
+      const urlToFetch = result.fullUrl ?? result.thumbnailUrl
+      const file = await fetchImageAsFile(urlToFetch)
+      
+      const newQueryId = `upload-${Date.now()}`
+      setQueryImageFile(file)
+      setQueryImagePreviewUrl(urlToFetch)
+      setPendingImageFile(file)
+      
+      navigate({
+        to: '/results',
+        search: { mode: 'image', q: '', query_id: newQueryId, page: 1 },
+      })
+      toastInfo(`Tìm ảnh tương tự với "${result.title ?? result.id}"`)
+    } catch (err) {
+      console.error(err)
+      toastError('Không thể tải ảnh để tìm kiếm')
+      setStatus('error')
+    }
   }
 
-  const handleRetry = () => fetchResults(mode, q, query_id)
+  const handleRetry = () => fetchResults(mode, q, search.page, query_id)
 
   // Is split view active: image mode + we have a query image
   const isSplitView = mode === 'image' && !!queryImagePreviewUrl
@@ -374,12 +420,43 @@ export function ResultsPage() {
 
             {/* Results grid */}
             {status === 'success' && results.length > 0 && (
-              <MasonryGrid
-                results={results}
-                onCardClick={handleCardClick}
-                onSearchSimilar={handleSearchSimilar}
-                compact={isSplitView}
-              />
+              <>
+                <MasonryGrid
+                  results={results}
+                  onCardClick={handleCardClick}
+                  onSearchSimilar={handleSearchSimilar}
+                  compact={isSplitView}
+                />
+                
+                {/* Pagination */}
+                <div className="mt-8 mb-4 flex justify-center items-center gap-3 animate-fade-in">
+                  <button
+                    type="button"
+                    disabled={search.page <= 1}
+                    onClick={() => {
+                      navigate({ to: '/results', search: { ...search, page: search.page - 1 } })
+                      window.scrollTo({ top: 0, behavior: 'smooth' })
+                    }}
+                    className="px-4 py-2 border border-border/60 bg-background/60 backdrop-blur-sm rounded-xl disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium hover:bg-muted/80 hover:text-foreground transition-colors"
+                  >
+                    Trang trước
+                  </button>
+                  <span className="flex items-center px-4 py-2 text-sm font-medium text-muted-foreground bg-muted/30 rounded-xl border border-border/40">
+                    Trang {search.page}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={results.length < 20}
+                    onClick={() => {
+                      navigate({ to: '/results', search: { ...search, page: search.page + 1 } })
+                      window.scrollTo({ top: 0, behavior: 'smooth' })
+                    }}
+                    className="px-4 py-2 border border-border/60 bg-background/60 backdrop-blur-sm rounded-xl disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium hover:bg-muted/80 hover:text-foreground transition-colors"
+                  >
+                    Trang sau
+                  </button>
+                </div>
+              </>
             )}
 
             {/* Empty */}

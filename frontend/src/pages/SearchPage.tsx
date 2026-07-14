@@ -4,6 +4,7 @@ import { Zap, Images, Clock, TrendingUp } from 'lucide-react'
 import { AnimatedBackground } from '@/components/ui/AnimatedBackground'
 import { SearchBar, type SearchState } from '@/components/search/SearchBar'
 import { useAuth } from '@/hooks/useAuth'
+import { setPendingImageFile } from '@/services/searchService'
 
 // ============================================================
 // SearchPage — Main landing after login
@@ -43,11 +44,12 @@ export function SearchPage() {
   const handleSearch = async (state: SearchState) => {
     setIsSearching(true)
 
-    // For image mode: convert the File to a base64 data URL BEFORE navigating.
-    // We must use the File object (not the blob URL) because blob: URLs are tied to the
-    // originating document and get revoked when ImageUploadZone unmounts during navigation.
-    // A data: URL is self-contained and survives cross-route navigation.
     if (state.mode === 'image' && state.imageFile) {
+      // Store the File object so ResultsPage can call the real API.
+      setPendingImageFile(state.imageFile)
+
+      // Also persist a data: URL preview so the QueryImagePanel can render
+      // without re-reading the (potentially revoked) blob URL after navigation.
       try {
         const dataUrl = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader()
@@ -57,17 +59,15 @@ export function SearchPage() {
         })
         sessionStorage.setItem('pendingImagePreviewUrl', dataUrl)
       } catch {
-        // Fallback: store blob URL (may be revoked, but at least try)
         if (state.imagePreviewUrl) {
           sessionStorage.setItem('pendingImagePreviewUrl', state.imagePreviewUrl)
         }
       }
     } else {
+      setPendingImageFile(null)
       sessionStorage.removeItem('pendingImagePreviewUrl')
     }
 
-    // Simulate brief loading
-    await new Promise((r) => setTimeout(r, 400))
     setIsSearching(false)
 
     navigate({
