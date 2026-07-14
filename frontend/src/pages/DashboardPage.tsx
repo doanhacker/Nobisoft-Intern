@@ -29,10 +29,10 @@ export function DashboardPage() {
         {/* Welcome */}
         <div className="space-y-2">
           <h1 className="text-3xl font-bold text-foreground">
-            Xin chào, <span className="text-gradient-brand">{user?.name ?? 'User'}</span>! 👋
+            Trang cá nhân của <span className="text-gradient-brand">{user?.name ?? 'User'}</span>
           </h1>
           <p className="text-muted-foreground">
-            Bạn đã đăng nhập thành công. Đây là trang được bảo vệ bởi Auth Guard.
+            Xin chào! Hiện tại trang cá nhân chưa có nhiều thông tin, chúng tôi đang trong quá trình phát triển.
           </p>
         </div>
 
@@ -63,27 +63,8 @@ export function DashboardPage() {
           </div>
         </div>
 
-        {/* Auth guard info */}
-        <div className="bg-primary/5 border border-primary/20 rounded-xl p-4 text-left">
-          <div className="flex items-center gap-2 mb-2">
-            <User className="size-4 text-primary" />
-            <span className="text-sm font-semibold text-primary">Auth Guard hoạt động</span>
-          </div>
-          <p className="text-xs text-muted-foreground leading-relaxed">
-            Route này được bảo vệ bởi <code className="bg-muted px-1 py-0.5 rounded text-primary">requireAuth()</code> trong{' '}
-            <code className="bg-muted px-1 py-0.5 rounded">beforeLoad</code>. Người dùng chưa đăng nhập
-            sẽ tự động bị chuyển về <code className="bg-muted px-1 py-0.5 rounded">/login</code>.
-          </p>
-        </div>
-
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
-          <Button variant="brand" size="lg" asChild>
-            <Link to="/style-guide">
-              <Search className="size-4" />
-              Xem Design System
-            </Link>
-          </Button>
           <Button
             id="logout-button"
             variant="outline"

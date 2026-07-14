@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { createRootRoute, Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/router-devtools'
-import { ScanSearch, LogIn, LogOut, Search, UserCircle2, Menu, X } from 'lucide-react'
+import { ScanSearch, LogIn, LogOut, Search, UserCircle2, Menu, X, LayoutDashboard } from 'lucide-react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ThemeProvider } from '@/context/ThemeContext'
 import { AuthProvider } from '@/context/AuthContext'
@@ -89,7 +89,7 @@ function MobileNavLink({ to, children, icon, onClick }: NavLinkProps) {
 
 // ── App shell ─────────────────────────────────────────────────
 function AppShell() {
-  const { isAuthenticated, user, logout } = useAuth()
+  const { isAuthenticated, user, logout, isAdmin } = useAuth()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = React.useState(false)
   const menuRef = React.useRef<HTMLDivElement>(null)
@@ -181,6 +181,11 @@ function AppShell() {
 
             {isAuthenticated ? (
               <>
+                {isAdmin && (
+                  <NavLink to="/admin" icon={<LayoutDashboard className="size-3.5" />}>
+                    Admin Dashboard
+                  </NavLink>
+                )}
                 <NavLink to="/dashboard" icon={<UserCircle2 className="size-3.5" />}>
                   {user?.name?.split(' ').at(-1) ?? 'Dashboard'}
                 </NavLink>
@@ -270,6 +275,15 @@ function AppShell() {
 
                 {isAuthenticated ? (
                   <>
+                    {isAdmin && (
+                      <MobileNavLink
+                        to="/admin"
+                        icon={<LayoutDashboard className="size-4 text-muted-foreground" />}
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        Admin Dashboard
+                      </MobileNavLink>
+                    )}
                     <MobileNavLink
                       to="/dashboard"
                       icon={<UserCircle2 className="size-4 text-muted-foreground" />}

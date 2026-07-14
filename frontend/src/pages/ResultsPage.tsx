@@ -7,6 +7,8 @@ import {
   RefreshCw,
   FileText,
   Eye,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { MasonryGrid, type SearchResult } from '@/components/results/MasonryGrid'
 import { SkeletonGrid } from '@/components/results/SkeletonGrid'
@@ -186,7 +188,8 @@ export function ResultsPage() {
 
   // ── State ──
   const [results, setResults] = React.useState<SearchResult[]>([])
-  const [totalResults, setTotalResults] = React.useState(0)
+  const [total, setTotal] = React.useState<number>(0)
+  const [limit, setLimit] = React.useState<number>(20)
   const [status, setStatus] = React.useState<'idle' | 'loading' | 'success' | 'error' | 'empty'>('loading')
   const [selectedResult, setSelectedResult] = React.useState<SearchResult | null>(null)
 
@@ -231,7 +234,8 @@ export function ResultsPage() {
 
       try {
         let data: SearchResult[]
-        let total = 0
+        let currentTotal = 0
+        let currentLimit = 20
 
         if (fetchMode === 'image') {
           // Use the overrideFile (from re-search), or the pending file stored by SearchPage,
@@ -248,7 +252,8 @@ export function ResultsPage() {
 
           const response = await searchByImage({ file, page: fetchPage, signal: controller.signal })
           data = response.results
-          total = response.total
+          currentTotal = response.total
+          currentLimit = response.limit
         } else {
           // Text-based modes: keep using mock data until those APIs are ready
           data = await getMockResults({
@@ -257,14 +262,17 @@ export function ResultsPage() {
             queryId: fetchQueryId,
             signal: controller.signal,
           })
-          total = data.length
+          currentTotal = data.length > 0 ? 100 : 0 // mock total
+          currentLimit = 20
         }
 
         if (data.length === 0) {
           setStatus('empty')
+          setTotal(0)
         } else {
           setResults(data)
-          setTotalResults(total)
+          setTotal(currentTotal)
+          setLimit(currentLimit)
           setStatus('success')
         }
       } catch (err) {
@@ -314,7 +322,7 @@ export function ResultsPage() {
       setQueryImagePreviewUrl(null)
       setPendingImageFile(null)
     }
-    navigate({ to: '/results', search: params as ResultsSearch })
+    navigate({ to: '/results', search: params as unknown as ResultsSearch })
   }
 
   const handleCardClick = (result: SearchResult) => {
@@ -354,7 +362,6 @@ export function ResultsPage() {
         to: '/results',
         search: { mode: 'image', q: '', query_id: newQueryId, page: 1 },
       })
-      toastInfo(`Tìm ảnh tương tự với "${result.title ?? result.id}"`)
     } catch (err) {
       console.error(err)
       toastError('Không thể tải ảnh để tìm kiếm')
@@ -410,7 +417,7 @@ export function ResultsPage() {
                 mode={mode}
                 query={q}
                 queryId={query_id}
-                count={results.length}
+                count={total > 0 ? total : results.length}
                 isLoading={status === 'loading'}
               />
             )}
@@ -429,33 +436,73 @@ export function ResultsPage() {
                 />
                 
                 {/* Pagination */}
-                <div className="mt-8 mb-4 flex justify-center items-center gap-3 animate-fade-in">
-                  <button
-                    type="button"
-                    disabled={search.page <= 1}
-                    onClick={() => {
-                      navigate({ to: '/results', search: { ...search, page: search.page - 1 } })
-                      window.scrollTo({ top: 0, behavior: 'smooth' })
-                    }}
-                    className="px-4 py-2 border border-border/60 bg-background/60 backdrop-blur-sm rounded-xl disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium hover:bg-muted/80 hover:text-foreground transition-colors"
-                  >
-                    Trang trước
-                  </button>
-                  <span className="flex items-center px-4 py-2 text-sm font-medium text-muted-foreground bg-muted/30 rounded-xl border border-border/40">
-                    Trang {search.page}
-                  </span>
-                  <button
-                    type="button"
-                    disabled={results.length < 20}
-                    onClick={() => {
-                      navigate({ to: '/results', search: { ...search, page: search.page + 1 } })
-                      window.scrollTo({ top: 0, behavior: 'smooth' })
-                    }}
-                    className="px-4 py-2 border border-border/60 bg-background/60 backdrop-blur-sm rounded-xl disabled:opacity-50 disabled:cursor-not-allowed text-sm font-medium hover:bg-muted/80 hover:text-foreground transition-colors"
-                  >
-                    Trang sau
-                  </button>
-                </div>
+                {total > limit && (
+                  <div className="mt-8 mb-4 flex justify-center items-center gap-2 animate-fade-in">
+                    <button
+                      type="button"
+                      disabled={search.page <= 1}
+                      onClick={() => {
+                        navigate({ to: '/results', search: { ...search, page: search.page - 1 } })
+                        window.scrollTo({ top: 0, behavior: 'smooth' })
+                      }}
+                      className="p-2 border border-border/60 bg-background/60 backdrop-blur-sm rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted/80 hover:text-foreground transition-colors"
+                      title="Trang trước"
+                    >
+                      <ChevronLeft className="size-4" />
+                    </button>
+                    
+                    {(() => {
+                      const totalPages = Math.ceil(total / limit);
+                      const pages: (number | string)[] = [];
+                      if (totalPages <= 7) {
+                        for (let i = 1; i <= totalPages; i++) pages.push(i);
+                      } else {
+                        pages.push(1);
+                        if (search.page > 3) pages.push('...');
+                        const start = Math.max(2, search.page - 1);
+                        const end = Math.min(totalPages - 1, search.page + 1);
+                        for (let i = start; i <= end; i++) pages.push(i);
+                        if (search.page < totalPages - 2) pages.push('...');
+                        pages.push(totalPages);
+                      }
+                      
+                      return pages.map((p, i) => (
+                         <button
+                           key={`${p}-${i}`}
+                           disabled={p === '...'}
+                           onClick={() => {
+                             if (p !== '...') {
+                               navigate({ to: '/results', search: { ...search, page: p as number } })
+                               window.scrollTo({ top: 0, behavior: 'smooth' })
+                             }
+                           }}
+                           className={cn(
+                             "w-9 h-9 flex items-center justify-center rounded-xl border text-sm font-medium transition-colors",
+                             p === '...' ? "border-transparent bg-transparent cursor-default" :
+                             search.page === p
+                               ? "bg-primary text-primary-foreground border-primary"
+                               : "border-border/60 bg-background hover:bg-muted/80 cursor-pointer"
+                           )}
+                         >
+                           {p}
+                         </button>
+                      ));
+                    })()}
+
+                    <button
+                      type="button"
+                      disabled={search.page >= Math.ceil(total / limit)}
+                      onClick={() => {
+                        navigate({ to: '/results', search: { ...search, page: search.page + 1 } })
+                        window.scrollTo({ top: 0, behavior: 'smooth' })
+                      }}
+                      className="p-2 border border-border/60 bg-background/60 backdrop-blur-sm rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted/80 hover:text-foreground transition-colors"
+                      title="Trang sau"
+                    >
+                      <ChevronRight className="size-4" />
+                    </button>
+                  </div>
+                )}
               </>
             )}
 

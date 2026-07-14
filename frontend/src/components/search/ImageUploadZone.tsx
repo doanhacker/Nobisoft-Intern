@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { CloudUpload, ImageIcon, X, AlertCircle, CheckCircle2, Crop, Loader2, RefreshCw, Trash2 } from 'lucide-react'
+import { CloudUpload, ImageIcon, AlertCircle, CheckCircle2, Crop, Loader2, RefreshCw, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { CropModal } from './CropModal'
 import { useToast } from '@/components/ui/Toast'
@@ -32,7 +32,6 @@ export function ImageUploadZone({
   const inputRef = React.useRef<HTMLInputElement>(null)
   const [isDragging, setIsDragging] = React.useState(false)
   const [preview, setPreview] = React.useState<string | null>(null)
-  const [originalFile, setOriginalFile] = React.useState<File | null>(null)
   const [originalPreview, setOriginalPreview] = React.useState<string | null>(null)
   const [fileName, setFileName] = React.useState<string | null>(null)
   const [error, setError] = React.useState<string | null>(null)
@@ -84,7 +83,6 @@ export function ImageUploadZone({
 
     // Simulate progress bar then reveal preview
     simulateProgress(() => {
-      setOriginalFile(file)
       setOriginalPreview(url)
       setPreview(url)
       setFileName(file.name)
@@ -127,7 +125,6 @@ export function ImageUploadZone({
     if (preview && preview !== originalPreview) URL.revokeObjectURL(preview)
     if (originalPreview) URL.revokeObjectURL(originalPreview)
     setPreview(null)
-    setOriginalFile(null)
     setOriginalPreview(null)
     setFileName(null)
     setError(null)

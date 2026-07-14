@@ -15,6 +15,7 @@ export interface User {
   id: string | number
   name: string
   email: string
+  role?: 'USER' | 'ADMIN'
 }
 
 export interface AuthResponse {
