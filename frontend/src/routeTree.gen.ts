@@ -15,7 +15,14 @@ import { Route as ResultsRouteImport } from './routes/results'
 import { Route as RegisterRouteImport } from './routes/register'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AdminUsersRouteImport } from './routes/admin/users'
+import { Route as AdminIndexingRouteImport } from './routes/admin/indexing'
+import { Route as AdminImagesRouteImport } from './routes/admin/images'
+import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
+import { Route as AdminUsersUserIdRouteImport } from './routes/admin/users.$userId'
 
 const StyleGuideRoute = StyleGuideRouteImport.update({
   id: '/style-guide',
@@ -47,20 +54,62 @@ const DashboardRoute = DashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminRoute = AdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AdminIndexRoute = AdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersRoute = AdminUsersRouteImport.update({
+  id: '/users',
+  path: '/users',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminIndexingRoute = AdminIndexingRouteImport.update({
+  id: '/indexing',
+  path: '/indexing',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminImagesRoute = AdminImagesRouteImport.update({
+  id: '/images',
+  path: '/images',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminDashboardRoute = AdminDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminUsersUserIdRoute = AdminUsersUserIdRouteImport.update({
+  id: '/$userId',
+  path: '/$userId',
+  getParentRoute: () => AdminUsersRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/results': typeof ResultsRoute
   '/search': typeof SearchRoute
   '/style-guide': typeof StyleGuideRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/images': typeof AdminImagesRoute
+  '/admin/indexing': typeof AdminIndexingRoute
+  '/admin/users': typeof AdminUsersRouteWithChildren
+  '/admin/': typeof AdminIndexRoute
+  '/admin/users/$userId': typeof AdminUsersUserIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -70,27 +119,47 @@ export interface FileRoutesByTo {
   '/results': typeof ResultsRoute
   '/search': typeof SearchRoute
   '/style-guide': typeof StyleGuideRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/images': typeof AdminImagesRoute
+  '/admin/indexing': typeof AdminIndexingRoute
+  '/admin/users': typeof AdminUsersRouteWithChildren
+  '/admin': typeof AdminIndexRoute
+  '/admin/users/$userId': typeof AdminUsersUserIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/admin': typeof AdminRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
   '/register': typeof RegisterRoute
   '/results': typeof ResultsRoute
   '/search': typeof SearchRoute
   '/style-guide': typeof StyleGuideRoute
+  '/admin/dashboard': typeof AdminDashboardRoute
+  '/admin/images': typeof AdminImagesRoute
+  '/admin/indexing': typeof AdminIndexingRoute
+  '/admin/users': typeof AdminUsersRouteWithChildren
+  '/admin/': typeof AdminIndexRoute
+  '/admin/users/$userId': typeof AdminUsersUserIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/admin'
     | '/dashboard'
     | '/login'
     | '/register'
     | '/results'
     | '/search'
     | '/style-guide'
+    | '/admin/dashboard'
+    | '/admin/images'
+    | '/admin/indexing'
+    | '/admin/users'
+    | '/admin/'
+    | '/admin/users/$userId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -100,19 +169,33 @@ export interface FileRouteTypes {
     | '/results'
     | '/search'
     | '/style-guide'
+    | '/admin/dashboard'
+    | '/admin/images'
+    | '/admin/indexing'
+    | '/admin/users'
+    | '/admin'
+    | '/admin/users/$userId'
   id:
     | '__root__'
     | '/'
+    | '/admin'
     | '/dashboard'
     | '/login'
     | '/register'
     | '/results'
     | '/search'
     | '/style-guide'
+    | '/admin/dashboard'
+    | '/admin/images'
+    | '/admin/indexing'
+    | '/admin/users'
+    | '/admin/'
+    | '/admin/users/$userId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AdminRoute: typeof AdminRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   LoginRoute: typeof LoginRoute
   RegisterRoute: typeof RegisterRoute
@@ -165,6 +248,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DashboardRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin': {
+      id: '/admin'
+      path: '/admin'
+      fullPath: '/admin'
+      preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -172,11 +262,84 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/admin/': {
+      id: '/admin/'
+      path: '/'
+      fullPath: '/admin/'
+      preLoaderRoute: typeof AdminIndexRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users': {
+      id: '/admin/users'
+      path: '/users'
+      fullPath: '/admin/users'
+      preLoaderRoute: typeof AdminUsersRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/indexing': {
+      id: '/admin/indexing'
+      path: '/indexing'
+      fullPath: '/admin/indexing'
+      preLoaderRoute: typeof AdminIndexingRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/images': {
+      id: '/admin/images'
+      path: '/images'
+      fullPath: '/admin/images'
+      preLoaderRoute: typeof AdminImagesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/dashboard': {
+      id: '/admin/dashboard'
+      path: '/dashboard'
+      fullPath: '/admin/dashboard'
+      preLoaderRoute: typeof AdminDashboardRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/users/$userId': {
+      id: '/admin/users/$userId'
+      path: '/$userId'
+      fullPath: '/admin/users/$userId'
+      preLoaderRoute: typeof AdminUsersUserIdRouteImport
+      parentRoute: typeof AdminUsersRoute
+    }
   }
 }
 
+interface AdminUsersRouteChildren {
+  AdminUsersUserIdRoute: typeof AdminUsersUserIdRoute
+}
+
+const AdminUsersRouteChildren: AdminUsersRouteChildren = {
+  AdminUsersUserIdRoute: AdminUsersUserIdRoute,
+}
+
+const AdminUsersRouteWithChildren = AdminUsersRoute._addFileChildren(
+  AdminUsersRouteChildren,
+)
+
+interface AdminRouteChildren {
+  AdminDashboardRoute: typeof AdminDashboardRoute
+  AdminImagesRoute: typeof AdminImagesRoute
+  AdminIndexingRoute: typeof AdminIndexingRoute
+  AdminUsersRoute: typeof AdminUsersRouteWithChildren
+  AdminIndexRoute: typeof AdminIndexRoute
+}
+
+const AdminRouteChildren: AdminRouteChildren = {
+  AdminDashboardRoute: AdminDashboardRoute,
+  AdminImagesRoute: AdminImagesRoute,
+  AdminIndexingRoute: AdminIndexingRoute,
+  AdminUsersRoute: AdminUsersRouteWithChildren,
+  AdminIndexRoute: AdminIndexRoute,
+}
+
+const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AdminRoute: AdminRouteWithChildren,
   DashboardRoute: DashboardRoute,
   LoginRoute: LoginRoute,
   RegisterRoute: RegisterRoute,

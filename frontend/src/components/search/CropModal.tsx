@@ -1,13 +1,13 @@
 import * as React from 'react'
-import Cropper from 'react-easy-crop'
-import type { Area } from 'react-easy-crop'
-import { X, Crop, Check, ZoomIn, ZoomOut } from 'lucide-react'
+import ReactCrop, { type Crop, type PixelCrop } from 'react-image-crop'
+import 'react-image-crop/dist/ReactCrop.css'
+import { X, Crop as CropIcon, Check } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 // ============================================================
-// CropModal — react-easy-crop overlay (spec 3.1)
+// CropModal — react-image-crop overlay
 // Opens when user clicks "Crop" after uploading an image.
-// Alternate path: Cancel → preserve original, no new request.
+// Allows free resizing of the crop box and dragging to edges.
 // ============================================================
 
 interface CropModalProps {
@@ -17,26 +17,56 @@ interface CropModalProps {
 }
 
 // ── Helper: get cropped image as File ────────────────────────
-async function getCroppedImage(imageSrc: string, cropArea: Area): Promise<{ file: File; url: string }> {
-  const image = await createImageBitmap(await (await fetch(imageSrc)).blob())
+async function getCroppedImg(
+  imageElement: HTMLImageElement,
+  crop: PixelCrop,
+  fileName: string
+): Promise<{ file: File; url: string }> {
   const canvas = document.createElement('canvas')
-  canvas.width = cropArea.width
-  canvas.height = cropArea.height
-  const ctx = canvas.getContext('2d')!
-  ctx.drawImage(image, cropArea.x, cropArea.y, cropArea.width, cropArea.height, 0, 0, cropArea.width, cropArea.height)
-  return new Promise((resolve) => {
+  const scaleX = imageElement.naturalWidth / imageElement.width
+  const scaleY = imageElement.naturalHeight / imageElement.height
+  
+  canvas.width = crop.width * scaleX
+  canvas.height = crop.height * scaleY
+  
+  const ctx = canvas.getContext('2d')
+  if (!ctx) throw new Error('No 2d context')
+
+  ctx.imageSmoothingQuality = 'high'
+
+  const cropX = crop.x * scaleX
+  const cropY = crop.y * scaleY
+  const cropWidth = crop.width * scaleX
+  const cropHeight = crop.height * scaleY
+
+  ctx.drawImage(
+    imageElement,
+    cropX,
+    cropY,
+    cropWidth,
+    cropHeight,
+    0,
+    0,
+    cropWidth,
+    cropHeight
+  )
+
+  return new Promise((resolve, reject) => {
     canvas.toBlob((blob) => {
-      if (!blob) throw new Error('Canvas is empty')
-      const file = new File([blob], 'cropped.jpg', { type: 'image/jpeg' })
+      if (!blob) {
+        reject(new Error('Canvas is empty'))
+        return
+      }
+      const file = new File([blob], fileName, { type: 'image/jpeg' })
       resolve({ file, url: URL.createObjectURL(blob) })
-    }, 'image/jpeg', 0.92)
+    }, 'image/jpeg', 0.95)
   })
 }
 
 export function CropModal({ imageSrc, onApply, onCancel }: CropModalProps) {
-  const [crop, setCrop] = React.useState({ x: 0, y: 0 })
-  const [zoom, setZoom] = React.useState(1)
-  const [croppedAreaPixels, setCroppedAreaPixels] = React.useState<Area | null>(null)
+  const [crop, setCrop] = React.useState<Crop>()
+  const [completedCrop, setCompletedCrop] = React.useState<PixelCrop>()
+  const imgRef = React.useRef<HTMLImageElement>(null)
   const [isProcessing, setIsProcessing] = React.useState(false)
 
   // Prevent background scroll
@@ -45,28 +75,36 @@ export function CropModal({ imageSrc, onApply, onCancel }: CropModalProps) {
     return () => { document.body.style.overflow = '' }
   }, [])
 
-  // Close on Escape (spec: "Huỷ giữa chừng → giữ nguyên ảnh gốc")
+  // Close on Escape
   React.useEffect(() => {
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onCancel() }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [onCancel])
 
-  const handleCropComplete = (_: Area, pixelCrop: Area) => {
-    setCroppedAreaPixels(pixelCrop)
-  }
-
   const handleApply = async () => {
-    if (!croppedAreaPixels) return
+    if (!completedCrop || !imgRef.current) return
     setIsProcessing(true)
     try {
-      const { file, url } = await getCroppedImage(imageSrc, croppedAreaPixels)
+      const { file, url } = await getCroppedImg(imgRef.current, completedCrop, 'cropped.jpg')
       onApply(file, url)
     } catch (err) {
       console.error('Crop failed:', err)
     } finally {
       setIsProcessing(false)
     }
+  }
+
+  // Initialize crop to whole image on load
+  const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
+    const { width, height } = e.currentTarget
+    setCrop({
+      unit: '%',
+      x: 10,
+      y: 10,
+      width: 80,
+      height: 80
+    })
   }
 
   return (
@@ -94,7 +132,7 @@ export function CropModal({ imageSrc, onApply, onCancel }: CropModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-white/10 shrink-0">
           <div className="flex items-center gap-2 text-white">
-            <Crop className="size-4" />
+            <CropIcon className="size-4" />
             <span className="text-sm font-semibold">Cắt ảnh</span>
           </div>
           <button
@@ -108,80 +146,50 @@ export function CropModal({ imageSrc, onApply, onCancel }: CropModalProps) {
         </div>
 
         {/* Crop area */}
-        <div className="relative flex-1 bg-black">
-          <Cropper
-            image={imageSrc}
+        <div className="relative flex-1 bg-black flex items-center justify-center p-4 overflow-hidden">
+          <ReactCrop
             crop={crop}
-            zoom={zoom}
-            aspect={undefined} // free crop
-            onCropChange={setCrop}
-            onZoomChange={setZoom}
-            onCropComplete={handleCropComplete}
-            style={{
-              containerStyle: { background: '#111' },
-            }}
-          />
+            onChange={(_, percentCrop) => setCrop(percentCrop)}
+            onComplete={(c) => setCompletedCrop(c)}
+            className="max-h-full max-w-full"
+          >
+            <img
+              ref={imgRef}
+              src={imageSrc}
+              alt="Crop target"
+              onLoad={onImageLoad}
+              className="max-h-full object-contain"
+              style={{ maxHeight: 'calc(100vh - 12rem)' }}
+            />
+          </ReactCrop>
         </div>
 
         {/* Footer controls */}
-        <div className="shrink-0 px-5 py-4 border-t border-white/10 bg-[#1a1a1a] flex items-center gap-4">
-          {/* Zoom control */}
-          <div className="flex items-center gap-2 flex-1">
-            <button
-              type="button"
-              onClick={() => setZoom((z) => Math.max(1, z - 0.2))}
-              className="p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-              aria-label="Thu nhỏ"
-            >
-              <ZoomOut className="size-4" />
-            </button>
-            <input
-              type="range"
-              min={1}
-              max={3}
-              step={0.05}
-              value={zoom}
-              onChange={(e) => setZoom(Number(e.target.value))}
-              className="flex-1 accent-primary"
-              aria-label="Zoom"
-            />
-            <button
-              type="button"
-              onClick={() => setZoom((z) => Math.min(3, z + 0.2))}
-              className="p-1.5 rounded-lg text-white/60 hover:text-white hover:bg-white/10 transition-colors"
-              aria-label="Phóng to"
-            >
-              <ZoomIn className="size-4" />
-            </button>
-          </div>
-
-          {/* Actions */}
-          <div className="flex items-center gap-2 shrink-0">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-4 py-2 rounded-xl border border-white/20 text-white/70 hover:text-white hover:bg-white/10 text-sm font-medium transition-all duration-200"
-            >
-              Huỷ
-            </button>
-            <button
-              type="button"
-              onClick={handleApply}
-              disabled={isProcessing || !croppedAreaPixels}
-              className={cn(
-                'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200',
-                'gradient-brand text-white shadow-brand hover:glow-brand active:scale-[0.98]',
-                'disabled:opacity-50 disabled:cursor-not-allowed',
-              )}
-            >
-              {isProcessing ? (
-                <span className="size-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
-              ) : (
-                <Check className="size-4" />
-              )}
-              Áp dụng cắt
-            </button>
-          </div>
+        <div className="shrink-0 px-5 py-4 border-t border-white/10 bg-[#1a1a1a] flex justify-end items-center gap-4">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="px-4 py-2 rounded-xl border border-white/20 text-white/70 hover:text-white hover:bg-white/10 text-sm font-medium transition-all duration-200"
+          >
+            Huỷ
+          </button>
+          <button
+            type="button"
+            onClick={handleApply}
+            disabled={isProcessing || !completedCrop?.width || !completedCrop?.height}
+            className={cn(
+              'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-all duration-200',
+              'gradient-brand text-white shadow-brand hover:glow-brand active:scale-[0.98]',
+              'disabled:opacity-50 disabled:cursor-not-allowed',
+            )}
+          >
+            {isProcessing ? (
+              <span className="size-4 rounded-full border-2 border-white/40 border-t-white animate-spin" />
+            ) : (
+              <Check className="size-4" />
+            )}
+            Áp dụng cắt
+          </button>
         </div>
       </div>
     </>

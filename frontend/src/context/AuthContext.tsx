@@ -20,6 +20,7 @@ interface AuthContextValue {
   user: User | null
   token: string | null
   isAuthenticated: boolean
+  isAdmin: boolean
   isLoading: boolean
   login: (payload: LoginPayload) => Promise<void>
   register: (payload: RegisterPayload) => Promise<void>
@@ -47,6 +48,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [isLoading, setIsLoading] = React.useState(false)
 
   const isAuthenticatedState = Boolean(token)
+  const isAdminState = user?.role === 'ADMIN'
 
   // ------------------------------------------------------------------
   // login
@@ -107,13 +109,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
       user,
       token,
       isAuthenticated: isAuthenticatedState,
+      isAdmin: isAdminState,
       isLoading,
       login,
       register,
       logout,
       loginAsGuest,
     }),
-    [user, token, isAuthenticatedState, isLoading, login, register, logout, loginAsGuest],
+    [user, token, isAuthenticatedState, isAdminState, isLoading, login, register, logout, loginAsGuest],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

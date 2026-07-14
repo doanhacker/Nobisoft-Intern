@@ -203,14 +203,32 @@ export function ImageDetailModal({ result, onClose, onSearchSimilar }: ImageDeta
             </button>
 
             {/* Download */}
-            <a
-              href={result.fullUrl ?? result.thumbnailUrl}
-              download
-              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-border/60 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-200"
+            <button
+              type="button"
+              onClick={async () => {
+                const url = result.fullUrl ?? result.thumbnailUrl;
+                if (!url) return;
+                try {
+                  const response = await fetch(url);
+                  const blob = await response.blob();
+                  const blobUrl = window.URL.createObjectURL(blob);
+                  const link = document.createElement('a');
+                  link.href = blobUrl;
+                  link.download = url.split('/').pop() || 'download.jpg';
+                  document.body.appendChild(link);
+                  link.click();
+                  link.remove();
+                  window.URL.revokeObjectURL(blobUrl);
+                } catch (error) {
+                  console.error('Download failed:', error);
+                  window.open(url, '_blank');
+                }
+              }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-border/60 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/60 transition-all duration-200 cursor-pointer"
             >
               <Download className="size-4" />
               Tải xuống
-            </a>
+            </button>
           </div>
         </div>
       </div>

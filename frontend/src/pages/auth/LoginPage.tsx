@@ -198,18 +198,6 @@ export function LoginPage() {
             </div>
           </div>
 
-          {/* Bypass login button */}
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            className="w-full border-dashed border-primary/45 text-primary hover:bg-primary/5 hover:text-primary transition-all duration-200 gap-2"
-            onClick={handleBypassLogin}
-          >
-            <Unlock className="size-4" />
-            Vào không cần đăng nhập (Chế độ Demo)
-          </Button>
-
           {/* Register link */}
           <p className="text-center text-sm text-muted-foreground">
             Chưa có tài khoản?{' '}

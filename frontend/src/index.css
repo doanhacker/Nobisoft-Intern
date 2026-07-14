@@ -407,16 +407,16 @@
 
   /* --- Similarity score color helpers --- */
   .similarity-high {
-    color: oklch(0.65 0.18 145);   /* Green > 80% */
-    background: oklch(0.65 0.18 145 / 0.1);
+    color: #ffffff;
+    background: oklch(0.65 0.18 145 / 0.85);
   }
   .similarity-medium {
-    color: oklch(0.75 0.16 65);    /* Amber 50–80% */
-    background: oklch(0.75 0.16 65 / 0.1);
+    color: #ffffff;
+    background: oklch(0.75 0.16 65 / 0.85);
   }
   .similarity-low {
-    color: oklch(0.55 0.05 270);   /* Muted < 50% */
-    background: oklch(0.55 0.05 270 / 0.1);
+    color: #ffffff;
+    background: oklch(0.55 0.05 270 / 0.85);
   }
 
   /* --- Interaction states --- */

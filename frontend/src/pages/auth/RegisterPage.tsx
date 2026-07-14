@@ -55,19 +55,19 @@ export function RegisterPage() {
     }
   }
 
-  // ── Password strength indicator ──
+  // ── Password requirements indicator ──
   const strength = React.useMemo(() => {
     if (!password) return 0
     let s = 0
     if (password.length >= 8) s++
+    if (/[a-z]/.test(password)) s++
     if (/[A-Z]/.test(password)) s++
     if (/[0-9]/.test(password)) s++
     if (/[^A-Za-z0-9]/.test(password)) s++
     return s
   }, [password])
 
-  const strengthLabel = ['', 'Yếu', 'Trung bình', 'Khá', 'Mạnh'][strength] ?? ''
-  const strengthColor = ['', 'bg-destructive', 'bg-amber-500', 'bg-yellow-400', 'bg-green-500'][strength] ?? ''
+  const strengthColor = ['', 'bg-destructive', 'bg-destructive', 'bg-amber-500', 'bg-yellow-400', 'bg-green-500'][strength] ?? ''
 
   return (
     <div className="min-h-screen flex">
@@ -207,11 +207,11 @@ export function RegisterPage() {
                 </button>
               </div>
 
-              {/* Password strength bar */}
+              {/* Password requirements bar */}
               {password && (
                 <div className="space-y-1.5 animate-in fade-in duration-200">
                   <div className="flex gap-1">
-                    {[1, 2, 3, 4].map((i) => (
+                    {[1, 2, 3, 4, 5].map((i) => (
                       <div
                         key={i}
                         className={cn(
@@ -221,19 +221,6 @@ export function RegisterPage() {
                       />
                     ))}
                   </div>
-                  {strengthLabel && (
-                    <p
-                      className={cn(
-                        'text-xs font-medium',
-                        strength === 1 && 'text-destructive',
-                        strength === 2 && 'text-amber-500',
-                        strength === 3 && 'text-yellow-500',
-                        strength === 4 && 'text-green-500',
-                      )}
-                    >
-                      Độ mạnh: {strengthLabel}
-                    </p>
-                  )}
                 </div>
               )}
               {fieldErrors.password && (
