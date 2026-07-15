@@ -70,7 +70,7 @@ async function seedMockImages() {
       await upsertImageVector(image.id, aiResponse.data.embedding, {
         imageId: image.id,
         path: image.path,
-        fileFormat: image.fileFormat,
+        fileFormat: image.fileFormat || 'unknown',
         hasOcr: false,
       });
 

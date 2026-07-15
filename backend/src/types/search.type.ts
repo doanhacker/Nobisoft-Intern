@@ -9,10 +9,10 @@ export interface SearchImageInput {
 export interface SearchImageResultItem {
   id: string;
   imageUrl: string;
-  width: number;
-  height: number;
-  fileSize: number;
-  fileFormat: string;
+  width: number | null;
+  height: number | null;
+  fileSize: number | null;
+  fileFormat: string | null;
   similarityScore: number;
   createdAt: Date;
 }
