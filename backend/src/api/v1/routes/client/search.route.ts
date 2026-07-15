@@ -11,9 +11,11 @@ const searchRouter = Router();
  * @swagger
  * /search/image:
  *   post:
- *     tags: [Search]
+ *     tags: [Client - Search]
  *     summary: Tìm ảnh tương tự bằng hình ảnh
- *     description: Nhận một ảnh, gọi AI tạo embedding và tìm vector tương tự trong Qdrant. Mỗi trang cố định 20 kết quả, FE không cần truyền limit khác.
+ *     description: |
+ *       Nhận 1 ảnh (jpg, png, webp, tối đa 10MB), gọi AI tạo embedding và tìm vector tương tự trong Qdrant.
+ *       Kết quả trả về có phân trang, mỗi trang cố định 20 kết quả.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -27,11 +29,12 @@ const searchRouter = Router();
  *               image:
  *                 type: string
  *                 format: binary
- *                 description: Ảnh JPG, PNG hoặc WebP, tối đa 10MB
+ *                 description: Ảnh cần tìm (jpg, png, webp, tối đa 10MB)
  *               page:
  *                 type: integer
  *                 minimum: 1
  *                 default: 1
+ *                 description: Số trang (mặc định 1)
  *               limit:
  *                 type: integer
  *                 enum: [20]
@@ -61,7 +64,7 @@ const searchRouter = Router();
  *                         $ref: '#/components/schemas/SearchImageResult'
  *                     total:
  *                       type: integer
- *                       example: 20
+ *                       example: 50
  *                     page:
  *                       type: integer
  *                       example: 1
@@ -69,23 +72,32 @@ const searchRouter = Router();
  *                       type: integer
  *                       example: 20
  *       400:
- *         description: File hoặc tham số không hợp lệ
+ *         description: Không có file hoặc file không hợp lệ
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "Vui lòng chọn một ảnh để tìm kiếm"
  *       401:
- *         description: Chưa đăng nhập
+ *         description: Chưa đăng nhập hoặc token hết hạn
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "Vui lòng đăng nhập"
  *       500:
- *         description: AI, Qdrant hoặc Backend gặp lỗi
+ *         description: Lỗi AI Service, Qdrant hoặc Backend
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "Tìm kiếm hình ảnh thất bại"
  */
 searchRouter.post('/image', uploadSearchImage, validateSearchImage, searchByImage);
 

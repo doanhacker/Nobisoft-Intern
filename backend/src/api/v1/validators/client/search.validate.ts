@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
 import type { ApiResponse } from '../../../../types/apiResponse.js';
-import { uploadSingle } from '../../middlewares/upload.middleware.js';
+import { uploadSearchImageMemory } from '../../middlewares/search.middleware.js';
 
 const searchImageSchema = z.object({
   page: z.coerce.number().int().min(1, 'Trang phải lớn hơn hoặc bằng 1').default(1),
@@ -16,7 +16,7 @@ const searchImageSchema = z.object({
 export type SearchImageQuery = z.infer<typeof searchImageSchema>;
 
 export function uploadSearchImage(req: Request, res: Response, next: NextFunction) {
-  uploadSingle(req, res, (error: unknown) => {
+  uploadSearchImageMemory(req, res, (error: unknown) => {
     if (!error) {
       next();
       return;

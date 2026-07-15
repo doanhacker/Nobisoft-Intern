@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import type { ApiResponse } from '../../../../types/apiResponse.js';
 import type { ImageListApiResponse, ImageDetailApiResponse } from '../../../../types/image.type.js';
-import type { ImageListQuery } from '../../validators/admin/image.validate.js';
+import type { ImageListQuery } from '../../validators/client/image.validate.js';
 import * as imageService from '../../services/image.service.js';
 
 export async function listImages(req: Request, res: Response) {
