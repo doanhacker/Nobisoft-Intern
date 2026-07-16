@@ -35,6 +35,28 @@ services:
       - ./storage:/app/storage
       - ./datasets:/app/datasets
 
+  indexing-worker:
+    build: ./indexing-worker
+    container_name: indexing-worker
+    environment:
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+      - AI_SERVICE_URL=${AI_SERVICE_URL}
+      - QDRANT_URL=${QDRANT_URL}
+      - DATABASE_URL=${DATABASE_URL}
+      - STORAGE_DIR=./storage
+    depends_on:
+      database:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      ai-service:
+        condition: service_started
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./storage:/app/storage
+
   frontend:
     build: ./frontend
     container_name: frontend
