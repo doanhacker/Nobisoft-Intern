@@ -58,10 +58,27 @@ export async function saveImageToDisk(
 }
 
 export async function deleteImageFromDisk(relativePath: string): Promise<void> {
-  const absolutePath = path.resolve(relativePath);
+  const absolutePath = resolveStoredImagePath(relativePath);
   try {
     await fs.unlink(absolutePath);
   } catch {
     // File không tồn tại — bỏ qua
   }
+}
+
+export function readImageFromDisk(relativePath: string): Promise<Buffer> {
+  return fs.readFile(resolveStoredImagePath(relativePath));
+}
+
+function resolveStoredImagePath(relativePath: string): string {
+  if (path.isAbsolute(relativePath)) {
+    return relativePath;
+  }
+
+  const normalizedPath = relativePath.replace(/\\/g, '/');
+  const pathInsideStorage = normalizedPath.startsWith('storage/')
+    ? normalizedPath.slice('storage/'.length)
+    : normalizedPath;
+
+  return path.resolve(STORAGE_DIR, pathInsideStorage);
 }

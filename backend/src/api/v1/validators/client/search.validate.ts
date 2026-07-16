@@ -5,6 +5,10 @@ import type { ApiResponse } from '../../../../types/apiResponse.js';
 import { uploadSearchImageMemory } from '../../middlewares/search.middleware.js';
 
 const searchImageSchema = z.object({
+  searchHistoryId: z.preprocess(
+    (value) => value === '' ? undefined : value,
+    z.string().uuid('searchHistoryId không hợp lệ').optional(),
+  ),
   page: z.coerce.number().int().min(1, 'Trang phải lớn hơn hoặc bằng 1').default(1),
   limit: z.coerce
     .number()
@@ -14,6 +18,13 @@ const searchImageSchema = z.object({
 });
 
 export type SearchImageQuery = z.infer<typeof searchImageSchema>;
+
+const searchClickSchema = z.object({
+  searchHistoryId: z.string().uuid('searchHistoryId không hợp lệ'),
+  clickedImageId: z.string().uuid('clickedImageId không hợp lệ'),
+});
+
+export type SearchClickBody = z.infer<typeof searchClickSchema>;
 
 export function uploadSearchImage(req: Request, res: Response, next: NextFunction) {
   uploadSearchImageMemory(req, res, (error: unknown) => {
@@ -35,21 +46,49 @@ export function uploadSearchImage(req: Request, res: Response, next: NextFunctio
 }
 
 export function validateSearchImage(req: Request, res: Response, next: NextFunction) {
-  if (!req.file) {
-    const response: ApiResponse = {
-      success: false,
-      message: 'Vui lòng chọn một ảnh để tìm kiếm',
-    };
-    res.status(400).json(response);
-    return;
-  }
-
   const result = searchImageSchema.safeParse(req.body);
 
   if (!result.success) {
     const response: ApiResponse = {
       success: false,
       message: result.error.issues[0]?.message ?? 'Tham số tìm kiếm không hợp lệ',
+    };
+    res.status(400).json(response);
+    return;
+  }
+
+  const hasImage = Boolean(req.file);
+  const hasSearchHistoryId = Boolean(result.data.searchHistoryId);
+
+  if (hasImage === hasSearchHistoryId) {
+    const response: ApiResponse = {
+      success: false,
+      message: 'Chỉ gửi ảnh khi tìm kiếm mới hoặc searchHistoryId khi chuyển trang',
+    };
+    res.status(400).json(response);
+    return;
+  }
+
+  if (hasImage && result.data.page !== 1) {
+    const response: ApiResponse = {
+      success: false,
+      message: 'Tìm kiếm mới phải bắt đầu từ trang 1',
+    };
+    res.status(400).json(response);
+    return;
+  }
+
+  req.body = result.data;
+  next();
+}
+
+export function validateSearchClick(req: Request, res: Response, next: NextFunction) {
+  const result = searchClickSchema.safeParse(req.body);
+
+  if (!result.success) {
+    const response: ApiResponse = {
+      success: false,
+      message: result.error.issues[0]?.message ?? 'Dữ liệu lượt click không hợp lệ',
     };
     res.status(400).json(response);
     return;
