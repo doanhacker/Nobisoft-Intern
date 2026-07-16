@@ -15,7 +15,7 @@ const searchRouter = Router();
  * @swagger
  * /search/image:
  *   post:
- *     tags: [Search]
+ *     tags: [Client - Search]
  *     summary: Tìm ảnh tương tự bằng hình ảnh
  *     description: Lần đầu gửi ảnh để tạo lịch sử. Khi đổi trang, kể cả quay lại trang 1, chỉ gửi searchHistoryId và page để không tạo lịch sử mới.
  *     security:
@@ -31,7 +31,7 @@ const searchRouter = Router();
  *               image:
  *                 type: string
  *                 format: binary
- *                 description: Ảnh JPG, PNG hoặc WebP, tối đa 10MB
+ *                 description: Ảnh cần tìm (jpg, png, webp, tối đa 10MB)
  *               page:
  *                 type: integer
  *                 enum: [1]
@@ -98,13 +98,16 @@ const searchRouter = Router();
  *                       type: integer
  *                       example: 20
  *       400:
- *         description: File hoặc tham số không hợp lệ
+ *         description: Không có file hoặc file không hợp lệ
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "Vui lòng chọn một ảnh để tìm kiếm"
  *       401:
- *         description: Chưa đăng nhập
+ *         description: Chưa đăng nhập hoặc token hết hạn
  *         content:
  *           application/json:
  *             schema:
@@ -116,11 +119,14 @@ const searchRouter = Router();
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
- *         description: AI, Qdrant hoặc Backend gặp lỗi
+ *         description: Lỗi AI Service, Qdrant hoặc Backend
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "Tìm kiếm hình ảnh thất bại"
  */
 searchRouter.post('/image', uploadSearchImage, validateSearchImage, searchByImage);
 

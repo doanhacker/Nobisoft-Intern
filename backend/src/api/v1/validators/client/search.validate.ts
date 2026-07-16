@@ -2,7 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
 import type { ApiResponse } from '../../../../types/apiResponse.js';
-import { uploadSingle } from '../../middlewares/upload.middleware.js';
+import { uploadSearchImageMemory } from '../../middlewares/search.middleware.js';
 
 const searchImageSchema = z.object({
   searchHistoryId: z.preprocess(
@@ -27,7 +27,7 @@ const searchClickSchema = z.object({
 export type SearchClickBody = z.infer<typeof searchClickSchema>;
 
 export function uploadSearchImage(req: Request, res: Response, next: NextFunction) {
-  uploadSingle(req, res, (error: unknown) => {
+  uploadSearchImageMemory(req, res, (error: unknown) => {
     if (!error) {
       next();
       return;

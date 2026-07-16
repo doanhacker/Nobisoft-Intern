@@ -10,6 +10,9 @@ const authRouter = Router();
  *   post:
  *     tags: [Auth]
  *     summary: Đăng ký tài khoản mới
+ *     description: |
+ *       Tạo tài khoản người dùng mới.
+ *       Mật khẩu phải tối thiểu 8 ký tự, bao gồm chữ hoa, chữ thường, chữ số và ký tự đặc biệt.
  *     requestBody:
  *       required: true
  *       content:
@@ -18,42 +21,58 @@ const authRouter = Router();
  *             $ref: '#/components/schemas/RegisterRequest'
  *     responses:
  *       201:
- *         description: Đăng ký thành công
+ *         description: Đăng ký thành công, trả về thông tin user
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/RegisterResponse'
  *       400:
- *         description: Dữ liệu không hợp lệ
+ *         description: Dữ liệu không hợp lệ (email sai định dạng, mật khẩu yếu, tên trống...)
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *             examples:
- *               invalidPasswordFormat:
- *                 summary: Mật khẩu không đúng định dạng
+ *               invalidEmail:
  *                 value:
  *                   success: false
- *                   message: Mật khẩu phải tối thiểu 8 ký tự bao gồm chữ hoa, chữ thường, chữ số và ký tự đặc biệt
- *               passwordTooLong:
- *                 summary: Mật khẩu vượt quá độ dài cho phép
+ *                   message: "Email không hợp lệ"
+ *               weakPassword:
  *                 value:
  *                   success: false
- *                   message: Mật khẩu vượt quá độ dài cho phép
+ *                   message: "Mật khẩu phải tối thiểu 8 ký tự bao gồm chữ hoa, chữ thường, chữ số và ký tự đặc biệt"
+ *               emptyName:
+ *                 value:
+ *                   success: false
+ *                   message: "Tên không được để trống"
  *       409:
- *         description: Email đã tồn tại
+ *         description: Email đã được sử dụng
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "Email đã được sử dụng"
+ *       500:
+ *         description: Lỗi server
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "Đăng ký thất bại"
  */
 authRouter.post('/register', validateRegister, authController.register);
+
 /**
  * @swagger
  * /auth/login:
  *   post:
  *     tags: [Auth]
  *     summary: Đăng nhập
+ *     description: Xác thực tài khoản và trả về JWT access token.
  *     requestBody:
  *       required: true
  *       content:
@@ -62,23 +81,38 @@ authRouter.post('/register', validateRegister, authController.register);
  *             $ref: '#/components/schemas/LoginRequest'
  *     responses:
  *       200:
- *         description: Đăng nhập thành công
+ *         description: Đăng nhập thành công, trả về access token và thông tin user
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/LoginResponse'
  *       400:
- *         description: Dữ liệu đăng nhập không hợp lệ
+ *         description: Dữ liệu đăng nhập không hợp lệ (thiếu email hoặc mật khẩu)
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "Email không hợp lệ"
  *       401:
  *         description: Email hoặc mật khẩu không đúng
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "Email hoặc mật khẩu không đúng"
+ *       500:
+ *         description: Lỗi server
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "Đăng nhập thất bại"
  */
 authRouter.post('/login', validateLogin, authController.login);
 

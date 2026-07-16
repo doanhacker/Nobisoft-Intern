@@ -14,17 +14,17 @@ export interface OcrLineDetail extends OcrLinePreview {
 export interface ImageIndexInfo {
   id: string;
   processDurationMs: number | null;
-  indexedAt: Date;
+  indexedAt: Date | null;
   ocrLines: OcrLinePreview[];
 }
 
 export interface ImageListItem {
   id: string;
   imageUrl: string;
-  width: number;
-  height: number;
-  fileSize: number;
-  fileFormat: string;
+  width: number | null;
+  height: number | null;
+  fileSize: number | null;
+  fileFormat: string | null;
   createdAt: Date;
   imageIndex: ImageIndexInfo | null;
 }

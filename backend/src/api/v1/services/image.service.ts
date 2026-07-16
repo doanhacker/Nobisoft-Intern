@@ -1,7 +1,7 @@
 import { prisma } from '../../../config/prisma.js';
 import { deleteImageVector } from '../../../services/qdrant.service.js';
 import { deleteImageFromDisk } from '../../../utils/storage.util.js';
-import type { ImageListQuery } from '../validators/admin/image.validate.js';
+import type { ImageListQuery } from '../validators/client/image.validate.js';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 

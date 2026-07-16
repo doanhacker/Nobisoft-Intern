@@ -13,6 +13,12 @@ enum Role {
   USER
 }
 
+enum IndexStatus {
+  PENDING
+  SUCCESS
+  FAILED
+}
+
 model User {
   id         String    @id @default(uuid()) @db.Uuid
   email      String    @unique @db.VarChar(50)
@@ -33,10 +39,10 @@ model User {
 model Image {
   id         String   @id @default(uuid()) @db.Uuid
   path       String   @db.VarChar(500)
-  width      Int
-  height     Int
-  fileSize   Int
-  fileFormat String   @db.VarChar(20)
+  width      Int?
+  height     Int?
+  fileSize   Int?
+  fileFormat String?  @db.VarChar(20)
   createdAt  DateTime @default(now()) @db.Timestamptz()
 
   imageIndex      ImageIndex?
@@ -47,10 +53,11 @@ model Image {
 }
 
 model ImageIndex {
-  id                String   @id @default(uuid()) @db.Uuid
-  imageId           String   @unique @db.Uuid
+  id                String      @id @default(uuid()) @db.Uuid
+  imageId           String      @unique @db.Uuid
+  status            IndexStatus @default(PENDING)
   processDurationMs Int?
-  indexedAt         DateTime @default(now()) @db.Timestamptz()
+  indexedAt         DateTime?   @db.Timestamptz()
 
   image    Image      @relation(fields: [imageId], references: [id], onDelete: Cascade)
   ocrLines ImageOcr[]
