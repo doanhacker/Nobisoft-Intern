@@ -10,7 +10,7 @@ export async function processImageUploads(files: Express.Multer.File[]) {
   for (const file of files) {
     // 1. Kiểm tra định dạng (multer đôi khi lọt nếu setup lỏng)
     const ext = file.originalname.split('.').pop()?.toLowerCase() || '';
-    if (!['jpg', 'jpeg', 'png', 'webp'].includes(ext)) {
+    if (!['jpg', 'jpeg', 'png', 'webp', 'avif'].includes(ext)) {
       if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
       results.push({ filename: file.originalname, success: false, error: 'Định dạng không hợp lệ' });
       continue;

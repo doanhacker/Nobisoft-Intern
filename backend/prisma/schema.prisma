@@ -57,7 +57,7 @@ model ImageIndex {
   imageId           String      @unique @db.Uuid
   status            IndexStatus @default(PENDING)
   processDurationMs Int?
-  indexedAt         DateTime    @default(now()) @db.Timestamptz()
+  indexedAt         DateTime?   @db.Timestamptz()
 
   image    Image      @relation(fields: [imageId], references: [id], onDelete: Cascade)
   ocrLines ImageOcr[]

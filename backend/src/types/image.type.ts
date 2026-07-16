@@ -14,7 +14,7 @@ export interface OcrLineDetail extends OcrLinePreview {
 export interface ImageIndexInfo {
   id: string;
   processDurationMs: number | null;
-  indexedAt: Date;
+  indexedAt: Date | null;
   ocrLines: OcrLinePreview[];
 }
 
