@@ -96,8 +96,7 @@ export function CropModal({ imageSrc, onApply, onCancel }: CropModalProps) {
   }
 
   // Initialize crop to whole image on load
-  const onImageLoad = (e: React.SyntheticEvent<HTMLImageElement>) => {
-    const { width, height } = e.currentTarget
+  const onImageLoad = (_e: React.SyntheticEvent<HTMLImageElement>) => {
     setCrop({
       unit: '%',
       x: 10,

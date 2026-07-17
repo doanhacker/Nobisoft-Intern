@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as UploadRouteImport } from './routes/upload'
 import { Route as StyleGuideRouteImport } from './routes/style-guide'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as ResultsRouteImport } from './routes/results'
@@ -24,6 +25,11 @@ import { Route as AdminImagesRouteImport } from './routes/admin/images'
 import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
 import { Route as AdminUsersUserIdRouteImport } from './routes/admin/users.$userId'
 
+const UploadRoute = UploadRouteImport.update({
+  id: '/upload',
+  path: '/upload',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StyleGuideRoute = StyleGuideRouteImport.update({
   id: '/style-guide',
   path: '/style-guide',
@@ -104,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/results': typeof ResultsRoute
   '/search': typeof SearchRoute
   '/style-guide': typeof StyleGuideRoute
+  '/upload': typeof UploadRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/images': typeof AdminImagesRoute
   '/admin/indexing': typeof AdminIndexingRoute
@@ -119,6 +126,7 @@ export interface FileRoutesByTo {
   '/results': typeof ResultsRoute
   '/search': typeof SearchRoute
   '/style-guide': typeof StyleGuideRoute
+  '/upload': typeof UploadRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/images': typeof AdminImagesRoute
   '/admin/indexing': typeof AdminIndexingRoute
@@ -136,6 +144,7 @@ export interface FileRoutesById {
   '/results': typeof ResultsRoute
   '/search': typeof SearchRoute
   '/style-guide': typeof StyleGuideRoute
+  '/upload': typeof UploadRoute
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/images': typeof AdminImagesRoute
   '/admin/indexing': typeof AdminIndexingRoute
@@ -154,6 +163,7 @@ export interface FileRouteTypes {
     | '/results'
     | '/search'
     | '/style-guide'
+    | '/upload'
     | '/admin/dashboard'
     | '/admin/images'
     | '/admin/indexing'
@@ -169,6 +179,7 @@ export interface FileRouteTypes {
     | '/results'
     | '/search'
     | '/style-guide'
+    | '/upload'
     | '/admin/dashboard'
     | '/admin/images'
     | '/admin/indexing'
@@ -185,6 +196,7 @@ export interface FileRouteTypes {
     | '/results'
     | '/search'
     | '/style-guide'
+    | '/upload'
     | '/admin/dashboard'
     | '/admin/images'
     | '/admin/indexing'
@@ -202,10 +214,18 @@ export interface RootRouteChildren {
   ResultsRoute: typeof ResultsRoute
   SearchRoute: typeof SearchRoute
   StyleGuideRoute: typeof StyleGuideRoute
+  UploadRoute: typeof UploadRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/upload': {
+      id: '/upload'
+      path: '/upload'
+      fullPath: '/upload'
+      preLoaderRoute: typeof UploadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/style-guide': {
       id: '/style-guide'
       path: '/style-guide'
@@ -346,6 +366,7 @@ const rootRouteChildren: RootRouteChildren = {
   ResultsRoute: ResultsRoute,
   SearchRoute: SearchRoute,
   StyleGuideRoute: StyleGuideRoute,
+  UploadRoute: UploadRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
