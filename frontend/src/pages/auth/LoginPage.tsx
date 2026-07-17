@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Link, useNavigate } from '@tanstack/react-router'
-import { Eye, EyeOff, Loader2, LogIn, Sparkles, Unlock } from 'lucide-react'
+import { Eye, EyeOff, Loader2, LogIn, Sparkles } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,7 +12,7 @@ import { cn } from '@/lib/utils'
 // ============================================================
 
 export function LoginPage() {
-  const { login, loginAsGuest, isLoading } = useAuth()
+  const { login, isLoading } = useAuth()
   const navigate = useNavigate()
 
   const [email, setEmail] = React.useState('')
@@ -36,10 +36,11 @@ export function LoginPage() {
     }
   }
 
-  const handleBypassLogin = () => {
-    loginAsGuest()
-    navigate({ to: '/search' })
-  }
+  // TODO: bypass login for development — remove before production
+  // const handleBypassLogin = () => {
+  //   loginAsGuest()
+  //   navigate({ to: '/search' })
+  // }
 
   return (
     <div className="min-h-screen flex">
