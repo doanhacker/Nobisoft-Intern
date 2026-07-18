@@ -97,7 +97,10 @@ export async function getImageSearchHistory(
 
   return {
     id: history.id,
-    queryImage: history.queryImage,
+    queryImage: {
+      path: history.queryImage.path,
+      fileFormat: history.queryImage.fileFormat ?? '',
+    }
   };
 }
 
