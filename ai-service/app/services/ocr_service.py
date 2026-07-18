@@ -1,118 +1,66 @@
-"""
-OCR Service — EasyOCR Singleton
-================================
-Module trích xuất text từ ảnh sử dụng EasyOCR.
-Áp dụng Singleton Pattern giống ClipEngine để tránh nạp model OCR nhiều lần.
-
-Output format tuân theo API contract:
-    ocrLines: [{rawText, confidenceScore, boundingBox}, ...]
-"""
-
-import io
-import logging
-import threading
+import re
+import unicodedata
+from collections.abc import Sequence
+from typing import cast
 
 import easyocr
+import numpy as np
 from PIL import Image
 
-logger = logging.getLogger(__name__)
+from app.core.config import OCR_LANGUAGES
+from app.schemas.indexing import OcrResult
 
 
-class OcrEngine:
-    """
-    Singleton class quản lý EasyOCR Reader.
+def normalize_text(text: str) -> str:
+    normalized = unicodedata.normalize("NFKC", text)
+    normalized = normalized.lower().strip()
+    normalized = re.sub(r"\s+", " ", normalized)
+    return normalized
 
-    Usage:
-        ocr = OcrEngine()
-        lines = ocr.extract_text_from_bytes(image_bytes)
-    """
 
-    _instance = None
-    _lock = threading.Lock()
+class OcrService:
+    def __init__(self) -> None:
+        self.reader = easyocr.Reader(
+            OCR_LANGUAGES,
+            gpu=False,
+        )
 
-    def __new__(cls):
-        if cls._instance is None:
-            with cls._lock:
-                if cls._instance is None:
-                    logger.info("Khởi tạo OcrEngine: Nạp mô hình EasyOCR...")
-                    instance = super(OcrEngine, cls).__new__(cls)
-                    instance._initialize()
-                    cls._instance = instance
-        return cls._instance
+    def extract_text(
+        self,
+        image: Image.Image,
+    ) -> list[OcrResult]:
+        image_array = np.asarray(image)
 
-    def _initialize(self):
-        """Nạp EasyOCR Reader vào bộ nhớ."""
-        # gpu=False cho môi trường không có GPU, tự chuyển sang GPU nếu có
-        self.reader = easyocr.Reader(["en"], gpu=False)
-        logger.info("OcrEngine đã sẵn sàng.")
+        raw_results = self.reader.readtext(
+            image_array,
+            detail=1,
+            paragraph=False,
+        )
 
-    def extract_text_from_bytes(self, image_bytes: bytes) -> list[dict]:
-        """
-        Trích xuất text từ ảnh (bytes) và trả về theo format API contract.
+        results: list[OcrResult] = []
 
-        Args:
-            image_bytes: Dữ liệu binary của ảnh
+        for bounding_box, text, confidence in raw_results:
+            clean_text = text.strip()
 
-        Returns:
-            List[dict] với mỗi phần tử có format:
-            {
-                "rawText": str,
-                "confidenceScore": float,
-                "boundingBox": {"x": int, "y": int, "width": int, "height": int}
-            }
-            Trả về [] nếu ảnh không có text hoặc lỗi.
-        """
-        try:
-            image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+            if not clean_text:
+                continue
 
-            # EasyOCR nhận numpy array
-            import numpy as np
+            points = cast(
+                Sequence[Sequence[float]],
+                bounding_box,
+            )
+            integer_box: list[list[int]] = [
+                [int(round(point[0])), int(round(point[1]))]
+                for point in points
+            ]
 
-            image_np = np.array(image)
-
-            # readtext trả về: [(bbox, text, confidence), ...]
-            # bbox là list 4 điểm [[x1,y1],[x2,y2],[x3,y3],[x4,y4]]
-            results = self.reader.readtext(image_np)
-
-            ocr_lines = []
-            for bbox, text, confidence in results:
-                # Chỉ giữ kết quả có confidence >= 0.3
-                if confidence < 0.3:
-                    continue
-
-                # Chuyển bbox 4 điểm thành {x, y, width, height}
-                x_coords = [point[0] for point in bbox]
-                y_coords = [point[1] for point in bbox]
-                x_min = int(min(x_coords))
-                y_min = int(min(y_coords))
-                width = int(max(x_coords) - x_min)
-                height = int(max(y_coords) - y_min)
-
-                ocr_lines.append(
-                    {
-                        "rawText": text,
-                        "confidenceScore": round(float(confidence), 4),
-                        "boundingBox": {
-                            "x": x_min,
-                            "y": y_min,
-                            "width": width,
-                            "height": height,
-                        },
-                    }
+            results.append(
+                OcrResult(
+                    text=clean_text,
+                    normalized_text=normalize_text(clean_text),
+                    confidence=float(confidence),
+                    bounding_box=integer_box,
                 )
+            )
 
-            logger.info(f"OCR phát hiện {len(ocr_lines)} dòng text.")
-            return ocr_lines
-
-        except Exception as e:
-            logger.error(f"Lỗi OCR: {str(e)}")
-            return []
-
-    def extract_text_from_path(self, image_path: str) -> list[dict]:
-        """Trích xuất text từ file path."""
-        try:
-            with open(image_path, "rb") as f:
-                return self.extract_text_from_bytes(f.read())
-        except FileNotFoundError:
-            logger.error(f"OCR: Không tìm thấy file {image_path}")
-            return []
+        return results

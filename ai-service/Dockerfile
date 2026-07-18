@@ -8,8 +8,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libglib2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
-# Cài PyTorch + torchvision CPU-only trước (nhẹ hơn ~3x so với bản full)
-RUN pip install --no-cache-dir torch torchvision --index-url https://download.pytorch.org/whl/cpu
+# Cài đúng bộ PyTorch CPU-only trước để requirements không kéo bản GPU.
+RUN pip install --no-cache-dir \
+    torch==2.13.0 \
+    torchvision==0.28.0 \
+    --index-url https://download.pytorch.org/whl/cpu
 
 # Cài các dependencies còn lại
 COPY requirements.txt .
@@ -21,8 +24,8 @@ COPY app ./app
 # Tải trước CLIP model vào image (force re-download để fix lỗi model bị corrupt)
 RUN python -c "from transformers import CLIPModel, CLIPProcessor; CLIPModel.from_pretrained('openai/clip-vit-base-patch32'); CLIPProcessor.from_pretrained('openai/clip-vit-base-patch32'); print('CLIP model cached successfully')"
 
-# Tải trước EasyOCR models (English detection & recognition) vào image
-RUN python -c "import easyocr; easyocr.Reader(['en'], gpu=False); print('EasyOCR models cached successfully')"
+# Tải trước đúng bộ EasyOCR mà ứng dụng sử dụng để runtime không cần tải thêm.
+RUN python -c "import easyocr; easyocr.Reader(['en', 'vi'], gpu=False); print('EasyOCR models cached successfully')"
 
 EXPOSE 9000
 
