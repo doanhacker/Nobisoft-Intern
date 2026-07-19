@@ -6,13 +6,9 @@ import {
   Images,
   UploadCloud,
   ScanSearch,
-  LogOut,
   ChevronRight,
 } from 'lucide-react'
-import { useAuth } from '@/hooks/useAuth'
-import { useNavigate } from '@tanstack/react-router'
 import { cn } from '@/lib/utils'
-import { Button } from '@/components/ui/button'
 
 // ============================================================
 // Navigation items config
@@ -90,14 +86,6 @@ interface AdminSidebarProps {
 }
 
 export function AdminSidebar({ onClose }: AdminSidebarProps) {
-  const { user, logout } = useAuth()
-  const navigate = useNavigate()
-
-  const handleLogout = () => {
-    logout()
-    navigate({ to: '/login' })
-  }
-
   return (
     <aside className="flex flex-col h-full w-64 border-r border-border/50 bg-card/50 backdrop-blur-sm">
       {/* ── Brand ── */}

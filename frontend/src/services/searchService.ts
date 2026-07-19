@@ -3,10 +3,18 @@ import type { SearchResult } from '@/components/results/MasonryGrid'
 
 // ============================================================
 // searchService.ts — Visual Search API integration
-// POST /search/image
+// POST /search/image  (2 modes in 1 endpoint)
+//
+// Mode A — New search (sends image file):
+//   multipart/form-data  { image: File, page: 1, limit: 20 }
+//   → Backend creates SearchHistory, returns searchHistoryId
+//
+// Mode B — Page navigation (sends searchHistoryId):
+//   application/json     { searchHistoryId: string, page: N, limit: 20 }
+//   → Backend re-reads the stored query image, does NOT create a new history record
 // ============================================================
 
-// ── Types matching backend SearchImageResultItem ──────────────
+// ── Backend response types ────────────────────────────────────
 
 interface SearchImageResultItem {
   id: string
@@ -21,7 +29,9 @@ interface SearchImageResultItem {
 
 interface SearchImageApiResponse {
   success: true
+  message: string
   data: {
+    searchHistoryId: string
     searchType: 'IMAGE_ONLY'
     results: SearchImageResultItem[]
     total: number
@@ -53,6 +63,18 @@ export function getPendingImageFile(): File | null {
   return _pendingImageFile
 }
 
+// ── Shared result type ────────────────────────────────────────
+
+export interface SearchByImageResult {
+  /** The backend-assigned ID for this search session. Must be stored in FE state
+   *  and passed to `searchByImagePage()` on subsequent page changes. */
+  searchHistoryId: string
+  results: SearchResult[]
+  total: number
+  page: number
+  limit: number
+}
+
 // ── Map backend item → frontend SearchResult ─────────────────
 
 function mapToSearchResult(item: SearchImageResultItem): SearchResult {
@@ -70,58 +92,75 @@ function mapToSearchResult(item: SearchImageResultItem): SearchResult {
   }
 }
 
-// ── API call ──────────────────────────────────────────────────
-
-export interface SearchByImageOptions {
-  file: File
-  page?: number
-  signal?: AbortSignal
-}
-
-export interface SearchByImageResult {
-  results: SearchResult[]
-  total: number
-  page: number
-  limit: number
-}
-
-/**
- * Call POST /search/image with the given image file.
- * Returns up to 20 similar images sorted by similarity score (descending),
- * along with pagination metadata (total, page, limit).
- *
- * @throws {Error} on HTTP error or if the backend returns success: false
- */
-export async function searchByImage({
-  file,
-  page = 1,
-  signal,
-}: SearchByImageOptions): Promise<SearchByImageResult> {
-  const formData = new FormData()
-  formData.append('image', file)
-  formData.append('page', String(page))
-  formData.append('limit', '20')
-
-  const response = await axiosClient.post<SearchImageApiResponse>(
-    '/search/image',
-    formData,
-    {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-      signal,
-      timeout: 30_000,
-    },
-  )
-
-  const { data } = response.data
+function parseResponse(raw: SearchImageApiResponse): SearchByImageResult {
+  const { data } = raw
   return {
+    searchHistoryId: data.searchHistoryId,
     results: data.results.map(mapToSearchResult),
     total: data.total,
     page: data.page,
     limit: data.limit,
   }
 }
+
+// ── Mode A: New search with image file ────────────────────────
+
+/**
+ * First search in a session — sends the image file as multipart.
+ *
+ * Backend will:
+ * 1. Save the query image to disk
+ * 2. Create a `SearchHistory` record
+ * 3. Run the CLIP embedding + vector search
+ * 4. Return `searchHistoryId` for use in subsequent page-change calls
+ *
+ * Always called with `page = 1` (backend enforces this).
+ *
+ * @throws on HTTP error or AI/Qdrant failure
+ */
+export async function searchByImageFile(
+  file: File,
+  signal?: AbortSignal,
+): Promise<SearchByImageResult> {
+  const formData = new FormData()
+  formData.append('image', file)
+  formData.append('page', '1')
+  formData.append('limit', '20')
+
+  const { data } = await axiosClient.post<SearchImageApiResponse>('/search/image', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    signal,
+    timeout: 30_000,
+  })
+
+  return parseResponse(data)
+}
+
+// ── Mode B: Page navigation with searchHistoryId ─────────────
+
+/**
+ * Subsequent page changes within the same image search session.
+ *
+ * Sends `searchHistoryId` (UUID from the first search) + desired `page` as JSON.
+ * Backend re-reads the stored query image from disk and does NOT create a new history.
+ *
+ * @throws on HTTP error, history-not-found (404), page out of range (400)
+ */
+export async function searchByImagePage(
+  searchHistoryId: string,
+  page: number,
+  signal?: AbortSignal,
+): Promise<SearchByImageResult> {
+  const { data } = await axiosClient.post<SearchImageApiResponse>(
+    '/search/image',
+    { searchHistoryId, page, limit: 20 },
+    { signal, timeout: 30_000 },
+  )
+
+  return parseResponse(data)
+}
+
+// ── Utility: fetch image URL as File ─────────────────────────
 
 /**
  * Fetch an image URL and convert it to a File object.

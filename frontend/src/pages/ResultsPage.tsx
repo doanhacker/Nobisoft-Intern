@@ -17,7 +17,7 @@ import { ResultsSidebar } from '@/components/results/ResultsSidebar'
 import { ResultsSearchBar, type ResultsSearchState, type SearchMode } from '@/components/results/ResultsSearchBar'
 import { ImageSearchModal } from '@/components/results/ImageSearchModal'
 import { getMockResults } from '@/services/mockData'
-import { searchByImage, getPendingImageFile, setPendingImageFile, fetchImageAsFile } from '@/services/searchService'
+import { searchByImageFile, searchByImagePage, getPendingImageFile, setPendingImageFile, fetchImageAsFile } from '@/services/searchService'
 import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
 
@@ -184,7 +184,7 @@ function QueryImagePanel({
 export function ResultsPage() {
   const search = useSearch({ from: '/results' }) as ResultsSearch
   const navigate = useNavigate()
-  const { error: toastError, info: toastInfo } = useToast()
+  const { error: toastError } = useToast()
 
   // ── State ──
   const [results, setResults] = React.useState<SearchResult[]>([])
@@ -197,6 +197,10 @@ export function ResultsPage() {
   const [queryImageFile, setQueryImageFile] = React.useState<File | null>(null)
   const [queryImagePreviewUrl, setQueryImagePreviewUrl] = React.useState<string | null>(null)
   const [showImageModalFromPanel, setShowImageModalFromPanel] = React.useState(false)
+
+  // searchHistoryId returned by the backend on the first image search of a session.
+  // Passed to subsequent page-change calls so the backend does NOT create a duplicate history.
+  const [searchHistoryId, setSearchHistoryId] = React.useState<string | null>(null)
 
   // On mount: restore query image preview from sessionStorage when coming from /search page.
   // The File object cannot be passed via URL, so SearchPage stores the blob URL in sessionStorage
@@ -238,22 +242,33 @@ export function ResultsPage() {
         let currentLimit = 20
 
         if (fetchMode === 'image') {
-          // Use the overrideFile (from re-search), or the pending file stored by SearchPage,
-          // or the current queryImageFile state (e.g., user changed image from QueryImagePanel).
-          const file = overrideFile !== undefined
-            ? overrideFile
-            : getPendingImageFile() ?? queryImageFile
+          // Determine whether this is a NEW search (has a file) or a PAGE CHANGE (has searchHistoryId).
+          //
+          // Priority:
+          //   1. overrideFile — explicit re-search triggered by handleSearch / handleSearchSimilar
+          //   2. pendingImageFile — file stored by SearchPage before navigating here
+          //   3. current searchHistoryId in state — pure page navigation (no new file)
+          const pendingFile = getPendingImageFile()
+          const file = overrideFile !== undefined ? overrideFile : pendingFile ?? queryImageFile
 
-          if (!file) {
-            // No file available (e.g. user refreshed the page directly on /results?mode=image)
+          if (file) {
+            // ── Mode A: New search — send file, get back a fresh searchHistoryId ──
+            const response = await searchByImageFile(file, controller.signal)
+            setSearchHistoryId(response.searchHistoryId)
+            data = response.results
+            currentTotal = response.total
+            currentLimit = response.limit
+          } else if (searchHistoryId) {
+            // ── Mode B: Page navigation — send searchHistoryId, no new history created ──
+            const response = await searchByImagePage(searchHistoryId, fetchPage, controller.signal)
+            data = response.results
+            currentTotal = response.total
+            currentLimit = response.limit
+          } else {
+            // No file and no history (e.g. user refreshed directly on /results?mode=image)
             setStatus('idle')
             return
           }
-
-          const response = await searchByImage({ file, page: fetchPage, signal: controller.signal })
-          data = response.results
-          currentTotal = response.total
-          currentLimit = response.limit
         } else {
           // Text-based modes: keep using mock data until those APIs are ready
           data = await getMockResults({
@@ -286,7 +301,7 @@ export function ResultsPage() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [toastError, queryImageFile],
+    [toastError, queryImageFile, searchHistoryId],
   )
 
   React.useEffect(() => {
@@ -316,11 +331,14 @@ export function ResultsPage() {
       setQueryImagePreviewUrl(state.imagePreviewUrl)
       // Store in module singleton so fetchResults can access it via URL-triggered effect
       setPendingImageFile(state.imageFile)
+      // Reset history so fetchResults uses Mode A (new search with file)
+      setSearchHistoryId(null)
     } else {
       // Clear image state when switching to text mode
       setQueryImageFile(null)
       setQueryImagePreviewUrl(null)
       setPendingImageFile(null)
+      setSearchHistoryId(null)
     }
     navigate({ to: '/results', search: params as unknown as ResultsSearch })
   }
@@ -357,6 +375,8 @@ export function ResultsPage() {
       setQueryImageFile(file)
       setQueryImagePreviewUrl(urlToFetch)
       setPendingImageFile(file)
+      // New image = new search session — reset history so fetchResults uses Mode A
+      setSearchHistoryId(null)
       
       navigate({
         to: '/results',

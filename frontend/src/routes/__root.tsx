@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { createRootRoute, Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/router-devtools'
-import { ScanSearch, LogIn, LogOut, Search, UserCircle2, Menu, X, LayoutDashboard } from 'lucide-react'
+import { ScanSearch, LogIn, LogOut, Search, UserCircle2, Menu, X, LayoutDashboard, UploadCloud } from 'lucide-react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ThemeProvider } from '@/context/ThemeContext'
 import { AuthProvider } from '@/context/AuthContext'
@@ -174,9 +174,14 @@ function AppShell() {
           {/* ── Desktop Navigation ── */}
           <nav className="hidden sm:flex items-center gap-1.5">
             {isAuthenticated && (
-              <NavLink to="/search" icon={<Search className="size-3.5" />}>
-                Search
-              </NavLink>
+              <>
+                <NavLink to="/search" icon={<Search className="size-3.5" />}>
+                  Search
+                </NavLink>
+                <NavLink to="/upload" icon={<UploadCloud className="size-3.5" />}>
+                  Tải ảnh lên
+                </NavLink>
+              </>
             )}
 
             {isAuthenticated ? (
@@ -264,13 +269,22 @@ function AppShell() {
               >
                 {/* Nav items */}
                 {isAuthenticated && (
-                  <MobileNavLink
-                    to="/search"
-                    icon={<Search className="size-4 text-muted-foreground" />}
-                    onClick={() => setMenuOpen(false)}
-                  >
-                    Tìm kiếm
-                  </MobileNavLink>
+                  <>
+                    <MobileNavLink
+                      to="/search"
+                      icon={<Search className="size-4 text-muted-foreground" />}
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      Tìm kiếm
+                    </MobileNavLink>
+                    <MobileNavLink
+                      to="/upload"
+                      icon={<UploadCloud className="size-4 text-muted-foreground" />}
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      Tải ảnh lên
+                    </MobileNavLink>
+                  </>
                 )}
 
                 {isAuthenticated ? (
