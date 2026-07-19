@@ -7,7 +7,7 @@ import fs from 'fs';
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/avif'];
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const MAX_FILES = 5;
+const MAX_FILES = 4;
 
 const STORAGE_DIR = process.env.STORAGE_DIR || './storage';
 const INDEX_DIR = path.join(STORAGE_DIR, 'images', 'index');

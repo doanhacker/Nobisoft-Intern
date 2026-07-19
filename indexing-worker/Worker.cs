@@ -84,23 +84,9 @@ public class Worker : BackgroundService
 
             _logger.LogInformation("Nhận batch {Count} ảnh từ RabbitMQ.", images.Count);
 
-            var success = 0;
-            var failed = 0;
-
-            foreach (var image in images)
-            {
-                try
-                {
-                    var ok = await _processor.ProcessAsync(image, ct);
-                    if (ok) success++;
-                    else failed++;
-                }
-                catch (Exception ex)
-                {
-                    failed++;
-                    _logger.LogError(ex, "Lỗi xử lý ảnh {Id}", image.Id);
-                }
-            }
+            // Gọi ProcessBatchAsync — tự động chia thành các batch tối đa 4 ảnh
+            // và gọi AI Service batch endpoint cho mỗi batch
+            var (success, failed) = await _processor.ProcessBatchAsync(images, ct);
 
             _logger.LogInformation("Batch hoàn tất: {Success} thành công, {Failed} thất bại.", success, failed);
         }

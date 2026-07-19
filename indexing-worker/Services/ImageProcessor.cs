@@ -20,6 +20,7 @@ public class ImageProcessor
     private readonly string _storageDir;
 
     private const int MaxResizeDimension = 1024;
+    private const int BatchSize = 4;
     private const string QdrantCollection = "images";
 
     public ImageProcessor(ILogger<ImageProcessor> logger, IHttpClientFactory httpClientFactory)
@@ -36,51 +37,147 @@ public class ImageProcessor
         );
     }
 
-    public async Task<bool> ProcessAsync(ImageMessage image, CancellationToken ct)
+    /// Xử lý danh sách ảnh: gom batch tối đa 4 ảnh, gọi AI Service 1 lần,
+    /// rồi lưu từng kết quả vào Qdrant + PostgreSQL.
+    public async Task<(int Success, int Failed)> ProcessBatchAsync(List<ImageMessage> images, CancellationToken ct)
     {
-        var stopwatch = Stopwatch.StartNew();
+        var totalSuccess = 0;
+        var totalFailed = 0;
 
-        // 1. Đọc file ảnh
-        var filePath = ResolveFilePath(image.Path);
-        if (!File.Exists(filePath))
+        // Chia danh sách thành các batch nhỏ tối đa 4 ảnh
+        for (var i = 0; i < images.Count; i += BatchSize)
         {
-            _logger.LogError("File không tồn tại: {Path}", filePath);
-            await UpdateIndexStatus(image.Id, "FAILED", 0);
-            return false;
+            var batch = images.Skip(i).Take(BatchSize).ToList();
+            var (s, f) = await ProcessSingleBatchAsync(batch, ct);
+            totalSuccess += s;
+            totalFailed += f;
         }
 
-        try
-        {
-            // 2. Resize ảnh và lấy kích thước nguyên bản
-            var (resizedBytes, originalWidth, originalHeight) = await ResizeImageAsync(filePath, ct);
-            var originalExt = Path.GetExtension(filePath).TrimStart('.');
+        return (totalSuccess, totalFailed);
+    }
 
-            // 3. Gọi AI Service
-            var aiResult = await CallAiServiceAsync(resizedBytes, image.Id, originalExt, ct);
-            if (aiResult == null || !aiResult.Success || aiResult.Data == null)
+    /// Xử lý theo batch: resize → gọi AI batch endpoint → lưu kết quả.
+    private async Task<(int Success, int Failed)> ProcessSingleBatchAsync(List<ImageMessage> batch, CancellationToken ct)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var success = 0;
+        var failed = 0;
+
+        // 1. Resize tất cả ảnh và chuẩn bị dữ liệu
+        var preparedImages = new List<(ImageMessage Message, byte[] Bytes, int OrigWidth, int OrigHeight, string Ext)>();
+
+        foreach (var image in batch)
+        {
+            var filePath = ResolveFilePath(image.Path);
+            if (!File.Exists(filePath))
             {
-                _logger.LogError("AI Service thất bại cho ảnh {Id}: {Err}", image.Id, aiResult?.ErrorMessage);
-                await UpdateIndexStatus(image.Id, "FAILED", (int)stopwatch.ElapsedMilliseconds);
-                return false;
+                _logger.LogError("File không tồn tại: {Path}", filePath);
+                await UpdateIndexStatus(image.Id, "FAILED", 0);
+                failed++;
+                continue;
             }
 
-            // 4. Lưu vector vào Qdrant
-            var hasOcr = aiResult.Data.OcrLines.Count > 0;
-            await UpsertQdrantAsync(image.Id, aiResult.Data.Embedding, image.Path, originalExt, hasOcr, ct);
+            try
+            {
+                var (resizedBytes, originalWidth, originalHeight) = await ResizeImageAsync(filePath, ct);
+                var ext = Path.GetExtension(filePath).TrimStart('.');
+                preparedImages.Add((image, resizedBytes, originalWidth, originalHeight, ext));
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi resize ảnh {Id}", image.Id);
+                await UpdateIndexStatus(image.Id, "FAILED", 0);
+                failed++;
+            }
+        }
 
-            // 5. Lưu OCR + cập nhật status và kích thước trong PostgreSQL
-            await SaveToPostgresAsync(image.Id, aiResult.Data.OcrLines, (int)stopwatch.ElapsedMilliseconds, originalWidth, originalHeight);
+        if (preparedImages.Count == 0)
+            return (success, failed);
 
-            _logger.LogInformation("Xử lý ảnh {Id} thành công ({Ms}ms, {OcrCount} dòng OCR)",
-                image.Id, stopwatch.ElapsedMilliseconds, aiResult.Data.OcrLines.Count);
-            return true;
+        // 2. Gọi AI Service batch endpoint
+        BatchIndexingResponse? batchResponse;
+        try
+        {
+            batchResponse = await CallAiBatchAsync(preparedImages, ct);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Lỗi xử lý ảnh {Id}", image.Id);
-            await UpdateIndexStatus(image.Id, "FAILED", (int)stopwatch.ElapsedMilliseconds);
-            return false;
+            _logger.LogError(ex, "AI Service batch call thất bại");
+            foreach (var img in preparedImages)
+            {
+                await UpdateIndexStatus(img.Message.Id, "FAILED", (int)stopwatch.ElapsedMilliseconds);
+                failed++;
+            }
+            return (success, failed);
         }
+
+        if (batchResponse == null || batchResponse.Results.Count == 0)
+        {
+            _logger.LogError("AI Service trả về response rỗng");
+            foreach (var img in preparedImages)
+            {
+                await UpdateIndexStatus(img.Message.Id, "FAILED", (int)stopwatch.ElapsedMilliseconds);
+                failed++;
+            }
+            return (success, failed);
+        }
+
+        // 3. Xử lý từng kết quả: lưu Qdrant + PostgreSQL
+        // Tạo lookup từ preparedImages để tìm thông tin gốc
+        var imageLookup = preparedImages.ToDictionary(p => p.Message.Id);
+
+        foreach (var result in batchResponse.Results)
+        {
+            if (!result.Success || result.Embedding.Count == 0)
+            {
+                _logger.LogError("AI thất bại cho ảnh {Id}: {Err}", result.ImageId, result.Error);
+                await UpdateIndexStatus(result.ImageId, "FAILED", (int)result.ProcessingTimeMs);
+                failed++;
+                continue;
+            }
+
+            try
+            {
+                string originalExt;
+                int originalWidth;
+                int originalHeight;
+                string imagePath;
+
+                if (imageLookup.TryGetValue(result.ImageId, out var prepared))
+                {
+                    originalExt = prepared.Ext;
+                    originalWidth = prepared.OrigWidth;
+                    originalHeight = prepared.OrigHeight;
+                    imagePath = prepared.Message.Path;
+                }
+                else
+                {
+                    originalExt = "jpg";
+                    originalWidth = result.Metadata?.Width ?? 0;
+                    originalHeight = result.Metadata?.Height ?? 0;
+                    imagePath = "";
+                }
+
+                // Lưu vector vào Qdrant
+                var hasOcr = result.OcrResults.Count > 0;
+                await UpsertQdrantAsync(result.ImageId, result.Embedding, imagePath, originalExt, hasOcr, ct);
+
+                // Lưu OCR + cập nhật status trong PostgreSQL
+                await SaveToPostgresAsync(result.ImageId, result.OcrResults, (int)result.ProcessingTimeMs, originalWidth, originalHeight);
+
+                _logger.LogInformation("Xử lý ảnh {Id} thành công ({Ms}ms, {OcrCount} dòng OCR)",
+                    result.ImageId, result.ProcessingTimeMs, result.OcrResults.Count);
+                success++;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Lỗi lưu kết quả ảnh {Id}", result.ImageId);
+                await UpdateIndexStatus(result.ImageId, "FAILED", (int)result.ProcessingTimeMs);
+                failed++;
+            }
+        }
+
+        return (success, failed);
     }
 
     // ── Resize ảnh (giảm kích thước trước khi gửi AI) ──
@@ -105,23 +202,35 @@ public class ImageProcessor
         }, ct);
     }
 
-    // Gọi AI Service
+    // ── Gọi AI Service batch endpoint ──
 
-    private async Task<AiProcessResponse?> CallAiServiceAsync(byte[] imageBytes, string imageId, string ext, CancellationToken ct)
+    private async Task<BatchIndexingResponse?> CallAiBatchAsync(
+        List<(ImageMessage Message, byte[] Bytes, int OrigWidth, int OrigHeight, string Ext)> preparedImages,
+        CancellationToken ct)
     {
         var client = _httpClientFactory.CreateClient();
         using var content = new MultipartFormDataContent();
-        var fileContent = new ByteArrayContent(imageBytes);
-        fileContent.Headers.ContentType = new System.Net.Http.Headers.MediaTypeHeaderValue($"image/{(ext == "jpg" ? "jpeg" : ext)}");
-        content.Add(fileContent, "image", $"{imageId}.{ext}");
 
-        var response = await client.PostAsync($"{_aiServiceUrl}/api/process-image", content, ct);
+        // Thêm image_ids dưới dạng JSON array
+        var imageIds = preparedImages.Select(p => p.Message.Id).ToList();
+        content.Add(new StringContent(JsonSerializer.Serialize(imageIds)), "image_ids");
+
+        // Thêm từng file ảnh
+        foreach (var (message, bytes, _, _, ext) in preparedImages)
+        {
+            var fileContent = new ByteArrayContent(bytes);
+            fileContent.Headers.ContentType =
+                new System.Net.Http.Headers.MediaTypeHeaderValue($"image/{(ext == "jpg" ? "jpeg" : ext)}");
+            content.Add(fileContent, "images", $"{message.Id}.{ext}");
+        }
+
+        var response = await client.PostAsync($"{_aiServiceUrl}/api/indexing/batch", content, ct);
         response.EnsureSuccessStatusCode();
 
-        return await response.Content.ReadFromJsonAsync<AiProcessResponse>(cancellationToken: ct);
+        return await response.Content.ReadFromJsonAsync<BatchIndexingResponse>(cancellationToken: ct);
     }
 
-    // Lưu vector vào Qdrant
+    // ── Lưu vector vào Qdrant ──
 
     private async Task UpsertQdrantAsync(string imageId, List<float> embedding, string path, string fileFormat, bool hasOcr, CancellationToken ct)
     {
@@ -147,7 +256,7 @@ public class ImageProcessor
 
     // ── Lưu kết quả vào PostgreSQL ──
 
-    private async Task SaveToPostgresAsync(string imageId, List<OcrLineResult> ocrLines, int durationMs, int width, int height)
+    private async Task SaveToPostgresAsync(string imageId, List<OcrResultItem> ocrResults, int durationMs, int width, int height)
     {
         var imageGuid = Guid.Parse(imageId);
         await using var conn = new NpgsqlConnection(_connectionString);
@@ -178,10 +287,10 @@ public class ImageProcessor
             );
 
             // Insert OCR lines
-            foreach (var line in ocrLines)
+            foreach (var ocr in ocrResults)
             {
-                var boundingJson = line.BoundingBox != null
-                    ? JsonSerializer.Serialize(line.BoundingBox)
+                var boundingJson = ocr.BoundingBox.Count > 0
+                    ? JsonSerializer.Serialize(ocr.BoundingBox)
                     : null;
 
                 await conn.ExecuteAsync(@"
@@ -190,9 +299,9 @@ public class ImageProcessor
                     new
                     {
                         IndexId = indexGuid.Value,
-                        line.RawText,
-                        NormalizedText = line.RawText.ToLowerInvariant().Trim(),
-                        line.ConfidenceScore,
+                        RawText = ocr.Text,
+                        NormalizedText = ocr.NormalizedText,
+                        ConfidenceScore = ocr.Confidence,
                         BoundingBoxes = boundingJson
                     }, tx
                 );
