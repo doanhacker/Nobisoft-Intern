@@ -7,9 +7,9 @@ services:
     environment:
       - PORT=8000
       - NODE_ENV=production
-      - DATABASE_URL=${DATABASE_URL}
-      - AI_SERVICE_URL=${AI_SERVICE_URL}
-      - QDRANT_URL=${QDRANT_URL}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-VisualSearchEngine}?schema=public
+      - AI_SERVICE_URL=http://ai:9000
+      - QDRANT_URL=http://qdrant:6333
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
       - SEARCH_MIN_SCORE=${SEARCH_MIN_SCORE}
       - SEARCH_MAX_RESULTS=${SEARCH_MAX_RESULTS}
@@ -40,9 +40,9 @@ services:
     container_name: indexing-worker
     environment:
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
-      - AI_SERVICE_URL=${AI_SERVICE_URL}
-      - QDRANT_URL=${QDRANT_URL}
-      - DATABASE_URL=${DATABASE_URL}
+      - AI_SERVICE_URL=http://ai:9000
+      - QDRANT_URL=http://qdrant:6333
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-VisualSearchEngine}?schema=public
       - STORAGE_DIR=./storage
     depends_on:
       database:

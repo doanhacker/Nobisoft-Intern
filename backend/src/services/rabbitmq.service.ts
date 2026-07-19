@@ -17,17 +17,17 @@ export async function connectRabbitMQ() {
   }
 }
 
-export async function publishToIndexingQueue(images: { id: string; path: string }[]) {
+export async function publishToIndexingQueue(batchId: string, images: { id: string; path: string }[]) {
   if (!channel) {
     console.warn('RabbitMQ channel is not open, trying to reconnect...');
     await connectRabbitMQ();
   }
 
   if (channel) {
-    const message = JSON.stringify(images);
+    const message = JSON.stringify({ batchId, images });
     // persistent: true saves message to disk
     channel.sendToQueue(INDEXING_QUEUE, Buffer.from(message), { persistent: true });
-    console.log(`Successfully published batch of ${images.length} images to RabbitMQ queue.`);
+    console.log(`Published ${images.length} images (batch: ${batchId}) to RabbitMQ queue.`);
   } else {
     throw new Error('RabbitMQ channel could not be established');
   }

@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 import type { ApiResponse } from '../../../../types/apiResponse.js';
-import { processImageUploads } from '../../services/upload.service.js';
+import { processImageUploads, getBatchStatus } from '../../services/upload.service.js';
 
 export async function uploadImages(req: Request, res: Response) {
   try {
@@ -15,20 +15,45 @@ export async function uploadImages(req: Request, res: Response) {
       return;
     }
 
-    const results = await processImageUploads(files);
+    const batchId = req.body.batchId as string | undefined;
+    const isLastChunk = req.body.isLastChunk === 'true';
+
+    const { batchId: resultBatchId, results } = await processImageUploads(files, batchId, isLastChunk);
 
     const successCount = results.filter((r) => r.success).length;
     const failCount = results.filter((r) => !r.success).length;
 
-    const response: ApiResponse<typeof results> = {
+    const response: ApiResponse<any> = {
       success: true,
       message: `Upload hoàn tất: ${successCount} thành công, ${failCount} thất bại`,
-      data: results,
+      data: {
+        batchId: resultBatchId,
+        results,
+      },
     };
 
     res.status(201).json(response);
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'Upload thất bại';
     console.error('Upload error:', error);
-    res.status(500).json({ success: false, message: 'Upload thất bại' });
+    res.status(400).json({ success: false, message });
+  }
+}
+
+export async function getBatchStatusController(req: Request, res: Response) {
+  try {
+    const batchId = req.params.batchId as string;
+
+    const status = await getBatchStatus(batchId);
+
+    if (!status) {
+      res.status(404).json({ success: false, message: 'Batch không tồn tại' });
+      return;
+    }
+
+    res.json({ success: true, data: status });
+  } catch (error) {
+    console.error('Get batch status error:', error);
+    res.status(500).json({ success: false, message: 'Lỗi server' });
   }
 }

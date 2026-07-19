@@ -18,6 +18,9 @@ public class BatchIndexingResponse
     [JsonPropertyName("failed")]
     public int Failed { get; set; }
 
+    [JsonPropertyName("processing_time_ms")]
+    public double ProcessingTimeMs { get; set; }
+
     [JsonPropertyName("results")]
     public List<IndexingResult> Results { get; set; } = [];
 }
@@ -38,9 +41,6 @@ public class IndexingResult
 
     [JsonPropertyName("ocr_results")]
     public List<OcrResultItem> OcrResults { get; set; } = [];
-
-    [JsonPropertyName("processing_time_ms")]
-    public double ProcessingTimeMs { get; set; }
 
     [JsonPropertyName("error")]
     public string? Error { get; set; }

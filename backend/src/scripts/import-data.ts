@@ -112,13 +112,22 @@ async function main() {
 
     // Insert image indexes (only for new images)
     const newIndexes = imageIndexes.filter((idx) => newImageIds.has(idx.imageId));
+    
+    let dummyBatchId = '';
+    if (newIndexes.length > 0) {
+      const dummyBatch = await prisma.batchIndex.create({
+        data: { status: 'COMPLETED' },
+      });
+      dummyBatchId = dummyBatch.id;
+    }
+
     for (let i = 0; i < newIndexes.length; i += BATCH_SIZE) {
       const batch = newIndexes.slice(i, i + BATCH_SIZE);
       await prisma.imageIndex.createMany({
         data: batch.map((idx) => ({
           id: idx.id,
           imageId: idx.imageId,
-          processDurationMs: idx.processDurationMs,
+          batchId: dummyBatchId,
           indexedAt: new Date(idx.indexedAt),
         })),
         skipDuplicates: true,
