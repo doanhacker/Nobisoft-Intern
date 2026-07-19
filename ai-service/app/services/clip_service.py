@@ -51,3 +51,36 @@ class ClipService:
             )
 
         return [float(value) for value in features[0].tolist()]
+
+    def create_text_embedding(
+        self,
+        text: str,
+    ) -> list[float]:
+        inputs = cast(
+            dict[str, torch.Tensor],
+            self.processor(
+                text=[text],
+                return_tensors="pt",
+                padding=True,
+                truncation=True,
+            ),
+        )
+
+        with torch.inference_mode():
+            model_output = self.model.get_text_features(**inputs)
+
+            if isinstance(model_output, torch.Tensor):
+                features = model_output
+            else:
+                features = cast(
+                    torch.Tensor,
+                    model_output.pooler_output,
+                )
+
+            features = functional.normalize(
+                features,
+                p=2,
+                dim=-1,
+            )
+
+        return [float(value) for value in features[0].tolist()]

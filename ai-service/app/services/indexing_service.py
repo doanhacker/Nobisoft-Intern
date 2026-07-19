@@ -32,6 +32,40 @@ class IndexingService:
         ocr_results = self.ocr_service.extract_text(image)
         return embedding, ocr_results
 
+    async def create_image_embedding(
+        self,
+        image: UploadFile,
+    ) -> list[float]:
+        """Tạo embedding CLIP cho ảnh dùng làm truy vấn tìm kiếm."""
+        pil_image, _, _ = await read_and_preprocess_image(image)
+
+        async with self._inference_slots:
+            embedding = await asyncio.to_thread(
+                self.clip_service.create_image_embedding,
+                pil_image,
+            )
+
+        if len(embedding) != 512:
+            raise RuntimeError("Embedding phải có 512 chiều")
+
+        return embedding
+
+    async def create_text_embedding(
+        self,
+        text: str,
+    ) -> list[float]:
+        """Tạo embedding CLIP cho truy vấn văn bản."""
+        async with self._inference_slots:
+            embedding = await asyncio.to_thread(
+                self.clip_service.create_text_embedding,
+                text,
+            )
+
+        if len(embedding) != 512:
+            raise RuntimeError("Embedding text phải có 512 chiều")
+
+        return embedding
+
     async def process_image(
         self,
         image_id: str,

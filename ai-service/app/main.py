@@ -4,6 +4,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.api.indexing import router as indexing_router
+from app.api.search import router as search_router
 from app.services.clip_service import ClipService
 from app.services.indexing_service import IndexingService
 from app.services.ocr_service import OcrService
@@ -32,3 +33,4 @@ app = FastAPI(
 app.openapi_version = "3.0.3"
 
 app.include_router(indexing_router)
+app.include_router(search_router)
