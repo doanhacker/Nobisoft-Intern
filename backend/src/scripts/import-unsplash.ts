@@ -59,6 +59,11 @@ async function main() {
   // Ensure Qdrant collection
   await ensureQdrantCollection();
 
+  const dummyBatch = await prisma.batchIndex.create({
+    data: { status: 'COMPLETED' }
+  });
+  const dummyBatchId = dummyBatch.id;
+
   // 1. Parse TSV
   const rows = parseTsv(DATASET_PATH);
   console.log(`[INFO] Total photos in dataset: ${rows.length}`);
@@ -134,7 +139,7 @@ async function main() {
         const imageIndex = await tx.imageIndex.create({
           data: {
             imageId: img.id,
-            processDurationMs,
+            batchId: dummyBatchId,
           },
         });
 

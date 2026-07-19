@@ -129,6 +129,29 @@ const options: swaggerJsdoc.Options = {
           },
         },
 
+        BatchStatusResponse: {
+          type: 'object',
+          properties: {
+            batchId: { type: 'string', format: 'uuid' },
+            status: { type: 'string', enum: ['UPLOADING', 'PROCESSING', 'COMPLETED'] },
+            totalImages: { type: 'integer', example: 12 },
+            successCount: { type: 'integer', example: 11 },
+            failedCount: { type: 'integer', example: 1 },
+            totalDurationMs: { type: 'integer', nullable: true, example: 15234 },
+            createdAt: { type: 'string', format: 'date-time' },
+            failedImages: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  id: { type: 'string', format: 'uuid' },
+                  imageId: { type: 'string', format: 'uuid' },
+                },
+              },
+            },
+          },
+        },
+
         // ============================
         // Images
         // ============================
@@ -149,7 +172,6 @@ const options: swaggerJsdoc.Options = {
               properties: {
                 id: { type: 'string', format: 'uuid' },
                 status: { type: 'string', enum: ['PENDING', 'SUCCESS', 'FAILED'] },
-                processDurationMs: { type: 'integer', nullable: true, example: 1250 },
                 indexedAt: { type: 'string', format: 'date-time' },
                 ocrLines: {
                   type: 'array',

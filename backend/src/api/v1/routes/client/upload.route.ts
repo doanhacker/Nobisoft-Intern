@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { uploadMultiple } from '../../middlewares/upload.middleware.js';
-import { uploadImages } from '../../controllers/client/upload.controller.js';
+import { uploadImages, getBatchStatusController } from '../../controllers/client/upload.controller.js';
 
 const uploadRouter = Router();
 
@@ -9,12 +9,17 @@ const uploadRouter = Router();
  * /upload:
  *   post:
  *     tags: [Client - Upload]
- *     summary: Upload ảnh hàng loạt
+ *     summary: Upload ảnh (hỗ trợ batch upload)
  *     description: |
- *       Upload tối đa 4 ảnh cùng lúc (jpg, png, webp). Mỗi file tối đa 10MB.
- *       Backend xử lý từng file một: lưu vào disk, insert DB, tạo bản ghi index với trạng thái PENDING.
- *       Sau đó đẩy các ảnh thành công vào hàng đợi RabbitMQ để Indexing Service xử lý sau.
- *       Nếu 1 file bị lỗi (sai định dạng, lỗi DB), các file còn lại vẫn được xử lý bình thường.
+ *       Upload tối đa 100 ảnh mỗi lần gọi (jpg, png, webp, avif). Mỗi file tối đa 10MB.
+ *
+ *       **Luồng batch upload:**
+ *       1. **Lần gọi đầu** (không truyền `batchId`): Server tạo batch mới, trả về `batchId`.
+ *       2. **Lần gọi tiếp theo** (truyền `batchId`): Ảnh được gắn vào batch đã có.
+ *       3. **Lần gọi cuối** (truyền `batchId` + `isLastChunk=true`): Đánh dấu batch đã upload xong.
+ *
+ *       Mỗi lần gọi, ảnh được đẩy ngay vào hàng đợi RabbitMQ để Worker xử lý song song.
+ *       FE dùng `GET /upload/batch/:batchId` để polling trạng thái indexing.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -31,9 +36,19 @@ const uploadRouter = Router();
  *                   type: string
  *                   format: binary
  *                 maxItems: 4
+ *                 description: Danh sách ảnh (tối đa 4 file, mỗi file tối đa 10MB)
+ *               batchId:
+ *                 type: string
+ *                 format: uuid
+ *                 description: ID batch từ lần upload trước. Bỏ trống ở lần đầu tiên.
+ *               isLastChunk:
+ *                 type: string
+ *                 enum: ['true', 'false']
+ *                 default: 'false'
+ *                 description: Đặt `true` ở lần upload cuối cùng để đánh dấu batch hoàn tất.
  *     responses:
  *       201:
- *         description: Upload hoàn tất. Mảng data chứa kết quả từng file (thành công hoặc thất bại).
+ *         description: Upload hoàn tất
  *         content:
  *           application/json:
  *             schema:
@@ -44,67 +59,71 @@ const uploadRouter = Router();
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: "Upload hoàn tất: 3 thành công, 2 thất bại"
+ *                   example: "Upload hoàn tất: 3 thành công, 0 thất bại"
  *                 data:
- *                   type: array
- *                   items:
- *                     $ref: '#/components/schemas/UploadResultItem'
- *             examples:
- *               allSuccess:
- *                 summary: Tất cả ảnh upload thành công
- *                 value:
- *                   success: true
- *                   message: "Upload hoàn tất: 2 thành công, 0 thất bại"
- *                   data:
- *                     - filename: "photo1.jpg"
- *                       success: true
- *                       id: "a1b2c3d4-..."
- *                       path: "storage/images/index/a1b2c3d4.jpg"
- *                     - filename: "photo2.png"
- *                       success: true
- *                       id: "e5f6g7h8-..."
- *                       path: "storage/images/index/e5f6g7h8.png"
- *               partialFailure:
- *                 summary: Một số ảnh bị lỗi
- *                 value:
- *                   success: true
- *                   message: "Upload hoàn tất: 1 thành công, 1 thất bại"
- *                   data:
- *                     - filename: "photo1.jpg"
- *                       success: true
- *                       id: "a1b2c3d4-..."
- *                       path: "storage/images/index/a1b2c3d4.jpg"
- *                     - filename: "invalid.bmp"
- *                       success: false
- *                       error: "Định dạng không hợp lệ"
+ *                   type: object
+ *                   properties:
+ *                     batchId:
+ *                       type: string
+ *                       format: uuid
+ *                     results:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/UploadResultItem'
  *       400:
- *         description: Không có file nào được gửi lên
+ *         description: Không có file hoặc batch không hợp lệ
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
- *             example:
- *               success: false
- *               message: "Vui lòng chọn ít nhất 1 ảnh"
  *       401:
- *         description: Chưa đăng nhập hoặc token hết hạn
+ *         description: Chưa đăng nhập
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
- *             example:
- *               success: false
- *               message: "Vui lòng đăng nhập"
- *       500:
- *         description: Lỗi server không xác định
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *             example:
- *               success: false
- *               message: "Upload thất bại"
  */
 uploadRouter.post('/', uploadMultiple, uploadImages);
+
+/**
+ * @swagger
+ * /upload/batch/{batchId}:
+ *   get:
+ *     tags: [Client - Upload]
+ *     summary: Kiểm tra trạng thái batch indexing
+ *     description: |
+ *       FE gọi endpoint này để polling trạng thái indexing sau khi upload xong.
+ *       Gọi mỗi 3-5 giây cho đến khi `status` chuyển sang `COMPLETED`.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: batchId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID batch cần kiểm tra
+ *     responses:
+ *       200:
+ *         description: Trạng thái batch
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 data:
+ *                   $ref: '#/components/schemas/BatchStatusResponse'
+ *       404:
+ *         description: Batch không tồn tại
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+uploadRouter.get('/batch/:batchId', getBatchStatusController);
 
 export default uploadRouter;

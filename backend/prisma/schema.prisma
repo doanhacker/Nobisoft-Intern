@@ -19,6 +19,12 @@ enum IndexStatus {
   FAILED
 }
 
+enum BatchStatus {
+  UPLOADING
+  PROCESSING
+  COMPLETED
+}
+
 model User {
   id         String    @id @default(uuid()) @db.Uuid
   email      String    @unique @db.VarChar(50)
@@ -34,6 +40,21 @@ model User {
 
   @@index([nameSearch])
   @@map("users")
+}
+
+model BatchIndex {
+  id              String      @id @default(uuid()) @db.Uuid
+  totalImages     Int         @default(0)
+  successCount    Int         @default(0)
+  failedCount     Int         @default(0)
+  status          BatchStatus @default(UPLOADING)
+  totalDurationMs Int?
+  createdAt       DateTime    @default(now()) @db.Timestamptz()
+  updatedAt       DateTime    @updatedAt @db.Timestamptz()
+
+  imageIndexes ImageIndex[]
+
+  @@map("batch_index")
 }
 
 model Image {
@@ -53,15 +74,17 @@ model Image {
 }
 
 model ImageIndex {
-  id                String      @id @default(uuid()) @db.Uuid
-  imageId           String      @unique @db.Uuid
-  status            IndexStatus @default(PENDING)
-  processDurationMs Int?
-  indexedAt         DateTime?   @db.Timestamptz()
+  id       String      @id @default(uuid()) @db.Uuid
+  imageId  String      @unique @db.Uuid
+  batchId  String      @db.Uuid
+  status   IndexStatus @default(PENDING)
+  indexedAt DateTime?  @db.Timestamptz()
 
   image    Image      @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  batch    BatchIndex @relation(fields: [batchId], references: [id], onDelete: Cascade)
   ocrLines ImageOcr[]
 
+  @@index([batchId])
   @@map("image_index")
 }
 

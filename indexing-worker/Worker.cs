@@ -73,22 +73,21 @@ public class Worker : BackgroundService
 
         try
         {
-            var images = JsonSerializer.Deserialize<List<ImageMessage>>(body, JsonOptions);
+            var message = JsonSerializer.Deserialize<IndexingMessage>(body, JsonOptions);
 
-            if (images == null || images.Count == 0)
+            if (message == null || message.Images.Count == 0 || string.IsNullOrEmpty(message.BatchId))
             {
-                _logger.LogWarning("Message rỗng hoặc không parse được. Bỏ qua.");
+                _logger.LogWarning("Message rỗng, không hợp lệ hoặc thiếu BatchId. Bỏ qua.");
                 _channel?.BasicAck(ea.DeliveryTag, multiple: false);
                 return;
             }
 
-            _logger.LogInformation("Nhận batch {Count} ảnh từ RabbitMQ.", images.Count);
+            _logger.LogInformation("Nhận batch {BatchId} có {Count} ảnh từ RabbitMQ.", message.BatchId, message.Images.Count);
 
-            // Gọi ProcessBatchAsync — tự động chia thành các batch tối đa 4 ảnh
-            // và gọi AI Service batch endpoint cho mỗi batch
-            var (success, failed) = await _processor.ProcessBatchAsync(images, ct);
+            // Gọi ProcessBatchAsync — tự động chia thành các sub-batch tối đa 4 ảnh
+            var (success, failed) = await _processor.ProcessBatchAsync(message.BatchId, message.Images, ct);
 
-            _logger.LogInformation("Batch hoàn tất: {Success} thành công, {Failed} thất bại.", success, failed);
+            _logger.LogInformation("Chunk của batch {BatchId} hoàn tất: {Success} thành công, {Failed} thất bại.", message.BatchId, success, failed);
         }
         catch (JsonException ex)
         {
