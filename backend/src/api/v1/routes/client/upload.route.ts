@@ -11,7 +11,7 @@ const uploadRouter = Router();
  *     tags: [Client - Upload]
  *     summary: Upload ảnh hàng loạt
  *     description: |
- *       Upload tối đa 5 ảnh cùng lúc (jpg, png, webp). Mỗi file tối đa 10MB.
+ *       Upload tối đa 4 ảnh cùng lúc (jpg, png, webp). Mỗi file tối đa 10MB.
  *       Backend xử lý từng file một: lưu vào disk, insert DB, tạo bản ghi index với trạng thái PENDING.
  *       Sau đó đẩy các ảnh thành công vào hàng đợi RabbitMQ để Indexing Service xử lý sau.
  *       Nếu 1 file bị lỗi (sai định dạng, lỗi DB), các file còn lại vẫn được xử lý bình thường.
@@ -30,7 +30,7 @@ const uploadRouter = Router();
  *                 items:
  *                   type: string
  *                   format: binary
- *                 maxItems: 5
+ *                 maxItems: 4
  *     responses:
  *       201:
  *         description: Upload hoàn tất. Mảng data chứa kết quả từng file (thành công hoặc thất bại).
