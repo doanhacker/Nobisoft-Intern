@@ -2,11 +2,11 @@ import axiosClient from './axiosClient'
 
 // ============================================================
 // User Image Upload Service
-// POST /upload  (field: "images", max 5 files/request, max 10MB/file)
+// POST /upload  (field: "images", max 4 files/request, max 10MB/file)
 // Auth: Bearer token (handled by axiosClient interceptor)
 // ============================================================
 
-const BATCH_SIZE = 5 // Hard limit enforced by backend Multer middleware
+const BATCH_SIZE = 4 // Hard limit enforced by backend Multer middleware
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -45,9 +45,9 @@ export type OnBatchProgress = (event: BatchProgressEvent) => void
 // ─── Core function ─────────────────────────────────────────────
 
 /**
- * Upload `files` to POST /upload in sequential batches of 5.
+ * Upload `files` to POST /upload in sequential batches of 4.
  *
- * - Each API call carries at most BATCH_SIZE (5) files.
+ * - Each API call carries at most BATCH_SIZE (4) files.
  * - Calls are made one after another (sequential) to avoid overloading the server.
  * - After each batch `onBatchProgress` is called with the running total progress
  *   and the individual results so the UI can update in real time.

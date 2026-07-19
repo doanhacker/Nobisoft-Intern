@@ -173,3 +173,22 @@ export async function fetchImageAsFile(imageUrl: string, signal?: AbortSignal): 
   const ext = blob.type.split('/')[1] ?? 'jpg'
   return new File([blob], `query.${ext}`, { type: blob.type })
 }
+
+// ── Click tracking ────────────────────────────────────────────
+
+/**
+ * Record that the user clicked on an image result.
+ * POST /search/history/click  { searchHistoryId, clickedImageId }
+ *
+ * Fire-and-forget — never throws; errors are logged to console only
+ * so the UI is never blocked by a tracking failure.
+ *
+ * Only called when `searchHistoryId` is available (image-search mode).
+ */
+export function recordSearchClick(searchHistoryId: string, clickedImageId: string): void {
+  axiosClient
+    .post('/search/history/click', { searchHistoryId, clickedImageId })
+    .catch((err) => {
+      console.warn('[recordSearchClick] Failed to record click:', err)
+    })
+}
