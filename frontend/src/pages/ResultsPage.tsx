@@ -17,7 +17,7 @@ import { ResultsSidebar } from '@/components/results/ResultsSidebar'
 import { ResultsSearchBar, type ResultsSearchState, type SearchMode } from '@/components/results/ResultsSearchBar'
 import { ImageSearchModal } from '@/components/results/ImageSearchModal'
 import { getMockResults } from '@/services/mockData'
-import { searchByImageFile, searchByImagePage, getPendingImageFile, setPendingImageFile, fetchImageAsFile } from '@/services/searchService'
+import { searchByImageFile, searchByImagePage, getPendingImageFile, setPendingImageFile, fetchImageAsFile, recordSearchClick } from '@/services/searchService'
 import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
 
@@ -248,12 +248,20 @@ export function ResultsPage() {
           //   1. overrideFile — explicit re-search triggered by handleSearch / handleSearchSimilar
           //   2. pendingImageFile — file stored by SearchPage before navigating here
           //   3. current searchHistoryId in state — pure page navigation (no new file)
+          // getPendingImageFile() peeks without clearing. We clear it explicitly
+          // with setPendingImageFile(null) only after Mode A succeeds. This is safe
+          // for React 18 Strict Mode: the double-invocation aborts the first request
+          // before it resolves, so setPendingImageFile(null) is never called by the
+          // first invocation — the file is still available for the second invocation.
           const pendingFile = getPendingImageFile()
-          const file = overrideFile !== undefined ? overrideFile : pendingFile ?? queryImageFile
+          const file = overrideFile !== undefined ? overrideFile : pendingFile
 
           if (file) {
             // ── Mode A: New search — send file, get back a fresh searchHistoryId ──
             const response = await searchByImageFile(file, controller.signal)
+            // Clear pending file only after a successful response so Strict Mode's
+            // second invocation (after abort) can still find and use the file.
+            setPendingImageFile(null)
             setSearchHistoryId(response.searchHistoryId)
             data = response.results
             currentTotal = response.total
@@ -301,7 +309,9 @@ export function ResultsPage() {
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [toastError, queryImageFile, searchHistoryId],
+    // queryImageFile removed: it is display-only; file selection is handled via
+    // consumePendingImageFile() and overrideFile, not via state fallback.
+    [toastError, searchHistoryId],
   )
 
   React.useEffect(() => {
@@ -345,6 +355,10 @@ export function ResultsPage() {
 
   const handleCardClick = (result: SearchResult) => {
     savedScrollY.current = window.scrollY
+    // Record the user's click for search history tracking (image mode only)
+    if (mode === 'image' && searchHistoryId) {
+      recordSearchClick(searchHistoryId, result.id)
+    }
     navigate({
       to: '/results',
       search: { ...search, imageId: result.id },
