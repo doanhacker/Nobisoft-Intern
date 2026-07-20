@@ -1,15 +1,23 @@
 import type { Request, Response } from 'express';
 import type { ApiResponse } from '../../../../types/apiResponse.js';
-import type { SearchClickData, SearchImageResponse } from '../../../../types/search.type.js';
+import type {
+  SearchClickData,
+  SearchImageResponse,
+  SearchTextSemanticResponse,
+} from '../../../../types/search.type.js';
 import { saveSearchClick } from '../../services/search-history.service.js';
 import {
   ImageSearchHistoryNotFoundError,
   SearchPageOutOfRangeError,
   searchImagesByImage,
+  searchImagesByTextSemantic,
+  TextSearchHistoryNotFoundError,
 } from '../../services/search.service.js';
 import type {
   SearchClickBody,
   SearchImageQuery,
+  SearchTextSemanticHistoryQuery,
+  SearchTextSemanticQuery,
 } from '../../validators/client/search.validate.js';
 
 export async function searchByImage(req: Request, res: Response) {
@@ -75,6 +83,89 @@ export async function searchByImage(req: Request, res: Response) {
     };
     res.status(500).json(response);
   }
+}
+
+export async function searchByTextSemantic(req: Request, res: Response) {
+  try {
+    const { q, page, limit } = res.locals
+      .searchTextSemanticQuery as SearchTextSemanticQuery;
+    const result = await searchImagesByTextSemantic({
+      userId: req.user!.id,
+      queryText: q,
+      page,
+      limit,
+    });
+
+    sendSemanticSearchResponse(res, result);
+  } catch (error) {
+    handleSemanticSearchError(error, res);
+  }
+}
+
+export async function searchByTextSemanticHistory(req: Request, res: Response) {
+  try {
+    const { searchHistoryId, page, limit } = res.locals
+      .searchTextSemanticHistoryQuery as SearchTextSemanticHistoryQuery;
+    const result = await searchImagesByTextSemantic({
+      userId: req.user!.id,
+      searchHistoryId,
+      page,
+      limit,
+    });
+
+    sendSemanticSearchResponse(res, result);
+  } catch (error) {
+    handleSemanticSearchError(error, res);
+  }
+}
+
+function sendSemanticSearchResponse(
+  res: Response,
+  result: Awaited<ReturnType<typeof searchImagesByTextSemantic>>,
+) {
+  const response: SearchTextSemanticResponse = {
+    success: true,
+    message: 'Tìm kiếm semantic thành công',
+    data: {
+      searchHistoryId: result.searchHistoryId,
+      searchType: 'TEXT_SEMANTIC',
+      results: result.results,
+      total: result.total,
+      page: result.page,
+      limit: result.limit,
+    },
+  };
+
+  res.setHeader('Cache-Control', 'no-store');
+  res.status(200).json(response);
+}
+
+function handleSemanticSearchError(error: unknown, res: Response) {
+  console.error('Semantic search error:', error);
+
+  if (error instanceof TextSearchHistoryNotFoundError) {
+    const response: ApiResponse = {
+      success: false,
+      message: error.message,
+    };
+    res.status(404).json(response);
+    return;
+  }
+
+  if (error instanceof SearchPageOutOfRangeError) {
+    const response: ApiResponse = {
+      success: false,
+      message: error.message,
+    };
+    res.status(400).json(response);
+    return;
+  }
+
+  const response: ApiResponse = {
+    success: false,
+    message: 'Tìm kiếm semantic thất bại',
+  };
+  res.status(500).json(response);
 }
 
 export async function recordSearchClick(req: Request, res: Response) {

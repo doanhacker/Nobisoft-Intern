@@ -46,6 +46,34 @@ export interface SearchImageData {
 
 export type SearchImageResponse = ApiResponse<SearchImageData>;
 
+interface SearchTextBaseInput {
+  userId: string;
+  page: number;
+  limit: number;
+}
+
+export type SearchTextSemanticInput =
+  | (SearchTextBaseInput & {
+      queryText: string;
+    })
+  | (SearchTextBaseInput & {
+      searchHistoryId: string;
+    });
+
+export interface SearchTextSemanticResult {
+  searchHistoryId: string;
+  results: SearchImageResultItem[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface SearchTextSemanticData extends SearchTextSemanticResult {
+  searchType: 'TEXT_SEMANTIC';
+}
+
+export type SearchTextSemanticResponse = ApiResponse<SearchTextSemanticData>;
+
 export type CreateSearchHistoryInput =
   | {
       userId: string;
@@ -70,6 +98,11 @@ export interface ImageSearchHistoryQuery {
     path: string;
     fileFormat: string;
   };
+}
+
+export interface TextSearchHistoryQuery {
+  id: string;
+  queryText: string;
 }
 
 export interface SearchClickInput {

@@ -17,14 +17,25 @@ export interface SimilarImageSearchResult {
   total: number;
 }
 
-const DEFAULT_SEARCH_MIN_SCORE = 0.5;
+type VectorSearchMode = 'image' | 'semantic';
+
+const DEFAULT_SEARCH_MIN_SCORES: Record<VectorSearchMode, number> = {
+  image: 0.3,
+  semantic: 0.1,
+};
 const DEFAULT_SEARCH_MAX_RESULTS = 2000;
 
-function getSearchMinScore(): number {
-  const configuredScore = Number(process.env.SEARCH_MIN_SCORE);
+function getSearchMinScore(mode: VectorSearchMode): number {
+  const environmentVariable = mode === 'image'
+    ? process.env.SEARCH_MIN_SCORE_IMAGE
+    : process.env.SEARCH_MIN_SCORE_SEMANTIC;
+  const configuredScore = environmentVariable?.trim()
+    ? Number(environmentVariable)
+    : Number.NaN;
+
   return Number.isFinite(configuredScore) && configuredScore >= 0 && configuredScore <= 1
     ? configuredScore
-    : DEFAULT_SEARCH_MIN_SCORE;
+    : DEFAULT_SEARCH_MIN_SCORES[mode];
 }
 
 function getSearchMaxResults(): number {
@@ -60,13 +71,14 @@ export async function searchSimilarImageVectors(
   vector: number[],
   page: number,
   limit: number,
+  mode: VectorSearchMode,
 ): Promise<SimilarImageSearchResult> {
   const offset = (page - 1) * limit;
   const maxResults = getSearchMaxResults();
   const queryResult = await qdrantClient.query(QDRANT_COLLECTION_NAME, {
     query: vector,
     limit: maxResults,
-    score_threshold: getSearchMinScore(),
+    score_threshold: getSearchMinScore(mode),
     with_payload: false,
     with_vector: false,
   });
