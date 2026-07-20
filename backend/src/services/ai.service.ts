@@ -1,4 +1,8 @@
-import type { AiEmbedImageResponse, AiProcessImageResponse } from '../types/ai.type.js';
+import type {
+  AiEmbedImageResponse,
+  AiEmbedTextResponse,
+  AiProcessImageResponse,
+} from '../types/ai.type.js';
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL;
 const AI_TIMEOUT_MS = 30_000;
@@ -47,6 +51,23 @@ export async function embedImage(
   }
 
   return response.json() as Promise<AiEmbedImageResponse>;
+}
+
+// POST /api/embed-text
+export async function embedText(text: string): Promise<AiEmbedTextResponse> {
+  const response = await fetchWithTimeout(`${AI_SERVICE_URL}/api/embed-text`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ text }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`AI embed-text failed: ${response.status} ${response.statusText}`);
+  }
+
+  return response.json() as Promise<AiEmbedTextResponse>;
 }
 
 // Fetch with timeout

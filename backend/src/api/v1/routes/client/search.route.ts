@@ -2,14 +2,224 @@ import { Router } from 'express';
 import {
   recordSearchClick,
   searchByImage,
+  searchByTextSemantic,
+  searchByTextSemanticHistory,
 } from '../../controllers/client/search.controller.js';
 import {
   uploadSearchImage,
   validateSearchClick,
   validateSearchImage,
+  validateSearchTextSemantic,
+  validateSearchTextSemanticHistory,
 } from '../../validators/client/search.validate.js';
 
 const searchRouter = Router();
+
+/**
+ * @swagger
+ * /search/text:
+ *   get:
+ *     tags: [Client - Search]
+ *     summary: Tìm kiếm hình ảnh bằng văn bản semantic
+ *     description: Gọi lần đầu theo dạng GET /search/text?q=...&mode=semantic&page=1&limit=20. Endpoint này tạo lịch sử và trả searchHistoryId.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         required: true
+ *         schema:
+ *           type: string
+ *           minLength: 1
+ *           maxLength: 500
+ *         description: Nội dung tìm kiếm mới.
+ *         example: black cat
+ *       - in: query
+ *         name: mode
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [semantic]
+ *         example: semantic
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           enum: [20]
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Tìm kiếm semantic thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Tìm kiếm semantic thành công
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     searchHistoryId:
+ *                       type: string
+ *                       format: uuid
+ *                     searchType:
+ *                       type: string
+ *                       enum: [TEXT_SEMANTIC]
+ *                     results:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/SearchImageResult'
+ *                     total:
+ *                       type: integer
+ *                       example: 87
+ *                     page:
+ *                       type: integer
+ *                       example: 1
+ *                     limit:
+ *                       type: integer
+ *                       example: 20
+ *       400:
+ *         description: Tham số tìm kiếm không hợp lệ hoặc trang không tồn tại
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Chưa đăng nhập hoặc token hết hạn
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Không tìm thấy lịch sử semantic của người dùng
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Lỗi AI Service, Qdrant hoặc Backend
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+searchRouter.get('/text', validateSearchTextSemantic, searchByTextSemantic);
+
+/**
+ * @swagger
+ * /search/text/history/{searchHistoryId}:
+ *   get:
+ *     tags: [Client - Search]
+ *     summary: Lấy trang tiếp theo của Semantic Search
+ *     description: Gọi chuyển trang theo dạng GET /search/text/history/{searchHistoryId}?mode=semantic&page=2&limit=20. Endpoint này dùng lại lịch sử và không tạo SearchHistory mới.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: searchHistoryId
+ *         required: true
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID lịch sử semantic cần lấy kết quả.
+ *       - in: query
+ *         name: mode
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [semantic]
+ *         example: semantic
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           enum: [20]
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Lấy kết quả semantic thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: Tìm kiếm semantic thành công
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     searchHistoryId:
+ *                       type: string
+ *                       format: uuid
+ *                     searchType:
+ *                       type: string
+ *                       enum: [TEXT_SEMANTIC]
+ *                     results:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/SearchImageResult'
+ *                     total:
+ *                       type: integer
+ *                     page:
+ *                       type: integer
+ *                     limit:
+ *                       type: integer
+ *                       example: 20
+ *       400:
+ *         description: Tham số phân trang không hợp lệ hoặc trang không tồn tại
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Chưa đăng nhập hoặc token hết hạn
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Không tìm thấy lịch sử semantic
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Lỗi AI Service, Qdrant hoặc Backend
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+searchRouter.get(
+  '/text/history/:searchHistoryId',
+  validateSearchTextSemanticHistory,
+  searchByTextSemanticHistory,
+);
 
 /**
  * @swagger
