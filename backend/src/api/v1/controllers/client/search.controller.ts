@@ -21,7 +21,6 @@ import type {
   SearchClickBody,
   SearchImageQuery,
   SearchTextOcrQuery,
-  SearchTextSemanticHistoryQuery,
   SearchTextSemanticQuery,
 } from '../../validators/client/search.validate.js';
 
@@ -94,31 +93,21 @@ export async function searchByImage(req: Request, res: Response) {
 
 export async function searchByTextSemantic(req: Request, res: Response) {
   try {
-    const { q, page, limit } = res.locals
+    const { q, searchHistoryId, page, limit } = res.locals
       .searchTextSemanticQuery as SearchTextSemanticQuery;
-    const result = await searchImagesByTextSemantic({
-      userId: req.user!.id,
-      queryText: q,
-      page,
-      limit,
-    });
-
-    sendSemanticSearchResponse(res, result);
-  } catch (error) {
-    handleSemanticSearchError(error, res);
-  }
-}
-
-export async function searchByTextSemanticHistory(req: Request, res: Response) {
-  try {
-    const { searchHistoryId, page, limit } = res.locals
-      .searchTextSemanticHistoryQuery as SearchTextSemanticHistoryQuery;
-    const result = await searchImagesByTextSemantic({
-      userId: req.user!.id,
-      searchHistoryId,
-      page,
-      limit,
-    });
+    const result = q
+      ? await searchImagesByTextSemantic({
+        userId: req.user!.id,
+        queryText: q,
+        page,
+        limit,
+      })
+      : await searchImagesByTextSemantic({
+        userId: req.user!.id,
+        searchHistoryId: searchHistoryId!,
+        page,
+        limit,
+      });
 
     sendSemanticSearchResponse(res, result);
   } catch (error) {

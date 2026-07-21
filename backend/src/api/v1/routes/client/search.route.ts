@@ -1,11 +1,11 @@
 import type { Request, Response } from 'express';
 import { Router } from 'express';
+import type { ApiResponse } from '../../../../types/apiResponse.js';
 import {
   recordSearchClick,
   searchByImage,
   searchByTextOcr,
   searchByTextSemantic,
-  searchByTextSemanticHistory,
 } from '../../controllers/client/search.controller.js';
 import {
   uploadSearchImage,
@@ -13,7 +13,6 @@ import {
   validateSearchImage,
   validateSearchTextOcr,
   validateSearchTextSemantic,
-  validateSearchTextSemanticHistory,
 } from '../../validators/client/search.validate.js';
 
 const searchRouter = Router();
@@ -31,9 +30,9 @@ const searchRouter = Router();
  *
  *       **Tìm kiếm mới:** `GET /search/text?q=...&mode=semantic|ocr&page=1&limit=20`
  *       **Chuyển trang (OCR):** `GET /search/text?searchHistoryId=...&mode=ocr&page=2&limit=20`
- *       **Chuyển trang (semantic):** Dùng `/search/text/history/{searchHistoryId}`
+ *       **Chuyển trang (Semantic):** `GET /search/text?searchHistoryId=...&mode=semantic&page=2&limit=20`
  *
- *       Với mode `ocr`, chỉ gửi `q` khi tìm mới hoặc `searchHistoryId` khi chuyển trang (không gửi cả 2).
+ *       Với cả hai mode, chỉ gửi `q` khi tìm mới hoặc `searchHistoryId` khi chuyển trang (không gửi cả 2).
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -44,7 +43,7 @@ const searchRouter = Router();
  *           type: string
  *           minLength: 1
  *           maxLength: 500
- *         description: Nội dung tìm kiếm (bắt buộc khi tìm mới, bỏ khi chuyển trang OCR).
+ *         description: Nội dung tìm kiếm (bắt buộc khi tìm mới ở cả mode semantic và ocr; bỏ khi chuyển trang).
  *         example: meme hài hước
  *       - in: query
  *         name: searchHistoryId
@@ -52,7 +51,7 @@ const searchRouter = Router();
  *         schema:
  *           type: string
  *           format: uuid
- *         description: ID lịch sử tìm kiếm OCR (chỉ dùng khi chuyển trang mode=ocr).
+ *         description: ID lịch sử tìm kiếm (dùng khi chuyển trang ở cả mode semantic và ocr).
  *       - in: query
  *         name: mode
  *         required: true
@@ -79,6 +78,7 @@ const searchRouter = Router();
  *           minimum: 1
  *           maximum: 100
  *           default: 20
+ *         description: Mode semantic cố định limit=20; mode ocr cho phép limit từ 1 đến 100.
  *     responses:
  *       200:
  *         description: Tìm kiếm thành công. Response schema phụ thuộc mode.
@@ -170,117 +170,16 @@ searchRouter.get('/text', (req: Request, res: Response) => {
   const mode = req.query.mode;
   if (mode === 'ocr') {
     validateSearchTextOcr(req, res, () => searchByTextOcr(req, res));
-  } else {
+  } else if (mode === 'semantic') {
     validateSearchTextSemantic(req, res, () => searchByTextSemantic(req, res));
+  } else {
+    const response: ApiResponse = {
+      success: false,
+      message: 'mode chỉ được phép là semantic hoặc ocr',
+    };
+    res.status(400).json(response);
   }
 });
-
-/**
- * @swagger
- * /search/text/history/{searchHistoryId}:
- *   get:
- *     tags: [Client - Search]
- *     summary: Lấy trang tiếp theo của Semantic Search
- *     description: |
- *       Gọi chuyển trang theo dạng `GET /search/text/history/{searchHistoryId}?mode=semantic&page=2&limit=20`.
- *       Endpoint này dùng lại lịch sử và không tạo SearchHistory mới.
- *
- *       **Lưu ý:** OCR search chuyển trang qua `GET /search/text?searchHistoryId=...&mode=ocr&page=2`.
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: searchHistoryId
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *         description: ID lịch sử semantic cần lấy kết quả.
- *       - in: query
- *         name: mode
- *         required: true
- *         schema:
- *           type: string
- *           enum: [semantic]
- *         example: semantic
- *       - in: query
- *         name: page
- *         required: false
- *         schema:
- *           type: integer
- *           minimum: 1
- *           default: 1
- *       - in: query
- *         name: limit
- *         required: false
- *         schema:
- *           type: integer
- *           enum: [20]
- *           default: 20
- *     responses:
- *       200:
- *         description: Lấy kết quả semantic thành công
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                   example: true
- *                 message:
- *                   type: string
- *                   example: Tìm kiếm semantic thành công
- *                 data:
- *                   type: object
- *                   properties:
- *                     searchHistoryId:
- *                       type: string
- *                       format: uuid
- *                     searchType:
- *                       type: string
- *                       enum: [TEXT_SEMANTIC]
- *                     results:
- *                       type: array
- *                       items:
- *                         $ref: '#/components/schemas/SearchImageResult'
- *                     total:
- *                       type: integer
- *                     page:
- *                       type: integer
- *                     limit:
- *                       type: integer
- *                       example: 20
- *       400:
- *         description: Tham số phân trang không hợp lệ hoặc trang không tồn tại
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       401:
- *         description: Chưa đăng nhập hoặc token hết hạn
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       404:
- *         description: Không tìm thấy lịch sử semantic
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *       500:
- *         description: Lỗi AI Service, Qdrant hoặc Backend
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- */
-searchRouter.get(
-  '/text/history/:searchHistoryId',
-  validateSearchTextSemanticHistory,
-  searchByTextSemanticHistory,
-);
 
 /**
  * @swagger

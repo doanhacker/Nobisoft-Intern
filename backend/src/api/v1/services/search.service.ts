@@ -20,7 +20,6 @@ import {
   createImageSearchHistory,
   createSearchHistory,
   getImageSearchHistory,
-  getOcrSearchHistory,
   getTextSearchHistory,
 } from './search-history.service.js';
 
@@ -228,7 +227,11 @@ async function resolveOcrSearchQuery(input: SearchTextOcrInput): Promise<string>
     return input.queryText;
   }
 
-  const history = await getOcrSearchHistory(input.userId, input.searchHistoryId);
+  const history = await getTextSearchHistory(
+    input.userId,
+    input.searchHistoryId,
+    'TEXT_OCR',
+  );
 
   if (!history) {
     throw new OcrSearchHistoryNotFoundError('Không tìm thấy lịch sử tìm kiếm OCR');
@@ -275,7 +278,11 @@ async function resolveTextSearchQuery(input: SearchTextSemanticInput): Promise<s
     return input.queryText;
   }
 
-  const history = await getTextSearchHistory(input.userId, input.searchHistoryId);
+  const history = await getTextSearchHistory(
+    input.userId,
+    input.searchHistoryId,
+    'TEXT_SEMANTIC',
+  );
 
   if (!history) {
     throw new TextSearchHistoryNotFoundError('Không tìm thấy lịch sử tìm kiếm semantic');
