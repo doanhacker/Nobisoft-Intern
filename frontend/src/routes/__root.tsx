@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import { ToastProvider } from '@/components/ui/Toast'
+import { UploadProvider } from '@/context/UploadContext'
 
 // Routes that use their own full-page layout (no shared header/footer)
 const FULL_PAGE_ROUTES = ['/results']
@@ -375,11 +376,13 @@ function RootComponent() {
   return (
     <ThemeProvider defaultTheme="system">
       <AuthProvider>
-        <ToastProvider>
-          <TooltipProvider>
-            <AppShell />
-          </TooltipProvider>
-        </ToastProvider>
+        <UploadProvider>
+          <ToastProvider>
+            <TooltipProvider>
+              <AppShell />
+            </TooltipProvider>
+          </ToastProvider>
+        </UploadProvider>
       </AuthProvider>
     </ThemeProvider>
   )
