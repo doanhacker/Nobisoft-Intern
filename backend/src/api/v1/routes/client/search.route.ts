@@ -108,15 +108,8 @@ const searchRouter = Router();
  *                           type: array
  *                           items:
  *                             $ref: '#/components/schemas/SearchImageResult'
- *                         total:
- *                           type: integer
- *                           example: 87
- *                         page:
- *                           type: integer
- *                           example: 1
- *                         limit:
- *                           type: integer
- *                           example: 20
+ *                     meta:
+ *                       $ref: '#/components/schemas/PaginationMeta'
  *                 - title: OCR Response
  *                   type: object
  *                   properties:
@@ -258,15 +251,8 @@ searchRouter.get('/text', (req: Request, res: Response) => {
  *                       type: array
  *                       items:
  *                         $ref: '#/components/schemas/SearchImageResult'
- *                     total:
- *                       type: integer
- *                       example: 87
- *                     page:
- *                       type: integer
- *                       example: 2
- *                     limit:
- *                       type: integer
- *                       example: 20
+ *                 meta:
+ *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
  *         description: Không có file hoặc file không hợp lệ
  *         content:
