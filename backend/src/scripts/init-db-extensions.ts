@@ -6,9 +6,9 @@ async function initDbExtensions() {
 
   await prisma.$executeRawUnsafe(`
     CREATE INDEX IF NOT EXISTS idx_image_ocr_normalized_trgm
-      ON image_ocr USING GIN (normalized_text gin_trgm_ops)
+      ON image_ocr USING GIN ("normalizedText" gin_trgm_ops)
   `);
-  console.log('✓ GIN trigram index on image_ocr.normalized_text ready');
+  console.log('✓ GIN trigram index on image_ocr."normalizedText" ready');
 }
 
 try {

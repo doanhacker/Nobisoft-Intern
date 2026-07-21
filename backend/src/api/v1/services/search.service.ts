@@ -141,27 +141,27 @@ export async function searchImagesByTextOcr(
 }
 
 interface MatchedImageRow {
-  image_id: string;
+  imageId: string;
 }
 
 async function findImagesByAllTokens(tokens: string[]): Promise<string[]> {
-  const likeConditions = tokens.map((_, i) => `io.normalized_text ILIKE $${i + 1}`);
-  const caseWhen = tokens.map((_, i) => `WHEN io.normalized_text ILIKE $${i + 1} THEN $${i + 1}`);
+  const likeConditions = tokens.map((_, i) => `io."normalizedText" ILIKE $${i + 1}`);
+  const caseWhen = tokens.map((_, i) => `WHEN io."normalizedText" ILIKE $${i + 1} THEN $${i + 1}`);
   const params = tokens.map((t) => `%${t}%`);
 
   const rows = await prisma.$queryRawUnsafe<MatchedImageRow[]>(
-    `SELECT ii.image_id
+    `SELECT ii."imageId" as "imageId"
      FROM image_ocr io
-     JOIN image_index ii ON ii.id = io.image_index_id
+     JOIN image_index ii ON ii.id = io."imageIndexId"
      WHERE ii.status = 'SUCCESS'
        AND (${likeConditions.join(' OR ')})
-     GROUP BY ii.image_id
+     GROUP BY ii."imageId"
      HAVING COUNT(DISTINCT CASE ${caseWhen.join(' ')} END) = ${tokens.length}
-     ORDER BY ii.image_id`,
+     ORDER BY ii."imageId"`,
     ...params,
   );
 
-  return rows.map((r) => r.image_id);
+  return rows.map((r) => r.imageId);
 }
 
 async function getOcrSearchResults(
