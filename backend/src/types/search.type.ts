@@ -74,6 +74,50 @@ export interface SearchTextSemanticData extends SearchTextSemanticResult {
 
 export type SearchTextSemanticResponse = ApiResponse<SearchTextSemanticData>;
 
+// ============================
+// OCR Search
+// ============================
+
+export type SearchTextOcrInput =
+  | (SearchTextBaseInput & { queryText: string })
+  | (SearchTextBaseInput & { searchHistoryId: string });
+
+export interface OcrMatchLine {
+  rawText: string;
+  confidenceScore: number;
+  boundingBoxes: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null;
+}
+
+export interface SearchTextOcrResultItem {
+  id: string;
+  imageUrl: string;
+  width: number | null;
+  height: number | null;
+  fileSize: number | null;
+  fileFormat: string | null;
+  createdAt: Date;
+  ocrMatches: OcrMatchLine[];
+}
+
+export interface SearchTextOcrResult {
+  searchHistoryId: string;
+  results: SearchTextOcrResultItem[];
+  total: number;
+}
+
+export interface SearchTextOcrData {
+  searchHistoryId: string;
+  searchType: 'TEXT_OCR';
+  results: SearchTextOcrResultItem[];
+}
+
+export type SearchTextOcrResponse = ApiResponse<SearchTextOcrData>;
+
 export type CreateSearchHistoryInput =
   | {
       userId: string;
