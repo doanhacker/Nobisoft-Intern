@@ -2,13 +2,17 @@ import axiosClient from './axiosClient'
 
 // ============================================================
 // User Image Upload Service
-// POST /upload  (field: "images", max 4 files/request, max 10MB/file)
+// POST /upload  (field: "images", tối đa 20 file / 20MB mỗi chunk)
+// GET  /upload/batch/:batchId  — polling indexing status
 // Auth: Bearer token (handled by axiosClient interceptor)
 // ============================================================
 
-const BATCH_SIZE = 4 // Hard limit enforced by backend Multer middleware
+const CHUNK_SIZE = 20 // max files per POST /upload call
+const CHUNK_MAX_BYTES = 20 * 1024 * 1024 // 20MB max per call
+const POLL_INTERVAL_MS = 4_000 // poll every 4 seconds
+const POLL_TIMEOUT_MS = 5 * 60 * 1000 // stop polling after 5 minutes
 
-// ─── Types ────────────────────────────────────────────────────
+// ─── Types ─────────────────────────────────────────────────
 
 export interface UserUploadResult {
   filename: string
@@ -21,87 +25,215 @@ export interface UserUploadResult {
   error?: string
 }
 
-interface BatchApiResponse {
+interface ChunkApiResponse {
   success: boolean
   message: string
-  data: UserUploadResult[]
+  data: {
+    /** batchId created/reused for this upload session */
+    batchId: string
+    results: UserUploadResult[]
+  }
 }
 
-// ─── Batch progress callback ───────────────────────────────────
+export type BatchIndexingStatus = 'UPLOADING' | 'PENDING' | 'PROCESSING' | 'COMPLETED' | 'FAILED'
 
-export interface BatchProgressEvent {
-  /** 0-100 overall percentage */
-  percent: number
-  /** Which batch just finished (1-indexed) */
-  batchIndex: number
-  /** Total number of batches */
-  totalBatches: number
-  /** Results from the batch that just completed */
-  batchResults: UserUploadResult[]
+interface BatchStatusResponse {
+  success: boolean
+  data: {
+    batchId: string
+    status: BatchIndexingStatus
+    totalImages: number
+    successCount: number
+    failedCount: number
+    totalDurationMs: number | null
+    createdAt: string
+  }
 }
 
-export type OnBatchProgress = (event: BatchProgressEvent) => void
+// ─── Progress callbacks ─────────────────────────────────────
 
-// ─── Core function ─────────────────────────────────────────────
+/** Fired after each chunk is uploaded (phase 1: uploading) */
+export interface UploadPhaseProgress {
+  /** 0–100 overall upload percentage */
+  uploadPercent: number
+  /** chunks finished so far */
+  chunksUploaded: number
+  /** total chunks to send */
+  totalChunks: number
+  /** running tally of results already uploaded */
+  uploadedResults: UserUploadResult[]
+}
+
+/** Fired on each poll tick (phase 2: indexing) */
+export interface IndexingPhaseProgress {
+  /** 0–100 indexing percentage (processedImages / totalImages) */
+  indexingPercent: number
+  processedImages: number
+  totalImages: number
+  status: BatchIndexingStatus
+}
+
+export interface UploadCallbacks {
+  onUploadProgress?: (e: UploadPhaseProgress) => void
+  onIndexingProgress?: (e: IndexingPhaseProgress) => void
+}
+
+// ─── Helpers ───────────────────────────────────────────────
 
 /**
- * Upload `files` to POST /upload in sequential batches of 4.
+ * Split `files` into chunks where each chunk has ≤ CHUNK_SIZE files
+ * and ≤ CHUNK_MAX_BYTES total size.
+ */
+function splitIntoChunks(files: File[]): File[][] {
+  const chunks: File[][] = []
+  let current: File[] = []
+  let currentBytes = 0
+
+  for (const file of files) {
+    const wouldExceedCount = current.length >= CHUNK_SIZE
+    const wouldExceedBytes = currentBytes + file.size > CHUNK_MAX_BYTES
+
+    if (current.length > 0 && (wouldExceedCount || wouldExceedBytes)) {
+      chunks.push(current)
+      current = []
+      currentBytes = 0
+    }
+
+    current.push(file)
+    currentBytes += file.size
+  }
+
+  if (current.length > 0) chunks.push(current)
+  return chunks
+}
+
+// ─── Polling helper ─────────────────────────────────────────
+
+/**
+ * Poll `GET /upload/batch/:batchId` every POLL_INTERVAL_MS until COMPLETED/FAILED.
+ * Exported so UploadContext can resume polling after the user navigates away and returns.
+ */
+export async function resumeIndexingPoll(
+  batchId: string,
+  onProgress?: (e: IndexingPhaseProgress) => void,
+  signal?: AbortSignal,
+): Promise<BatchIndexingStatus> {
+  const deadline = Date.now() + POLL_TIMEOUT_MS
+
+  while (Date.now() < deadline) {
+    if (signal?.aborted) break
+
+    await new Promise<void>((resolve) => setTimeout(resolve, POLL_INTERVAL_MS))
+
+    if (signal?.aborted) break
+
+    const { data } = await axiosClient.get<BatchStatusResponse>(`/upload/batch/${batchId}`, {
+      signal,
+      timeout: 10_000,
+    })
+
+    const { status, successCount, failedCount, totalImages } = data.data
+    // processedImages = tất cả ảnh đã có kết quả (thành công + thất bại)
+    const processedImages = (successCount ?? 0) + (failedCount ?? 0)
+    const indexingPercent =
+      totalImages > 0 ? Math.round((processedImages / totalImages) * 100) : 0
+
+    onProgress?.({ indexingPercent, processedImages, totalImages: totalImages ?? 0, status })
+
+    if (status === 'COMPLETED' || status === 'FAILED') {
+      return status
+    }
+  }
+
+  // Timed out or aborted — treat as unknown completion
+  return 'COMPLETED'
+}
+
+// ─── Core function ──────────────────────────────────────────
+
+/**
+ * Full two-phase upload flow:
  *
- * - Each API call carries at most BATCH_SIZE (4) files.
- * - Calls are made one after another (sequential) to avoid overloading the server.
- * - After each batch `onBatchProgress` is called with the running total progress
- *   and the individual results so the UI can update in real time.
- * - Pass an `AbortSignal` to allow the user to cancel mid-flight.
+ * **Phase 1 — Upload**: Files are split into chunks (≤ 20 files, ≤ 20MB each)
+ * and POSTed sequentially. The server returns a `batchId` on the first call;
+ * subsequent calls reuse it. The last chunk is flagged with `isLastChunk=true`.
  *
- * @throws {Error} if the request itself fails (network error, 401, 500, etc.)
- *                 Individual file failures are surfaced via `result.success = false`.
+ * **Phase 2 — Indexing**: After all chunks are sent, `GET /upload/batch/:batchId`
+ * is polled every 4 s until the server reports `COMPLETED` or `FAILED` (max 5 min).
+ *
+ * Both phases fire progress callbacks so the UI can show user-friendly progress
+ * without exposing any internal batch/chunk concepts.
+ *
+ * @throws {Error} on network/server errors. Individual file failures are surfaced
+ *                 in the returned `UserUploadResult[]` with `success = false`.
  */
 export async function uploadUserImages(
   files: File[],
-  onBatchProgress?: OnBatchProgress,
+  callbacks?: UploadCallbacks,
   signal?: AbortSignal,
-): Promise<UserUploadResult[]> {
-  // Split into chunks of BATCH_SIZE
-  const chunks: File[][] = []
-  for (let i = 0; i < files.length; i += BATCH_SIZE) {
-    chunks.push(files.slice(i, i + BATCH_SIZE))
-  }
-
-  const totalBatches = chunks.length
+): Promise<{ results: UserUploadResult[]; finalStatus: BatchIndexingStatus }> {
+  const chunks = splitIntoChunks(files)
+  const totalChunks = chunks.length
   const allResults: UserUploadResult[] = []
+  let batchId: string | null = null
 
-  for (let batchIndex = 0; batchIndex < totalBatches; batchIndex++) {
-    // Respect cancellation between batches
-    if (signal?.aborted) {
-      break
-    }
+  // ── Phase 1: Upload ───────────────────────────────────────
+  for (let i = 0; i < totalChunks; i++) {
+    if (signal?.aborted) break
 
-    const chunk = chunks[batchIndex]
+    const chunk = chunks[i]
+    const isLastChunk = i === totalChunks - 1
+
     const formData = new FormData()
     for (const file of chunk) {
       formData.append('images', file)
     }
+    if (batchId) {
+      formData.append('batchId', batchId)
+    }
+    if (isLastChunk) {
+      formData.append('isLastChunk', 'true')
+    }
 
-    const { data } = await axiosClient.post<BatchApiResponse>('/upload', formData, {
+    const { data } = await axiosClient.post<ChunkApiResponse>('/upload', formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
       signal,
-      // Give large batches more time — 60s per batch
       timeout: 60_000,
     })
 
-    const batchResults: UserUploadResult[] = data.data ?? []
-    allResults.push(...batchResults)
+    // Capture batchId from first response
+    if (!batchId && data.data?.batchId) {
+      batchId = data.data.batchId
+    }
 
-    // Calculate overall progress: completed batches / total batches
-    const percent = Math.round(((batchIndex + 1) / totalBatches) * 100)
+    const chunkResults: UserUploadResult[] = Array.isArray(data.data?.results)
+      ? data.data.results
+      : []
+    allResults.push(...chunkResults)
 
-    onBatchProgress?.({
-      percent,
-      batchIndex: batchIndex + 1,
-      totalBatches,
-      batchResults,
+    const uploadPercent = Math.round(((i + 1) / totalChunks) * 100)
+    callbacks?.onUploadProgress?.({
+      uploadPercent,
+      chunksUploaded: i + 1,
+      totalChunks,
+      uploadedResults: allResults,
     })
   }
 
-  return allResults
+  // ── Phase 2: Indexing polling ─────────────────────────────
+  let finalStatus: BatchIndexingStatus = 'COMPLETED'
+
+  if (batchId && !signal?.aborted) {
+    // Fire initial progress so UI transitions to indexing phase right away
+    callbacks?.onIndexingProgress?.({
+      indexingPercent: 0,
+      processedImages: 0,
+      totalImages: files.length,
+      status: 'PENDING',
+    })
+
+    finalStatus = await resumeIndexingPoll(batchId, callbacks?.onIndexingProgress, signal)
+  }
+
+  return { results: allResults, finalStatus }
 }
