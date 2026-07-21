@@ -21,7 +21,7 @@ services:
       - ADMIN_EMAIL=${ADMIN_EMAIL}
       - ADMIN_NAME=${ADMIN_NAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-    command: sh -c "npx prisma db push && npm run seed:admin && npm start"
+    command: sh -c "npx prisma db push && npm run init:db-extensions && npm run seed:admin && npm start"
     depends_on:
       database:
         condition: service_healthy

@@ -22,6 +22,7 @@
     "seed:admin": "tsx src/scripts/seed-admin.ts",
     "seed:mock-images": "tsx src/scripts/seed-mock-images.ts",
     "init:qdrant": "tsx src/scripts/init-qdrant.ts",
+    "init:db-extensions": "tsx src/scripts/init-db-extensions.ts",
     "import:unsplash": "tsx src/scripts/import-unsplash.ts",
     "import:data": "tsx src/scripts/import-data.ts"
   },
