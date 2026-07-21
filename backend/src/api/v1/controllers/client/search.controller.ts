@@ -53,9 +53,12 @@ export async function searchByImage(req: Request, res: Response) {
         searchHistoryId: result.searchHistoryId,
         searchType: 'IMAGE_ONLY',
         results: result.results,
-        total: result.total,
+      },
+      meta: {
         page: result.page,
         limit: result.limit,
+        totalDocs: result.total,
+        totalPages: Math.ceil(result.total / result.limit),
       },
     };
 
@@ -126,9 +129,12 @@ function sendSemanticSearchResponse(
       searchHistoryId: result.searchHistoryId,
       searchType: 'TEXT_SEMANTIC',
       results: result.results,
-      total: result.total,
+    },
+    meta: {
       page: result.page,
       limit: result.limit,
+      totalDocs: result.total,
+      totalPages: Math.ceil(result.total / result.limit),
     },
   };
 

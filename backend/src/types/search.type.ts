@@ -39,9 +39,6 @@ export interface SearchImageData {
   searchHistoryId: string;
   searchType: 'IMAGE_ONLY';
   results: SearchImageResultItem[];
-  total: number;
-  page: number;
-  limit: number;
 }
 
 export type SearchImageResponse = ApiResponse<SearchImageData>;
@@ -68,8 +65,10 @@ export interface SearchTextSemanticResult {
   limit: number;
 }
 
-export interface SearchTextSemanticData extends SearchTextSemanticResult {
+export interface SearchTextSemanticData {
+  searchHistoryId: string;
   searchType: 'TEXT_SEMANTIC';
+  results: SearchImageResultItem[];
 }
 
 export type SearchTextSemanticResponse = ApiResponse<SearchTextSemanticData>;
