@@ -150,6 +150,64 @@ export function validateSearchTextSemanticHistory(req: Request, res: Response, n
   next();
 }
 
+const searchTextOcrSchema = z.object({
+  q: z.preprocess(
+    (value) => value === '' ? undefined : value,
+    z
+      .string()
+      .trim()
+      .min(1, 'Nội dung tìm kiếm không được để trống')
+      .max(500, 'Nội dung tìm kiếm không được vượt quá 500 ký tự')
+      .optional(),
+  ),
+  searchHistoryId: z.preprocess(
+    (value) => value === '' ? undefined : value,
+    z.string().uuid('searchHistoryId không hợp lệ').optional(),
+  ),
+  mode: z.literal('ocr', 'mode chỉ được phép là ocr'),
+  page: z.coerce.number().int().min(1, 'Trang phải lớn hơn hoặc bằng 1').default(1),
+  limit: z.coerce.number().int().min(1, 'limit phải lớn hơn 0').max(100, 'limit tối đa 100').default(20),
+});
+
+export type SearchTextOcrQuery = z.infer<typeof searchTextOcrSchema>;
+
+export function validateSearchTextOcr(req: Request, res: Response, next: NextFunction) {
+  const result = searchTextOcrSchema.safeParse(req.query);
+
+  if (!result.success) {
+    const response: ApiResponse = {
+      success: false,
+      message: result.error.issues[0]?.message ?? 'Tham số tìm kiếm không hợp lệ',
+    };
+    res.status(400).json(response);
+    return;
+  }
+
+  const hasQuery = Boolean(result.data.q);
+  const hasSearchHistoryId = Boolean(result.data.searchHistoryId);
+
+  if (hasQuery === hasSearchHistoryId) {
+    const response: ApiResponse = {
+      success: false,
+      message: 'Chỉ gửi q khi tìm kiếm mới hoặc searchHistoryId khi chuyển trang',
+    };
+    res.status(400).json(response);
+    return;
+  }
+
+  if (hasQuery && result.data.page !== 1) {
+    const response: ApiResponse = {
+      success: false,
+      message: 'Tìm kiếm mới phải bắt đầu từ trang 1',
+    };
+    res.status(400).json(response);
+    return;
+  }
+
+  res.locals.searchTextOcrQuery = result.data;
+  next();
+}
+
 export function validateSearchClick(req: Request, res: Response, next: NextFunction) {
   const result = searchClickSchema.safeParse(req.body);
 
@@ -165,3 +223,4 @@ export function validateSearchClick(req: Request, res: Response, next: NextFunct
   req.body = result.data;
   next();
 }
+

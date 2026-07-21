@@ -219,6 +219,41 @@ const options: swaggerJsdoc.Options = {
           },
         },
 
+        SearchTextOcrResultItem: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            imageUrl: { type: 'string', example: 'http://localhost:8000/storage/images/index/uuid.jpg' },
+            width: { type: 'integer', nullable: true, example: 1920 },
+            height: { type: 'integer', nullable: true, example: 1080 },
+            fileSize: { type: 'integer', nullable: true, example: 245760 },
+            fileFormat: { type: 'string', nullable: true, example: 'jpg' },
+            createdAt: { type: 'string', format: 'date-time' },
+            ocrMatches: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/OcrMatchLine' },
+            },
+          },
+        },
+
+        OcrMatchLine: {
+          type: 'object',
+          properties: {
+            rawText: { type: 'string', example: 'cực hài' },
+            confidenceScore: { type: 'number', example: 0.95 },
+            boundingBoxes: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                x: { type: 'number', example: 120 },
+                y: { type: 'number', example: 45 },
+                width: { type: 'number', example: 200 },
+                height: { type: 'number', example: 30 },
+              },
+            },
+          },
+        },
+
         // ============================
         // Admin - Users
         // ============================

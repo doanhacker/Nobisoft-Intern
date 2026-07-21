@@ -99,6 +99,7 @@ model ImageOcr {
   imageIndex ImageIndex @relation(fields: [imageIndexId], references: [id], onDelete: Cascade)
 
   @@index([imageIndexId])
+  @@index([normalizedText])
   @@map("image_ocr")
 }
 

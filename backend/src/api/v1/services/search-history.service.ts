@@ -131,6 +131,32 @@ export async function getTextSearchHistory(
   };
 }
 
+export async function getOcrSearchHistory(
+  userId: string,
+  searchHistoryId: string,
+): Promise<TextSearchHistoryQuery | null> {
+  const history = await prisma.searchHistory.findFirst({
+    where: {
+      id: searchHistoryId,
+      userId,
+      searchType: 'TEXT_OCR',
+    },
+    select: {
+      id: true,
+      queryText: true,
+    },
+  });
+
+  if (!history?.queryText) {
+    return null;
+  }
+
+  return {
+    id: history.id,
+    queryText: history.queryText,
+  };
+}
+
 export async function saveSearchClick(input: SearchClickInput): Promise<SaveSearchClickResult> {
   const history = await prisma.searchHistory.findFirst({
     where: {
