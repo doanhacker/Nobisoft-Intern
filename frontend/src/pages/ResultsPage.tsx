@@ -16,8 +16,7 @@ import { ImageDetailModal } from '@/components/results/ImageDetailModal'
 import { ResultsSidebar } from '@/components/results/ResultsSidebar'
 import { ResultsSearchBar, type ResultsSearchState, type SearchMode } from '@/components/results/ResultsSearchBar'
 import { ImageSearchModal } from '@/components/results/ImageSearchModal'
-import { getMockResults } from '@/services/mockData'
-import { searchByImageFile, searchByImagePage, getPendingImageFile, setPendingImageFile, fetchImageAsFile, recordSearchClick } from '@/services/searchService'
+import { searchByImageFile, searchByImagePage, getPendingImageFile, setPendingImageFile, fetchImageAsFile, recordSearchClick, searchByTextNew, searchByTextPage } from '@/services/searchService'
 import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
 
@@ -278,15 +277,42 @@ export function ResultsPage() {
             return
           }
         } else {
-          // Text-based modes: keep using mock data until those APIs are ready
-          data = await getMockResults({
-            mode: fetchMode,
-            query: fetchQuery || undefined,
-            queryId: fetchQueryId,
-            signal: controller.signal,
-          })
-          currentTotal = data.length > 0 ? 100 : 0 // mock total
-          currentLimit = 20
+          // Text-based modes (semantic / ocr) — call the real backend API.
+          // Strategy:
+          //   • If searchHistoryId is already in state AND the page hasn't reset to 1,
+          //     this is a pagination request → send searchHistoryId (no q).
+          //   • Otherwise this is a new search → send q from page 1.
+          //
+          // Note: the backend enforces that q and searchHistoryId are mutually exclusive.
+          const isTextMode = fetchMode === 'semantic' || fetchMode === 'ocr'
+          if (!isTextMode) return // guard: should never happen
+
+          if (searchHistoryId && fetchPage > 1) {
+            // ── Pagination: reuse existing session ──
+            const response = await searchByTextPage(
+              fetchMode as 'semantic' | 'ocr',
+              searchHistoryId,
+              fetchPage,
+              20,
+              controller.signal,
+            )
+            setSearchHistoryId(response.searchHistoryId)
+            data = response.results
+            currentTotal = response.total
+            currentLimit = response.limit
+          } else {
+            // ── New search: send q, always start at page 1 ──
+            const response = await searchByTextNew(
+              fetchMode as 'semantic' | 'ocr',
+              fetchQuery,
+              20,
+              controller.signal,
+            )
+            setSearchHistoryId(response.searchHistoryId)
+            data = response.results
+            currentTotal = response.total
+            currentLimit = response.limit
+          }
         }
 
         if (data.length === 0) {
@@ -344,7 +370,8 @@ export function ResultsPage() {
       // Reset history so fetchResults uses Mode A (new search with file)
       setSearchHistoryId(null)
     } else {
-      // Clear image state when switching to text mode
+      // Clear image state when switching to text mode.
+      // Always reset searchHistoryId so the new query triggers a fresh search (not pagination).
       setQueryImageFile(null)
       setQueryImagePreviewUrl(null)
       setPendingImageFile(null)
@@ -355,8 +382,8 @@ export function ResultsPage() {
 
   const handleCardClick = (result: SearchResult) => {
     savedScrollY.current = window.scrollY
-    // Record the user's click for search history tracking (image mode only)
-    if (mode === 'image' && searchHistoryId) {
+    // Record the user's click for search history tracking (all modes)
+    if (searchHistoryId) {
       recordSearchClick(searchHistoryId, result.id)
     }
     navigate({
