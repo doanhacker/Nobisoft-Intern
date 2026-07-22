@@ -21,7 +21,6 @@ class IndexingResult(BaseModel):
     metadata: ImageMetadata | None = None
     embedding: list[float] = Field(default_factory=list)
     ocr_results: list[OcrResult] = Field(default_factory=list)
-    processing_time_ms: float
     error: str | None = None
 
 
@@ -30,4 +29,5 @@ class BatchIndexingResponse(BaseModel):
     total: int
     succeeded: int
     failed: int
+    processing_time_ms: float
     results: list[IndexingResult]

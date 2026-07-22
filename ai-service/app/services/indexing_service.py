@@ -1,5 +1,4 @@
 import asyncio
-from time import perf_counter
 
 from fastapi import UploadFile
 from PIL import Image
@@ -71,8 +70,6 @@ class IndexingService:
         image_id: str,
         image: UploadFile,
     ) -> IndexingResult:
-        started_at = perf_counter()
-
         try:
             pil_image, _, metadata = (
                 await read_and_preprocess_image(image)
@@ -92,39 +89,24 @@ class IndexingService:
                     "Embedding phải có 512 chiều"
                 )
 
-            elapsed_ms = (
-                perf_counter() - started_at
-            ) * 1000
-
             return IndexingResult(
                 success=True,
                 image_id=image_id,
                 metadata=metadata,
                 embedding=embedding,
                 ocr_results=ocr_results,
-                processing_time_ms=round(elapsed_ms, 2),
             )
 
         except InvalidImageError as exc:
-            elapsed_ms = (
-                perf_counter() - started_at
-            ) * 1000
-
             return IndexingResult(
                 success=False,
                 image_id=image_id,
-                processing_time_ms=round(elapsed_ms, 2),
                 error=str(exc),
             )
 
         except Exception as exc:
-            elapsed_ms = (
-                perf_counter() - started_at
-            ) * 1000
-
             return IndexingResult(
                 success=False,
                 image_id=image_id,
-                processing_time_ms=round(elapsed_ms, 2),
                 error=f"Xử lý ảnh thất bại: {exc}",
             )
