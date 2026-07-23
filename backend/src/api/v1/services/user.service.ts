@@ -1,7 +1,7 @@
 import { prisma } from '../../../config/prisma.js';
 import { removeVietnameseDiacritics } from '../../../utils/normalize.util.js';
-import type { UserListServiceResult, SearchHistoryServiceResult } from '../../../types/user.type.js';
-import type { UserListQuery, SearchHistoryQuery } from '../validators/admin/user.validate.js';
+import type { UserListServiceResult } from '../../../types/user.type.js';
+import type { UserListQuery } from '../validators/admin/user.validate.js';
 
 export async function getUserList(query: UserListQuery): Promise<UserListServiceResult> {
   const { page, limit, search } = query;
@@ -46,84 +46,4 @@ export async function getUserList(query: UserListQuery): Promise<UserListService
     data: users,
     total,
   };
-}
-
-export async function getUserSearchHistory(
-  userId: string,
-  query: SearchHistoryQuery,
-): Promise<SearchHistoryServiceResult> {
-  // Verify user exists
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { id: true },
-  });
-
-  if (!user) {
-    return {
-      success: false,
-      message: 'Người dùng không tồn tại',
-    };
-  }
-
-  const { page, limit, searchType } = query;
-  const skip = (page - 1) * limit;
-
-  const where = {
-    userId,
-    ...(searchType ? { searchType } : {}),
-  };
-
-  const [histories, total] = await Promise.all([
-    prisma.searchHistory.findMany({
-      where,
-      select: {
-        id: true,
-        searchType: true,
-        queryImagePath: true,
-        queryText: true,
-        clickedImage: {
-          select: {
-            id: true,
-            path: true,
-            width: true,
-            height: true,
-          },
-        },
-        createdAt: true,
-      },
-      skip,
-      take: limit,
-      orderBy: { createdAt: 'desc' },
-    }),
-    prisma.searchHistory.count({ where }),
-  ]);
-
-  const formattedHistories = histories.map((history) => {
-    const clickedImage = history.clickedImage as any;
-    if (!clickedImage) return history;
-    const { path, ...restClickedImage } = clickedImage;
-    return {
-      ...history,
-      clickedImage: {
-        ...restClickedImage,
-        imageUrl: resolveImageUrl(path),
-      },
-    };
-  });
-
-  return {
-    success: true,
-    data: formattedHistories as any,
-    total,
-  };
-}
-
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
-
-function resolveImageUrl(imagePath: string): string {
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
-  }
-  const cleanPath = imagePath.replace(/\\/g, '/').replace(/^\//, '');
-  return `${BACKEND_URL}/${cleanPath}`;
 }
