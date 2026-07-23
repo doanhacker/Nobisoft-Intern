@@ -9,6 +9,7 @@ import {
   HistoryPageOutOfRangeError,
   SearchHistoryUserNotFoundError,
 } from '../../services/history.service.js';
+import { createPaginationMeta } from '../../../../utils/pagination.util.js';
 
 export async function getUsers(req: Request, res: Response) {
   try {
@@ -32,12 +33,7 @@ export async function getUsers(req: Request, res: Response) {
       success: true,
       message: 'Lấy danh sách người dùng thành công',
       data,
-      meta: {
-        page,
-        limit,
-        totalDocs: total,
-        totalPages: Math.ceil(total / limit),
-      },
+      meta: createPaginationMeta(page, limit, total),
     };
 
     res.status(200).json(response);
@@ -63,12 +59,7 @@ export async function getSearchHistory(req: Request, res: Response) {
       success: true,
       message: 'Lấy lịch sử tìm kiếm thành công',
       data: result.data,
-      meta: {
-        page: query.page,
-        limit: query.limit,
-        totalDocs: result.total,
-        totalPages: Math.ceil(result.total / query.limit),
-      },
+      meta: createPaginationMeta(query.page, query.limit, result.total),
     };
 
     res.status(200).json(response);

@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import type { ApiResponse } from '../../../../types/apiResponse.js';
 import type { UserSearchHistoryApiResponse } from '../../../../types/history.type.js';
+import { createPaginationMeta } from '../../../../utils/pagination.util.js';
 import {
   getUserSearchHistory,
   HistoryPageOutOfRangeError,
@@ -17,12 +18,7 @@ export async function getHistory(req: Request, res: Response) {
       success: true,
       message: 'Lấy lịch sử tìm kiếm thành công',
       data: result.data,
-      meta: {
-        page: query.page,
-        limit: query.limit,
-        totalDocs: result.total,
-        totalPages: Math.ceil(result.total / query.limit),
-      },
+      meta: createPaginationMeta(query.page, query.limit, result.total),
     };
 
     res.status(200).json(response);

@@ -1,5 +1,9 @@
 import type { NextFunction, Request, Response } from 'express';
 import { z } from 'zod';
+import {
+  searchHistoryQuerySchema,
+  type SearchHistoryQuery as SharedSearchHistoryQuery,
+} from '../shared/search-history-query.schema.js';
 
 export const userListQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
@@ -7,30 +11,12 @@ export const userListQuerySchema = z.object({
   search: z.string().trim().optional()
 });
 
-export const searchHistoryQuerySchema = z.object({
-  page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce
-    .number()
-    .int()
-    .pipe(z.literal(20, 'Số lượng lịch sử mỗi trang chỉ được là 20'))
-    .default(20),
-  searchType: z.enum(['IMAGE_ONLY', 'TEXT_SEMANTIC', 'TEXT_OCR']).optional(),
-  fromDate: z.coerce.date('fromDate không hợp lệ').optional(),
-  toDate: z.coerce.date('toDate không hợp lệ').optional(),
-}).refine(
-  (data) => !data.fromDate || !data.toDate || data.fromDate <= data.toDate,
-  {
-    message: 'fromDate phải nhỏ hơn hoặc bằng toDate',
-    path: ['toDate'],
-  },
-);
-
 export const userIdParamSchema = z.object({
   userId: z.string().uuid('userId không hợp lệ'),
 });
 
 export type UserListQuery = z.infer<typeof userListQuerySchema>;
-export type SearchHistoryQuery = z.infer<typeof searchHistoryQuerySchema>;
+export type SearchHistoryQuery = SharedSearchHistoryQuery;
 export type UserIdParam = z.infer<typeof userIdParamSchema>;
 
 export function validateUserListQuery(req: Request, res: Response, next: NextFunction) {
