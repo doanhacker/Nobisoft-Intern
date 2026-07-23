@@ -17,8 +17,9 @@ export async function uploadImages(req: Request, res: Response) {
 
     const batchId = req.body.batchId as string | undefined;
     const isLastChunk = req.body.isLastChunk === 'true';
+    const userId = req.user?.id;
 
-    const { batchId: resultBatchId, results } = await processImageUploads(files, batchId, isLastChunk);
+    const { batchId: resultBatchId, results } = await processImageUploads(files, batchId, isLastChunk, userId);
 
     const successCount = results.filter((r) => r.success).length;
     const failCount = results.filter((r) => !r.success).length;

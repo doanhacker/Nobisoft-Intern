@@ -15,6 +15,7 @@ export async function processImageUploads(
   files: Express.Multer.File[],
   batchId?: string,
   isLastChunk?: boolean,
+  userId?: string,
 ) {
   const results: Array<{
     filename: string;
@@ -36,7 +37,7 @@ export async function processImageUploads(
       throw new Error('Batch đã kết thúc upload, không thể thêm ảnh');
     }
   } else {
-    batch = await prisma.batchIndex.create({ data: {} });
+    batch = await prisma.batchIndex.create({ data: userId ? { uploadedBy: userId } : {} });
   }
 
   // 2. Xử lý từng file
