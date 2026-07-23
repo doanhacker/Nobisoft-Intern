@@ -1,6 +1,7 @@
 import type { Request, Response } from 'express';
 import type { ApiResponse } from '../../../../types/apiResponse.js';
 import type { ImageListApiResponse, ImageDetailApiResponse } from '../../../../types/image.type.js';
+import { createPaginationMeta } from '../../../../utils/pagination.util.js';
 import type { ImageListQuery } from '../../validators/client/image.validate.js';
 import * as imageService from '../../services/image.service.js';
 
@@ -13,12 +14,7 @@ export async function listImages(req: Request, res: Response) {
       success: true,
       message: 'Lấy danh sách ảnh thành công',
       data: images,
-      meta: {
-        page: query.page,
-        limit: query.limit,
-        totalDocs: total,
-        totalPages: Math.ceil(total / query.limit),
-      },
+      meta: createPaginationMeta(query.page, query.limit, total),
     };
 
     res.status(200).json(response);
