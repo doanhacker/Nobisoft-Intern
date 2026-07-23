@@ -26,36 +26,3 @@ export type UserListServiceResult =
       success: false;
       message: string;
     };
-
-// ─── Search History ───
-
-export type SearchTypeValue = 'IMAGE_ONLY' | 'TEXT_SEMANTIC' | 'TEXT_OCR';
-
-export interface SearchHistoryClickedImage {
-  id: string;
-  imageUrl: string;
-  width: number;
-  height: number;
-}
-
-export interface SearchHistoryItem {
-  id: string;
-  searchType: SearchTypeValue;
-  queryImagePath: string | null;
-  queryText: string | null;
-  clickedImage: SearchHistoryClickedImage | null;
-  createdAt: Date;
-}
-
-export type SearchHistoryListApiResponse = ApiResponse<SearchHistoryItem[]>;
-
-export type SearchHistoryServiceResult =
-  | {
-      success: true;
-      data: SearchHistoryItem[];
-      total: number;
-    }
-  | {
-      success: false;
-      message: string;
-    };

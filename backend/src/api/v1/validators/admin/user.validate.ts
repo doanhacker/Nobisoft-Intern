@@ -9,9 +9,21 @@ export const userListQuerySchema = z.object({
 
 export const searchHistoryQuerySchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
-  limit: z.coerce.number().int().min(1).max(100).default(20),
+  limit: z.coerce
+    .number()
+    .int()
+    .pipe(z.literal(20, 'Số lượng lịch sử mỗi trang chỉ được là 20'))
+    .default(20),
   searchType: z.enum(['IMAGE_ONLY', 'TEXT_SEMANTIC', 'TEXT_OCR']).optional(),
-});
+  fromDate: z.coerce.date('fromDate không hợp lệ').optional(),
+  toDate: z.coerce.date('toDate không hợp lệ').optional(),
+}).refine(
+  (data) => !data.fromDate || !data.toDate || data.fromDate <= data.toDate,
+  {
+    message: 'fromDate phải nhỏ hơn hoặc bằng toDate',
+    path: ['toDate'],
+  },
+);
 
 export const userIdParamSchema = z.object({
   userId: z.string().uuid('userId không hợp lệ'),
