@@ -14,6 +14,7 @@ import { Route as StyleGuideRouteImport } from './routes/style-guide'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as ResultsRouteImport } from './routes/results'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as MyImagesRouteImport } from './routes/my-images'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AdminRouteImport } from './routes/admin'
@@ -48,6 +49,11 @@ const ResultsRoute = ResultsRouteImport.update({
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyImagesRoute = MyImagesRouteImport.update({
+  id: '/my-images',
+  path: '/my-images',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -106,6 +112,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/my-images': typeof MyImagesRoute
   '/register': typeof RegisterRoute
   '/results': typeof ResultsRoute
   '/search': typeof SearchRoute
@@ -122,6 +129,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/my-images': typeof MyImagesRoute
   '/register': typeof RegisterRoute
   '/results': typeof ResultsRoute
   '/search': typeof SearchRoute
@@ -140,6 +148,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRouteWithChildren
   '/dashboard': typeof DashboardRoute
   '/login': typeof LoginRoute
+  '/my-images': typeof MyImagesRoute
   '/register': typeof RegisterRoute
   '/results': typeof ResultsRoute
   '/search': typeof SearchRoute
@@ -159,6 +168,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/dashboard'
     | '/login'
+    | '/my-images'
     | '/register'
     | '/results'
     | '/search'
@@ -175,6 +185,7 @@ export interface FileRouteTypes {
     | '/'
     | '/dashboard'
     | '/login'
+    | '/my-images'
     | '/register'
     | '/results'
     | '/search'
@@ -192,6 +203,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/dashboard'
     | '/login'
+    | '/my-images'
     | '/register'
     | '/results'
     | '/search'
@@ -210,6 +222,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRouteWithChildren
   DashboardRoute: typeof DashboardRoute
   LoginRoute: typeof LoginRoute
+  MyImagesRoute: typeof MyImagesRoute
   RegisterRoute: typeof RegisterRoute
   ResultsRoute: typeof ResultsRoute
   SearchRoute: typeof SearchRoute
@@ -252,6 +265,13 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-images': {
+      id: '/my-images'
+      path: '/my-images'
+      fullPath: '/my-images'
+      preLoaderRoute: typeof MyImagesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -362,6 +382,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRouteWithChildren,
   DashboardRoute: DashboardRoute,
   LoginRoute: LoginRoute,
+  MyImagesRoute: MyImagesRoute,
   RegisterRoute: RegisterRoute,
   ResultsRoute: ResultsRoute,
   SearchRoute: SearchRoute,

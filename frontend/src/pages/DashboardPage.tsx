@@ -1,5 +1,5 @@
-import { useNavigate } from '@tanstack/react-router'
-import { LogOut, ShieldCheck } from 'lucide-react'
+import { useNavigate, Link } from '@tanstack/react-router'
+import { LogOut, ShieldCheck, Images } from 'lucide-react'
 import { useAuth } from '@/hooks/useAuth'
 import { Button } from '@/components/ui/button'
 
@@ -65,6 +65,17 @@ export function DashboardPage() {
 
         {/* Actions */}
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
+          <Button
+            id="dashboard-my-images-btn"
+            variant="brand"
+            size="lg"
+            asChild
+          >
+            <Link to="/my-images">
+              <Images className="size-4" />
+              Xem ảnh của tôi
+            </Link>
+          </Button>
           <Button
             id="logout-button"
             variant="outline"
