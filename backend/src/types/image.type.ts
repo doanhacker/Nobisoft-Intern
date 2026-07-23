@@ -28,5 +28,16 @@ export interface ImageListItem {
   imageIndex: ImageIndexInfo | null;
 }
 
+export interface MyImageListItem {
+  id: string;
+  imageUrl: string;
+  width: number | null;
+  height: number | null;
+  fileSize: number | null;
+  fileFormat: string | null;
+  createdAt: Date;
+}
+
 export type ImageListApiResponse = ApiResponse<ImageListItem[]>;
 export type ImageDetailApiResponse = ApiResponse<ImageListItem>;
+export type MyImageListApiResponse = ApiResponse<MyImageListItem[]>;
