@@ -1,4 +1,3 @@
-import { cn } from '@/lib/utils'
 import type { SearchResult } from './MasonryGrid'
 import { Search } from 'lucide-react'
 
@@ -13,20 +12,12 @@ interface ImageResultCardProps {
     style?: React.CSSProperties
 }
 
-// Helper: similarity score color
-function getSimilarityStyle(score: number): { label: string; className: string } {
-    if (score >= 0.8) return { label: `${Math.round(score * 100)}%`, className: 'similarity-high' }
-    if (score >= 0.5) return { label: `${Math.round(score * 100)}%`, className: 'similarity-medium' }
-    return { label: `${Math.round(score * 100)}%`, className: 'similarity-low' }
-}
-
 export function ImageResultCard({
     result,
     onClick,
     onSearchSimilar,
     style,
 }: ImageResultCardProps) {
-    const sim = getSimilarityStyle(result.similarityScore)
 
     return (
         <div
@@ -72,8 +63,8 @@ export function ImageResultCard({
                 </div>
             </div>
 
-            {/* ── Similarity Score Badge ── */}
-            <div
+            {/* ── Similarity Score Badge — hidden per UX requirement ── */}
+            {/* <div
                 className={cn(
                     'absolute top-2 right-2 px-2 py-0.5 rounded-full text-[11px] font-bold',
                     'backdrop-blur-sm border shadow-sm',
@@ -81,7 +72,7 @@ export function ImageResultCard({
                 )}
             >
                 {sim.label}
-            </div>
+            </div> */}
 
             {/* ── OCR text badge ── */}
             {result.ocrText && (

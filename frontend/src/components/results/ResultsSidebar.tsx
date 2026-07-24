@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
-import { ScanSearch, Home, Search, LayoutDashboard, LogOut, UserCircle2, LogIn } from 'lucide-react'
+import { ScanSearch, Home, Search, LayoutDashboard, LogOut, UserCircle2, LogIn, Sparkles } from 'lucide-react'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
@@ -121,6 +121,15 @@ export function ResultsSidebar({ className }: ResultsSidebarProps) {
             icon={Search}
             label="Tìm kiếm mới"
             active={pathname === '/search'}
+          />
+        )}
+
+        {isAuthenticated && (
+          <SidebarIconButton
+            to="/recommendations"
+            icon={Sparkles}
+            label="Gợi ý dành cho bạn"
+            active={pathname === '/recommendations'}
           />
         )}
 
