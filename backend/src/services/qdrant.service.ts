@@ -67,6 +67,68 @@ export async function deleteImageVector(imageId: string): Promise<void> {
   });
 }
 
+export async function getImageVectors(
+  imageIds: string[],
+): Promise<Map<string, number[]>> {
+  if (imageIds.length === 0) return new Map();
+
+  const points = await qdrantClient.retrieve(QDRANT_COLLECTION_NAME, {
+    ids: imageIds,
+    with_vector: true,
+    with_payload: false,
+  });
+
+  const vectorMap = new Map<string, number[]>();
+  for (const point of points) {
+    const vector = point.vector;
+    if (Array.isArray(vector)) {
+      vectorMap.set(String(point.id), vector as number[]);
+    }
+  }
+
+  return vectorMap;
+}
+
+export async function searchSimilarExcluding(
+  vector: number[],
+  excludeIds: string[],
+  page: number,
+  limit: number,
+): Promise<SimilarImageSearchResult> {
+  const offset = (page - 1) * limit;
+  const maxResults = getSearchMaxResults();
+
+  const queryParams: Parameters<typeof qdrantClient.query>[1] = {
+    query: vector,
+    limit: maxResults,
+    score_threshold: getSearchMinScore('image'),
+    with_payload: false,
+    with_vector: false,
+  };
+
+  if (excludeIds.length > 0) {
+    queryParams.filter = {
+      must_not: [
+        {
+          has_id: excludeIds,
+        },
+      ],
+    };
+  }
+
+  const queryResult = await qdrantClient.query(QDRANT_COLLECTION_NAME, queryParams);
+
+  const matchedPoints = queryResult.points.map((point) => ({
+    imageId: String(point.id),
+    score: point.score,
+  }));
+
+  return {
+    points: matchedPoints.slice(offset, offset + limit),
+    total: matchedPoints.length,
+  };
+}
+
 export async function searchSimilarImageVectors(
   vector: number[],
   page: number,
