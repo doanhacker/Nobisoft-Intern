@@ -19,7 +19,7 @@ import {
   CalendarRange,
 } from 'lucide-react'
 import { getUserSearchHistory } from '@/services/adminUserService'
-import type { SearchHistoryItem, SearchTypeValue } from '@/types/admin'
+import type { SearchHistoryItem } from '@/types/admin'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'

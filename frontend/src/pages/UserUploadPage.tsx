@@ -12,7 +12,6 @@ import {
   FolderOpen,
   Info,
   StopCircle,
-  Clock,
 } from 'lucide-react'
 import { uploadUserImages } from '@/services/userUploadService'
 import type { UploadPhaseProgress, IndexingPhaseProgress, BatchIndexingStatus, UserUploadResult } from '@/services/userUploadService'
@@ -114,6 +113,29 @@ function UploadDropZone({ onFilesSelected, disabled, fileCount }: UploadDropZone
     return valid
   }
 
+  // ── Clipboard paste ─────────────────────────────────────────
+  React.useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      if (disabled) return
+      const items = e.clipboardData?.items
+      if (!items) return
+      const imageFiles: File[] = []
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          const file = items[i].getAsFile()
+          if (file) imageFiles.push(file)
+        }
+      }
+      if (imageFiles.length > 0) {
+        const valid = validateAndFilter(imageFiles)
+        if (valid.length > 0) onFilesSelected(valid)
+      }
+    }
+    document.addEventListener('paste', handlePaste)
+    return () => document.removeEventListener('paste', handlePaste)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [disabled])
+
   const handleDragEnter = useCallback(
     (e: React.DragEvent) => {
       e.preventDefault()
@@ -202,12 +224,16 @@ function UploadDropZone({ onFilesSelected, disabled, fileCount }: UploadDropZone
       <p className="font-bold text-base sm:text-lg text-foreground mb-1 text-center">
         {isDragActive ? 'Thả ảnh vào đây!' : 'Kéo & thả ảnh vào đây'}
       </p>
-      <p className="text-sm text-muted-foreground text-center mb-4">
+      <p className="text-sm text-muted-foreground text-center mb-3">
         hoặc{' '}
         <span className="text-primary font-semibold underline-offset-2 hover:underline">
           bấm để chọn ảnh
         </span>{' '}
         từ thiết bị
+      </p>
+      <p className="text-xs text-muted-foreground/60 flex items-center gap-1.5 mb-4">
+        <kbd className="inline-flex items-center rounded border border-border/60 bg-muted px-1.5 py-0.5 font-mono text-[10px]">Ctrl+V</kbd>
+        để dán ảnh từ clipboard
       </p>
 
       <div className="flex flex-wrap gap-2 justify-center">
@@ -287,72 +313,6 @@ function UploadingCard({ totalFiles, uploadPercent, isCancelled, onCancel }: Upl
           />
         </div>
       </div>
-    </div>
-  )
-}
-
-// ============================================================
-// IndexingCard — Phase 2
-// ============================================================
-
-interface IndexingCardProps {
-  indexingPercent: number
-  processedImages: number
-  totalImages: number
-  status: BatchIndexingStatus
-}
-
-function IndexingCard({ indexingPercent, processedImages, totalImages, status }: IndexingCardProps) {
-  const isCompleting = status === 'COMPLETED'
-
-  return (
-    <div className="rounded-2xl border border-violet-500/20 bg-card p-6 space-y-5">
-      <div className="flex items-center gap-2.5">
-        <div className="relative flex items-center justify-center size-8 rounded-full bg-violet-500/10 shrink-0">
-          {isCompleting ? (
-            <CheckCircle2 className="size-4 text-emerald-500" />
-          ) : (
-            <Sparkles className="size-4 text-violet-500 animate-pulse" />
-          )}
-        </div>
-        <div>
-          <p className="font-semibold text-foreground text-sm">
-            {isCompleting ? 'Hệ thống đã xử lý xong!' : 'Hệ thống đang phân tích ảnh...'}
-          </p>
-          <p className="text-xs text-muted-foreground">
-            {isCompleting
-              ? 'Ảnh đã sẵn sàng để tìm kiếm'
-              : 'AI đang nhận diện nội dung trong từng ảnh'}
-          </p>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <div className="flex items-center justify-between text-xs text-muted-foreground">
-          <span className="flex items-center gap-1.5">
-            <Clock className="size-3.5" />
-            {totalImages > 0
-              ? `Đã xử lý ${processedImages.toLocaleString()} / ${totalImages.toLocaleString()} ảnh`
-              : 'Đang chuẩn bị...'}
-          </span>
-          <span className="font-semibold tabular-nums text-foreground">{indexingPercent}%</span>
-        </div>
-        <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-          <div
-            className={cn(
-              'h-full rounded-full transition-all duration-700 ease-out',
-              isCompleting ? 'bg-emerald-500' : 'bg-violet-500',
-            )}
-            style={{ width: `${Math.max(indexingPercent, 3)}%` }}
-          />
-        </div>
-      </div>
-
-      {!isCompleting && (
-        <p className="text-[11px] text-muted-foreground/70 text-center">
-          Quá trình này có thể mất vài phút tuỳ số lượng ảnh
-        </p>
-      )}
     </div>
   )
 }
@@ -440,10 +400,6 @@ export function UserUploadPage() {
     phase,
     uploadPercent,
     isCancelled,
-    indexingPercent,
-    processedImages,
-    totalImages,
-    indexingStatus,
     uploadResults,
     finalStatus,
     totalUploadedSession,
@@ -477,9 +433,12 @@ export function UserUploadPage() {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
+  const userCancelledRef = React.useRef(false)
+
   // ── Cancel (upload phase only) ─────────────────────────────
 
   const handleCancel = () => {
+    userCancelledRef.current = true
     abortControllerRef.current?.abort()
     localAbortRef.current?.abort()
     updateSession({ isCancelled: true })
@@ -496,6 +455,13 @@ export function UserUploadPage() {
 
   const handleUpload = async () => {
     if (selectedFiles.length === 0) return
+
+    userCancelledRef.current = false
+
+    // If currently indexing a previous batch, abort its polling loop quietly so we can start fresh.
+    if (isIndexing) {
+      abortControllerRef.current?.abort()
+    }
 
     const filesToUpload = [...selectedFiles]
 
@@ -536,7 +502,7 @@ export function UserUploadPage() {
 
       const successCount = results.filter((r) => r.success).length
       const failCount = results.length - successCount
-      const wasCancelled = controller.signal.aborted
+      const wasUserCancelled = userCancelledRef.current
 
       updateSession({
         uploadResults: results,
@@ -545,7 +511,7 @@ export function UserUploadPage() {
         phase: 'done',
       })
 
-      if (wasCancelled) {
+      if (wasUserCancelled) {
         toast.warning(`Đã huỷ. ${successCount} ảnh đã được tải lên trước khi dừng.`)
       } else if (failCount === 0) {
         toast.success(`${successCount} ảnh đã được thêm vào thư viện thành công 🎉`)
@@ -572,7 +538,20 @@ export function UserUploadPage() {
   const isIndexing = phase === 'indexing'
   const isDone = phase === 'done'
   const isError = phase === 'error'
-  const isProcessing = isUploading || isIndexing
+  // Drop zone only disabled during active upload, not during background indexing
+  const isDropZoneDisabled = isUploading
+
+  // Toast when indexing completes in background (phase: indexing → done)
+  const prevPhaseRef = React.useRef(phase)
+  React.useEffect(() => {
+    if (prevPhaseRef.current === 'indexing' && phase === 'done') {
+      toast.success('Ảnh đã được phân tích xong và sẵn sàng tìm kiếm! 🌟', {
+        description: `${uploadResults.filter((r) => r.success).length.toLocaleString()} ảnh đã được lập chỉ mục.`,
+      })
+    }
+    prevPhaseRef.current = phase
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase])
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-background">
@@ -616,17 +595,27 @@ export function UserUploadPage() {
         {/* ── How it works (idle only) ── */}
         {isIdle && <HowItWorksBanner />}
 
-        {/* ── Drop zone (not while processing) ── */}
-        {!isProcessing && (
+        {/* ── Background indexing indicator (minimal, non-blocking) ── */}
+        {isIndexing && (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-violet-500/20 bg-violet-500/5 text-sm">
+            <Sparkles className="size-4 text-violet-500 animate-pulse shrink-0" />
+            <p className="text-violet-700 dark:text-violet-300 text-xs font-medium flex-1">
+              AI đang phân tích ảnh trong nền… Bạn có thể tiếp tục upload ảnh mới.
+            </p>
+          </div>
+        )}
+
+        {/* ── Drop zone (hidden only during active upload) ── */}
+        {!isUploading && (
           <UploadDropZone
             onFilesSelected={handleFilesSelected}
-            disabled={isProcessing}
+            disabled={isDropZoneDisabled}
             fileCount={selectedFiles.length}
           />
         )}
 
         {/* ── Selected files preview ── */}
-        {selectedFiles.length > 0 && !isProcessing && (
+        {selectedFiles.length > 0 && !isUploading && (
           <div className="space-y-4">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
@@ -708,15 +697,8 @@ export function UserUploadPage() {
           />
         )}
 
-        {/* ── Phase 2: Indexing ── */}
-        {isIndexing && (
-          <IndexingCard
-            indexingPercent={indexingPercent}
-            processedImages={processedImages}
-            totalImages={totalImages}
-            status={indexingStatus}
-          />
-        )}
+        {/* ── Phase 2: Indexing — hidden (runs in background) ── */}
+        {/* IndexingCard intentionally removed — user sees a minimal banner above instead. */}
 
         {/* ── Error state ── */}
         {isError && (

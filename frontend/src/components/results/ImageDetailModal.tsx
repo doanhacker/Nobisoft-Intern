@@ -31,11 +31,15 @@ export function ImageDetailModal({ result, onClose, onSearchSimilar }: ImageDeta
     return () => window.removeEventListener('keydown', handler)
   }, [result, onClose])
 
-  // Prevent body scroll when open
+  // Prevent body scroll when open without losing scroll position
   React.useEffect(() => {
-    if (result) document.body.style.overflow = 'hidden'
-    else document.body.style.overflow = ''
-    return () => { document.body.style.overflow = '' }
+    if (!result) return
+    const scrollY = window.scrollY
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = ''
+      window.scrollTo({ top: scrollY, behavior: 'instant' })
+    }
   }, [result])
 
   if (!result) return null

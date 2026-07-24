@@ -172,8 +172,8 @@ function EmptyState() {
 // ============================================================
 
 interface DeleteConfirmProps {
-  onConfirm: () => void
-  onCancel: () => void
+  onConfirm: (e: React.MouseEvent) => void
+  onCancel: (e: React.MouseEvent) => void
   isDeleting: boolean
 }
 
@@ -530,7 +530,7 @@ export function MyImagesPage() {
   // ── Data state ────────────────────────────────────────────
   const [images, setImages] = React.useState<UserImage[]>([])
   const [totalDocs, setTotalDocs] = React.useState(0)
-  const [totalPages, setTotalPages] = React.useState(1)
+  const [, setTotalPages] = React.useState(1)
   const [hasMore, setHasMore] = React.useState(false)
   const [page, setPage] = React.useState(1)
 

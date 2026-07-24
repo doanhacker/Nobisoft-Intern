@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { createRootRoute, Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/router-devtools'
-import { ScanSearch, LogIn, LogOut, Search, UserCircle2, Menu, X, LayoutDashboard, UploadCloud, History } from 'lucide-react'
+import { ScanSearch, LogIn, LogOut, Search, UserCircle2, Menu, X, LayoutDashboard, UploadCloud, History, Sparkles } from 'lucide-react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ThemeProvider } from '@/context/ThemeContext'
 import { AuthProvider } from '@/context/AuthContext'
@@ -179,6 +179,9 @@ function AppShell() {
                 <NavLink to="/search" icon={<Search className="size-3.5" />}>
                   Search
                 </NavLink>
+                <NavLink to="/recommendations" icon={<Sparkles className="size-3.5" />}>
+                  Gợi ý
+                </NavLink>
                 <NavLink to="/upload" icon={<UploadCloud className="size-3.5" />}>
                   Tải ảnh lên
                 </NavLink>
@@ -280,6 +283,13 @@ function AppShell() {
                       onClick={() => setMenuOpen(false)}
                     >
                       Tìm kiếm
+                    </MobileNavLink>
+                    <MobileNavLink
+                      to="/recommendations"
+                      icon={<Sparkles className="size-4 text-muted-foreground" />}
+                      onClick={() => setMenuOpen(false)}
+                    >
+                      Gợi ý dành cho bạn
                     </MobileNavLink>
                     <MobileNavLink
                       to="/upload"

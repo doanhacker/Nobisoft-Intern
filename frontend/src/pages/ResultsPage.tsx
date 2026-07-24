@@ -386,23 +386,26 @@ export function ResultsPage() {
     if (searchHistoryId) {
       recordSearchClick(searchHistoryId, result.id)
     }
+    setSelectedResult(result)
     navigate({
       to: '/results',
       search: { ...search, imageId: result.id },
-      replace: false,
+      replace: true,
+      resetScroll: false,
     })
-    setSelectedResult(result)
   }
 
   const handleModalClose = () => {
+    const targetY = savedScrollY.current
     setSelectedResult(null)
     navigate({
       to: '/results',
       search: { mode: search.mode, q: search.q, query_id: search.query_id, page: search.page },
       replace: true,
+      resetScroll: false,
     })
     requestAnimationFrame(() => {
-      window.scrollTo({ top: savedScrollY.current, behavior: 'instant' })
+      window.scrollTo({ top: targetY, behavior: 'instant' })
     })
   }
 

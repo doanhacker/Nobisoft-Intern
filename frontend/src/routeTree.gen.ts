@@ -14,6 +14,7 @@ import { Route as StyleGuideRouteImport } from './routes/style-guide'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as ResultsRouteImport } from './routes/results'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as RecommendationsRouteImport } from './routes/recommendations'
 import { Route as MyImagesRouteImport } from './routes/my-images'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as HistoryRouteImport } from './routes/history'
@@ -50,6 +51,11 @@ const ResultsRoute = ResultsRouteImport.update({
 const RegisterRoute = RegisterRouteImport.update({
   id: '/register',
   path: '/register',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RecommendationsRoute = RecommendationsRouteImport.update({
+  id: '/recommendations',
+  path: '/recommendations',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MyImagesRoute = MyImagesRouteImport.update({
@@ -120,6 +126,7 @@ export interface FileRoutesByFullPath {
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
   '/my-images': typeof MyImagesRoute
+  '/recommendations': typeof RecommendationsRoute
   '/register': typeof RegisterRoute
   '/results': typeof ResultsRoute
   '/search': typeof SearchRoute
@@ -138,6 +145,7 @@ export interface FileRoutesByTo {
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
   '/my-images': typeof MyImagesRoute
+  '/recommendations': typeof RecommendationsRoute
   '/register': typeof RegisterRoute
   '/results': typeof ResultsRoute
   '/search': typeof SearchRoute
@@ -158,6 +166,7 @@ export interface FileRoutesById {
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
   '/my-images': typeof MyImagesRoute
+  '/recommendations': typeof RecommendationsRoute
   '/register': typeof RegisterRoute
   '/results': typeof ResultsRoute
   '/search': typeof SearchRoute
@@ -179,6 +188,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/login'
     | '/my-images'
+    | '/recommendations'
     | '/register'
     | '/results'
     | '/search'
@@ -197,6 +207,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/login'
     | '/my-images'
+    | '/recommendations'
     | '/register'
     | '/results'
     | '/search'
@@ -216,6 +227,7 @@ export interface FileRouteTypes {
     | '/history'
     | '/login'
     | '/my-images'
+    | '/recommendations'
     | '/register'
     | '/results'
     | '/search'
@@ -236,6 +248,7 @@ export interface RootRouteChildren {
   HistoryRoute: typeof HistoryRoute
   LoginRoute: typeof LoginRoute
   MyImagesRoute: typeof MyImagesRoute
+  RecommendationsRoute: typeof RecommendationsRoute
   RegisterRoute: typeof RegisterRoute
   ResultsRoute: typeof ResultsRoute
   SearchRoute: typeof SearchRoute
@@ -278,6 +291,13 @@ declare module '@tanstack/react-router' {
       path: '/register'
       fullPath: '/register'
       preLoaderRoute: typeof RegisterRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/recommendations': {
+      id: '/recommendations'
+      path: '/recommendations'
+      fullPath: '/recommendations'
+      preLoaderRoute: typeof RecommendationsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/my-images': {
@@ -404,6 +424,7 @@ const rootRouteChildren: RootRouteChildren = {
   HistoryRoute: HistoryRoute,
   LoginRoute: LoginRoute,
   MyImagesRoute: MyImagesRoute,
+  RecommendationsRoute: RecommendationsRoute,
   RegisterRoute: RegisterRoute,
   ResultsRoute: ResultsRoute,
   SearchRoute: SearchRoute,
