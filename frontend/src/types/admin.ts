@@ -43,19 +43,24 @@ export type UserListParams = {
 
 export type SearchTypeValue = 'IMAGE_ONLY' | 'TEXT_SEMANTIC' | 'TEXT_OCR'
 
-export interface SearchHistoryClickedImage {
+/** Ảnh dùng để tìm kiếm (query image) — khớp với backend history.type.ts */
+export interface HistoryQueryImage {
   id: string
   imageUrl: string
-  width: number
-  height: number
+  width: number | null
+  height: number | null
+  fileSize: number | null
+  fileFormat: string | null
 }
 
+/** Một bản ghi lịch sử tìm kiếm — khớp với UserSearchHistoryItem của backend */
 export interface SearchHistoryItem {
   id: string
   searchType: SearchTypeValue
-  queryImagePath: string | null
+  /** Ảnh query (nếu searchType = IMAGE_ONLY). Null nếu tìm bằng text. */
+  queryImage: HistoryQueryImage | null
+  /** Văn bản query (nếu searchType = TEXT_SEMANTIC hoặc TEXT_OCR). Null nếu tìm bằng ảnh. */
   queryText: string | null
-  clickedImage: SearchHistoryClickedImage | null
   createdAt: string
 }
 
@@ -63,6 +68,8 @@ export type SearchHistoryParams = {
   page?: number
   limit?: number
   searchType?: SearchTypeValue
+  fromDate?: string
+  toDate?: string
 }
 
 // ─── Images ──────────────────────────────────────────────────

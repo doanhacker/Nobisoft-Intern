@@ -17,8 +17,8 @@ import {
   getMyImages,
   deleteMyImage,
   formatFileSize,
+  type UserImage,
 } from '@/services/myImagesService'
-import type { UserImage } from '@/services/myImagesService'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
@@ -247,7 +247,7 @@ function ImageCard({ image, onClick, onDelete }: ImageCardProps) {
     >
       {/* Image */}
       <img
-        src={image.thumbnailUrl}
+        src={image.imageUrl}
         alt={image.filename}
         className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
         loading="lazy"
@@ -410,7 +410,7 @@ function Lightbox({ image, allImages, onClose, onDelete, onNavigate }: LightboxP
             <div className="min-w-0">
               <p className="text-sm font-semibold text-white truncate">{image.filename}</p>
               <p className="text-xs text-white/60">
-                {formatFullDateTime(image.uploadedAt)} · {formatFileSize(image.size)}
+                {formatFullDateTime(image.uploadedAt)}{image.size !== null ? ` · ${formatFileSize(image.size)}` : ''}
               </p>
             </div>
           </div>
@@ -479,7 +479,7 @@ function Lightbox({ image, allImages, onClose, onDelete, onNavigate }: LightboxP
           {/* Image */}
           <div className="flex-1 flex items-center justify-center min-w-0">
             <img
-              src={image.fullUrl}
+              src={image.imageUrl}
               alt={image.filename}
               className="max-h-[75vh] max-w-full object-contain rounded-xl shadow-2xl"
               style={{ display: 'block' }}
@@ -529,7 +529,8 @@ interface LightboxState {
 export function MyImagesPage() {
   // ── Data state ────────────────────────────────────────────
   const [images, setImages] = React.useState<UserImage[]>([])
-  const [totalCount, setTotalCount] = React.useState(0)
+  const [totalDocs, setTotalDocs] = React.useState(0)
+  const [totalPages, setTotalPages] = React.useState(1)
   const [hasMore, setHasMore] = React.useState(false)
   const [page, setPage] = React.useState(1)
 
@@ -549,10 +550,11 @@ export function MyImagesPage() {
     async function fetchInitial() {
       setIsInitialLoading(true)
       try {
-        const result = await getMyImages({ page: 1, pageSize: PAGE_SIZE })
+        const result = await getMyImages({ page: 1, limit: PAGE_SIZE })
         if (!cancelled) {
           setImages(result.images)
-          setTotalCount(result.totalCount)
+          setTotalDocs(result.totalDocs)
+          setTotalPages(result.totalPages)
           setHasMore(result.hasMore)
           setPage(1)
         }
@@ -575,9 +577,10 @@ export function MyImagesPage() {
     setIsLoadingMore(true)
     try {
       const nextPage = page + 1
-      const result = await getMyImages({ page: nextPage, pageSize: PAGE_SIZE })
+      const result = await getMyImages({ page: nextPage, limit: PAGE_SIZE })
       setImages((prev) => [...prev, ...result.images])
-      setTotalCount(result.totalCount)
+      setTotalDocs(result.totalDocs)
+      setTotalPages(result.totalPages)
       setHasMore(result.hasMore)
       setPage(nextPage)
     } catch {
@@ -592,7 +595,7 @@ export function MyImagesPage() {
     try {
       await deleteMyImage(id)
       setImages((prev) => prev.filter((img) => img.id !== id))
-      setTotalCount((prev) => prev - 1)
+      setTotalDocs((prev) => prev - 1)
       // Also update lightbox allImages if open
       if (lightbox) {
         const updated = lightbox.allImages.filter((img) => img.id !== id)
@@ -647,9 +650,9 @@ export function MyImagesPage() {
                   <h1 className="text-2xl sm:text-3xl font-black text-foreground tracking-tight">
                     Ảnh của tôi
                   </h1>
-                  {!isInitialLoading && totalCount > 0 && (
+                  {!isInitialLoading && totalDocs > 0 && (
                     <p className="text-sm text-muted-foreground">
-                      <span className="font-semibold text-foreground">{totalCount.toLocaleString()}</span> ảnh đã upload
+                      <span className="font-semibold text-foreground">{totalDocs.toLocaleString()}</span> ảnh đã upload
                     </p>
                   )}
                 </div>
@@ -721,7 +724,7 @@ export function MyImagesPage() {
                 </Button>
               ) : (
                 <p className="text-xs text-muted-foreground font-medium py-2">
-                  ✓ Đã hiển thị tất cả {totalCount.toLocaleString()} ảnh
+                  ✓ Đã hiển thị tất cả {totalDocs.toLocaleString()} ảnh
                 </p>
               )}
             </div>
