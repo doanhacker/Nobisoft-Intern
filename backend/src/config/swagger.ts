@@ -214,7 +214,12 @@ const options: swaggerJsdoc.Options = {
             height: { type: 'integer', example: 1080 },
             fileSize: { type: 'integer', example: 245760 },
             fileFormat: { type: 'string', example: 'jpg' },
-            similarityScore: { type: 'number', format: 'float', example: 0.97 },
+            similarityScore: {
+              type: 'number',
+              format: 'float',
+              example: 0.97,
+              description: 'Điểm tương đồng, chỉ được trả về cho tài khoản ADMIN',
+            },
             createdAt: { type: 'string', format: 'date-time' },
           },
         },

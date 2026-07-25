@@ -60,7 +60,7 @@ const searchRouter = Router();
  *           enum: [semantic, ocr]
  *         description: |
  *           Chế độ tìm kiếm:
- *           - `semantic` — AI hiểu ngữ nghĩa, trả `similarityScore`
+ *           - `semantic` — AI hiểu ngữ nghĩa; `similarityScore` chỉ trả về cho ADMIN
  *           - `ocr` — Matching text trong ảnh, trả `ocrMatches[]` với toạ độ
  *         example: ocr
  *       - in: query
@@ -180,7 +180,7 @@ searchRouter.get('/text', (req: Request, res: Response) => {
  *   post:
  *     tags: [Client - Search]
  *     summary: Tìm ảnh tương tự bằng hình ảnh
- *     description: Lần đầu gửi ảnh để tạo lịch sử. Khi đổi trang, kể cả quay lại trang 1, chỉ gửi searchHistoryId và page để không tạo lịch sử mới.
+ *     description: Lần đầu gửi ảnh để tạo lịch sử. Khi đổi trang, kể cả quay lại trang 1, chỉ gửi searchHistoryId và page để không tạo lịch sử mới. similarityScore chỉ trả về cho ADMIN.
  *     security:
  *       - bearerAuth: []
  *     requestBody:

@@ -27,6 +27,10 @@ export interface SearchImageResultItem {
   createdAt: Date;
 }
 
+export type SearchImageResponseItem = Omit<SearchImageResultItem, 'similarityScore'> & {
+  similarityScore?: number;
+};
+
 export interface SearchImageResult {
   searchHistoryId: string;
   results: SearchImageResultItem[];
@@ -38,7 +42,7 @@ export interface SearchImageResult {
 export interface SearchImageData {
   searchHistoryId: string;
   searchType: 'IMAGE_ONLY';
-  results: SearchImageResultItem[];
+  results: SearchImageResponseItem[];
 }
 
 export type SearchImageResponse = ApiResponse<SearchImageData>;
@@ -68,7 +72,7 @@ export interface SearchTextSemanticResult {
 export interface SearchTextSemanticData {
   searchHistoryId: string;
   searchType: 'TEXT_SEMANTIC';
-  results: SearchImageResultItem[];
+  results: SearchImageResponseItem[];
 }
 
 export type SearchTextSemanticResponse = ApiResponse<SearchTextSemanticData>;

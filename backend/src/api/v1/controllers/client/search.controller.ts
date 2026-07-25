@@ -23,6 +23,7 @@ import type {
   SearchTextOcrQuery,
   SearchTextSemanticQuery,
 } from '../../validators/client/search.validate.js';
+import { formatSearchResultsForRole } from '../../../../utils/search-response.util.js';
 
 export async function searchByImage(req: Request, res: Response) {
   try {
@@ -52,7 +53,7 @@ export async function searchByImage(req: Request, res: Response) {
       data: {
         searchHistoryId: result.searchHistoryId,
         searchType: 'IMAGE_ONLY',
-        results: result.results,
+        results: formatSearchResultsForRole(result.results, req.user!.role),
       },
       meta: {
         page: result.page,
@@ -112,7 +113,7 @@ export async function searchByTextSemantic(req: Request, res: Response) {
         limit,
       });
 
-    sendSemanticSearchResponse(res, result);
+    sendSemanticSearchResponse(res, result, req.user!.role);
   } catch (error) {
     handleSemanticSearchError(error, res);
   }
@@ -121,6 +122,7 @@ export async function searchByTextSemantic(req: Request, res: Response) {
 function sendSemanticSearchResponse(
   res: Response,
   result: Awaited<ReturnType<typeof searchImagesByTextSemantic>>,
+  role: NonNullable<Request['user']>['role'],
 ) {
   const response: SearchTextSemanticResponse = {
     success: true,
@@ -128,7 +130,7 @@ function sendSemanticSearchResponse(
     data: {
       searchHistoryId: result.searchHistoryId,
       searchType: 'TEXT_SEMANTIC',
-      results: result.results,
+      results: formatSearchResultsForRole(result.results, role),
     },
     meta: {
       page: result.page,
