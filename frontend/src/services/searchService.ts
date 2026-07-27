@@ -23,7 +23,8 @@ interface SearchImageResultItem {
   height: number
   fileSize: number
   fileFormat: string
-  similarityScore: number
+  /** Only present when the requester has ADMIN role */
+  similarityScore?: number
   createdAt: string
 }
 
@@ -86,6 +87,7 @@ function mapToSearchResult(item: SearchImageResultItem): SearchResult {
     thumbnailUrl: item.imageUrl,
     fullUrl: item.imageUrl,
     title: undefined,
+    // similarityScore is undefined for USER role (backend omits it)
     similarityScore: item.similarityScore,
     width: item.width,
     height: item.height,
@@ -212,7 +214,7 @@ export function recordSearchClick(searchHistoryId: string, clickedImageId: strin
 
 // ── Backend response types ────────────────────────────────────
 
-/** Single result item for semantic search (has similarityScore) */
+/** Single result item for semantic search (similarityScore present only for ADMIN role) */
 interface TextSemanticResultItem {
   id: string
   imageUrl: string
@@ -220,7 +222,8 @@ interface TextSemanticResultItem {
   height: number | null
   fileSize: number | null
   fileFormat: string | null
-  similarityScore: number
+  /** Only present when the requester has ADMIN role */
+  similarityScore?: number
   createdAt: string
 }
 
@@ -299,6 +302,7 @@ function mapSemanticItem(item: TextSemanticResultItem): SearchResult {
     thumbnailUrl: item.imageUrl,
     fullUrl: item.imageUrl,
     title: undefined,
+    // similarityScore is undefined for USER role (backend omits it)
     similarityScore: item.similarityScore,
     width: item.width ?? undefined,
     height: item.height ?? undefined,
@@ -317,8 +321,8 @@ function mapOcrItem(item: TextOcrResultItem): SearchResult {
     thumbnailUrl: item.imageUrl,
     fullUrl: item.imageUrl,
     title: undefined,
-    // OCR results don't have a similarity score; use best OCR confidence as proxy (0–1 range)
-    similarityScore: item.ocrMatches[0]?.confidenceScore ?? 0,
+    // OCR results never carry a similarity score — leave it undefined
+    similarityScore: undefined,
     width: item.width ?? undefined,
     height: item.height ?? undefined,
     aspectRatio: item.width && item.height ? `${item.width}/${item.height}` : undefined,

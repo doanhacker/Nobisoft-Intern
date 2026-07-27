@@ -16,7 +16,7 @@ interface RecommendationResultItem {
   height: number
   fileSize: number
   fileFormat: string
-  similarityScore: number
+  similarityScore?: number
   createdAt: string
 }
 
