@@ -145,7 +145,7 @@ interface MatchedImageRow {
 
 async function findImagesByAllTokens(tokens: string[]): Promise<string[]> {
   const likeConditions = tokens.map((_, i) => `io."normalizedText" ILIKE $${i + 1}`);
-  const caseWhen = tokens.map((_, i) => `WHEN io."normalizedText" ILIKE $${i + 1} THEN $${i + 1}`);
+  const havingConditions = tokens.map((_, i) => `bool_or(io."normalizedText" ILIKE $${i + 1})`);
   const params = tokens.map((t) => `%${t}%`);
 
   const rows = await prisma.$queryRawUnsafe<MatchedImageRow[]>(
@@ -155,7 +155,7 @@ async function findImagesByAllTokens(tokens: string[]): Promise<string[]> {
      WHERE ii.status = 'SUCCESS'
        AND (${likeConditions.join(' OR ')})
      GROUP BY ii."imageId"
-     HAVING COUNT(DISTINCT CASE ${caseWhen.join(' ')} END) = ${tokens.length}
+     HAVING ${havingConditions.join(' AND ')}
      ORDER BY ii."imageId"`,
     ...params,
   );
