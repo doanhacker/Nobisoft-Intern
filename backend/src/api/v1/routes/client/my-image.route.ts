@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import * as myImageController from '../../controllers/client/my-image.controller.js';
 import { validateMyImageListQuery } from '../../validators/client/my-image.validate.js';
-import { validateImageIdParam } from '../../validators/client/image.validate.js';
+import { validateImageIdParam } from '../../validators/shared/image-id.validate.js';
 
 const myImageRouter = Router();
 
