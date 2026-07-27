@@ -1,7 +1,7 @@
 import { prisma } from '../../../config/prisma.js';
 import { deleteImageVector } from '../../../services/qdrant.service.js';
 import { deleteImageFromDisk } from '../../../utils/storage.util.js';
-import type { ImageListQuery } from '../validators/client/image.validate.js';
+import type { ImageListQuery } from '../validators/admin/image.validate.js';
 import type { MyImageListQuery } from '../validators/client/my-image.validate.js';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
@@ -25,7 +25,11 @@ export async function getIndexedImages(query: ImageListQuery) {
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {
-    imageIndex: { isNot: null },
+    imageIndex: {
+      is: {
+        status: 'SUCCESS',
+      },
+    },
   };
 
   if (fileFormat) {
@@ -35,7 +39,7 @@ export async function getIndexedImages(query: ImageListQuery) {
   if (fromDate || toDate) {
     const dateFilter: Record<string, Date> = {};
     if (fromDate) dateFilter.gte = fromDate;
-    if (toDate) dateFilter.lte = toDate;
+    if (toDate) dateFilter.lte = endOfDay(toDate);
     where.createdAt = dateFilter;
   }
 
@@ -127,7 +131,7 @@ export async function getUserImages(userId: string, query: MyImageListQuery) {
   if (fromDate || toDate) {
     const dateFilter: Record<string, Date> = {};
     if (fromDate) dateFilter.gte = fromDate;
-    if (toDate) dateFilter.lte = toDate;
+    if (toDate) dateFilter.lte = endOfDay(toDate);
     where.createdAt = dateFilter;
   }
 
@@ -188,4 +192,10 @@ export async function deleteUserImage(userId: string, imageId: string) {
   await deleteImageFromDisk(image.path);
 
   return { found: true as const, owned: true as const };
+}
+
+function endOfDay(date: Date): Date {
+  const endDate = new Date(date);
+  endDate.setUTCHours(23, 59, 59, 999);
+  return endDate;
 }

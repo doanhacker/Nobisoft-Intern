@@ -1,15 +1,15 @@
 import { Router } from 'express';
-import * as imageController from '../../controllers/client/image.controller.js';
-import { validateImageListQuery, validateImageIdParam } from '../../validators/client/image.validate.js';
-import { requireAdmin } from '../../middlewares/auth.middleware.js';
+import * as imageController from '../../controllers/admin/image.controller.js';
+import { validateImageListQuery } from '../../validators/admin/image.validate.js';
+import { validateImageIdParam } from '../../validators/shared/image-id.validate.js';
 
 const imageRouter = Router();
 
 /**
  * @swagger
- * /images:
+ * /admin/images:
  *   get:
- *     tags: [Client - Images]
+ *     tags: [Admin - Images]
  *     summary: Lấy danh sách ảnh
  *     description: |
  *       Trả về danh sách ảnh đã upload, phân trang.
@@ -89,6 +89,15 @@ const imageRouter = Router();
  *             example:
  *               success: false
  *               message: "Vui lòng đăng nhập"
+ *       403:
+ *         description: Không có quyền Admin
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "Bạn không có quyền truy cập"
  *       500:
  *         description: Lỗi server
  *         content:
@@ -103,9 +112,9 @@ imageRouter.get('/', validateImageListQuery, imageController.listImages);
 
 /**
  * @swagger
- * /images/{id}:
+ * /admin/images/{id}:
  *   get:
- *     tags: [Client - Images]
+ *     tags: [Admin - Images]
  *     summary: Chi tiết ảnh
  *     description: |
  *       Trả về thông tin chi tiết của 1 ảnh, bao gồm toàn bộ dữ liệu OCR.
@@ -153,6 +162,15 @@ imageRouter.get('/', validateImageListQuery, imageController.listImages);
  *             example:
  *               success: false
  *               message: "Vui lòng đăng nhập"
+ *       403:
+ *         description: Không có quyền Admin
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *             example:
+ *               success: false
+ *               message: "Bạn không có quyền truy cập"
  *       404:
  *         description: Ảnh không tồn tại trong hệ thống
  *         content:
@@ -176,9 +194,9 @@ imageRouter.get('/:id', validateImageIdParam, imageController.getImage);
 
 /**
  * @swagger
- * /images/{id}:
+ * /admin/images/{id}:
  *   delete:
- *     tags: [Client - Images]
+ *     tags: [Admin - Images]
  *     summary: Xóa ảnh (chỉ Admin)
  *     description: |
  *       Xóa ảnh khỏi hệ thống. Chỉ Admin mới có quyền thực hiện.
@@ -255,6 +273,6 @@ imageRouter.get('/:id', validateImageIdParam, imageController.getImage);
  *               success: false
  *               message: "Xóa ảnh thất bại"
  */
-imageRouter.delete('/:id', requireAdmin, validateImageIdParam, imageController.removeImage);
+imageRouter.delete('/:id', validateImageIdParam, imageController.removeImage);
 
 export default imageRouter;
