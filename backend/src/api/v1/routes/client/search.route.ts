@@ -1,15 +1,178 @@
+import type { Request, Response } from 'express';
 import { Router } from 'express';
+import type { ApiResponse } from '../../../../types/apiResponse.js';
 import {
   recordSearchClick,
   searchByImage,
+  searchByTextOcr,
+  searchByTextSemantic,
 } from '../../controllers/client/search.controller.js';
 import {
   uploadSearchImage,
   validateSearchClick,
   validateSearchImage,
+  validateSearchTextOcr,
+  validateSearchTextSemantic,
 } from '../../validators/client/search.validate.js';
 
 const searchRouter = Router();
+
+/**
+ * @swagger
+ * /search/text:
+ *   get:
+ *     tags: [Client - Search]
+ *     summary: Tìm kiếm hình ảnh bằng văn bản
+ *     description: |
+ *       Tìm kiếm hình ảnh theo nội dung văn bản với 2 chế độ:
+ *       - **semantic**: Tìm ảnh có nội dung liên quan đến mô tả (dùng AI embedding)
+ *       - **ocr**: Tìm ảnh chứa text khớp với từ khóa (dùng OCR text matching)
+ *
+ *       **Tìm kiếm mới:** `GET /search/text?q=...&mode=semantic|ocr&page=1&limit=20`
+ *       **Chuyển trang (OCR):** `GET /search/text?searchHistoryId=...&mode=ocr&page=2&limit=20`
+ *       **Chuyển trang (Semantic):** `GET /search/text?searchHistoryId=...&mode=semantic&page=2&limit=20`
+ *
+ *       Với cả hai mode, chỉ gửi `q` khi tìm mới hoặc `searchHistoryId` khi chuyển trang (không gửi cả 2).
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: q
+ *         required: false
+ *         schema:
+ *           type: string
+ *           minLength: 1
+ *           maxLength: 500
+ *         description: Nội dung tìm kiếm (bắt buộc khi tìm mới ở cả mode semantic và ocr; bỏ khi chuyển trang).
+ *         example: meme hài hước
+ *       - in: query
+ *         name: searchHistoryId
+ *         required: false
+ *         schema:
+ *           type: string
+ *           format: uuid
+ *         description: ID lịch sử tìm kiếm (dùng khi chuyển trang ở cả mode semantic và ocr).
+ *       - in: query
+ *         name: mode
+ *         required: true
+ *         schema:
+ *           type: string
+ *           enum: [semantic, ocr]
+ *         description: |
+ *           Chế độ tìm kiếm:
+ *           - `semantic` — AI hiểu ngữ nghĩa; `similarityScore` chỉ trả về cho ADMIN
+ *           - `ocr` — Matching text trong ảnh, trả `ocrMatches[]` với toạ độ
+ *         example: ocr
+ *       - in: query
+ *         name: page
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         required: false
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 20
+ *         description: Mode semantic cố định limit=20; mode ocr cho phép limit từ 1 đến 100.
+ *     responses:
+ *       200:
+ *         description: Tìm kiếm thành công. Response schema phụ thuộc mode.
+ *         content:
+ *           application/json:
+ *             schema:
+ *               oneOf:
+ *                 - title: Semantic Response
+ *                   type: object
+ *                   properties:
+ *                     success:
+ *                       type: boolean
+ *                       example: true
+ *                     message:
+ *                       type: string
+ *                       example: Tìm kiếm semantic thành công
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         searchHistoryId:
+ *                           type: string
+ *                           format: uuid
+ *                         searchType:
+ *                           type: string
+ *                           enum: [TEXT_SEMANTIC]
+ *                         results:
+ *                           type: array
+ *                           items:
+ *                             $ref: '#/components/schemas/SearchImageResult'
+ *                     meta:
+ *                       $ref: '#/components/schemas/PaginationMeta'
+ *                 - title: OCR Response
+ *                   type: object
+ *                   properties:
+ *                     success:
+ *                       type: boolean
+ *                       example: true
+ *                     message:
+ *                       type: string
+ *                       example: Tìm kiếm OCR thành công
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         searchHistoryId:
+ *                           type: string
+ *                           format: uuid
+ *                         searchType:
+ *                           type: string
+ *                           enum: [TEXT_OCR]
+ *                         results:
+ *                           type: array
+ *                           items:
+ *                             $ref: '#/components/schemas/SearchTextOcrResultItem'
+ *                     meta:
+ *                       $ref: '#/components/schemas/PaginationMeta'
+ *       400:
+ *         description: Tham số tìm kiếm không hợp lệ hoặc trang không tồn tại
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Chưa đăng nhập hoặc token hết hạn
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       404:
+ *         description: Không tìm thấy lịch sử tìm kiếm của người dùng
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Lỗi AI Service, Qdrant hoặc Backend
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+searchRouter.get('/text', (req: Request, res: Response) => {
+  const mode = req.query.mode;
+  if (mode === 'ocr') {
+    validateSearchTextOcr(req, res, () => searchByTextOcr(req, res));
+  } else if (mode === 'semantic') {
+    validateSearchTextSemantic(req, res, () => searchByTextSemantic(req, res));
+  } else {
+    const response: ApiResponse = {
+      success: false,
+      message: 'mode chỉ được phép là semantic hoặc ocr',
+    };
+    res.status(400).json(response);
+  }
+});
 
 /**
  * @swagger
@@ -17,7 +180,7 @@ const searchRouter = Router();
  *   post:
  *     tags: [Client - Search]
  *     summary: Tìm ảnh tương tự bằng hình ảnh
- *     description: Lần đầu gửi ảnh để tạo lịch sử. Khi đổi trang, kể cả quay lại trang 1, chỉ gửi searchHistoryId và page để không tạo lịch sử mới.
+ *     description: Lần đầu gửi ảnh để tạo lịch sử. Khi đổi trang, kể cả quay lại trang 1, chỉ gửi searchHistoryId và page để không tạo lịch sử mới. similarityScore chỉ trả về cho ADMIN.
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -88,15 +251,8 @@ const searchRouter = Router();
  *                       type: array
  *                       items:
  *                         $ref: '#/components/schemas/SearchImageResult'
- *                     total:
- *                       type: integer
- *                       example: 87
- *                     page:
- *                       type: integer
- *                       example: 2
- *                     limit:
- *                       type: integer
- *                       example: 20
+ *                 meta:
+ *                   $ref: '#/components/schemas/PaginationMeta'
  *       400:
  *         description: Không có file hoặc file không hợp lệ
  *         content:

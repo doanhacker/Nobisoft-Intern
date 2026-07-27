@@ -1,9 +1,3 @@
-/**
- * Chuyển chuỗi tiếng Việt có dấu thành không dấu, lowercase.
- * Dùng cho cột `nameSearch` để hỗ trợ tìm kiếm không dấu.
- *
- * Ví dụ: "Nguyễn Văn Đức" → "nguyen van duc"
- */
 export function removeVietnameseDiacritics(str: string): string {
   return str
     .normalize('NFD')
@@ -11,4 +5,11 @@ export function removeVietnameseDiacritics(str: string): string {
     .toLowerCase()
     .replace(/đ/g, 'd')
     .trim();
+}
+
+export function tokenizeSearchQuery(query: string): string[] {
+  const normalized = removeVietnameseDiacritics(query);
+  return normalized
+    .split(/\s+/)
+    .filter((token) => token.length > 0);
 }

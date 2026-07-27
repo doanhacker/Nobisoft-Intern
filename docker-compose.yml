@@ -11,16 +11,19 @@ services:
       - AI_SERVICE_URL=http://ai:9000
       - QDRANT_URL=http://qdrant:6333
       - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
-      - SEARCH_MIN_SCORE=${SEARCH_MIN_SCORE}
+      - SEARCH_MIN_SCORE_IMAGE=${SEARCH_MIN_SCORE_IMAGE}
+      - SEARCH_MIN_SCORE_SEMANTIC=${SEARCH_MIN_SCORE_SEMANTIC}
       - SEARCH_MAX_RESULTS=${SEARCH_MAX_RESULTS}
+      - RECOMMENDATION_CLICK_LIMIT=${RECOMMENDATION_CLICK_LIMIT:-30}
       - STORAGE_DIR=${STORAGE_DIR}
       - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
       - JWT_ACCESS_EXPIRES_IN=${JWT_ACCESS_EXPIRES_IN}
+      - BACKEND_URL=${BACKEND_URL}
       - ALLOWED_ORIGINS=${FRONTEND_URL},${BACKEND_URL}
       - ADMIN_EMAIL=${ADMIN_EMAIL}
       - ADMIN_NAME=${ADMIN_NAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
-    command: sh -c "npx prisma db push && npm run seed:admin && npm start"
+    command: sh -c "npx prisma db push && npm run init:db-extensions && npm run seed:admin && npm start"
     depends_on:
       database:
         condition: service_healthy
@@ -100,16 +103,16 @@ services:
     image: pgvector/pgvector:pg16
     container_name: database
     environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-VisualSearchEngine}
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./database:/docker-entrypoint-initdb.d
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}" ]
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-VisualSearchEngine}" ]
       interval: 10s
       timeout: 5s
       retries: 5

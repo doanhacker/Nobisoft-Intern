@@ -10,7 +10,8 @@ export interface SearchResult {
     thumbnailUrl: string
     fullUrl?: string
     title?: string
-    similarityScore: number
+    /** Present only when the current user has ADMIN role (backend omits it for USER) */
+    similarityScore?: number
     width?: number
     height?: number
     aspectRatio?: string
@@ -24,6 +25,8 @@ interface MasonryGridProps {
     onSearchSimilar: (result: SearchResult) => void
     /** Compact mode: fewer columns for split-view (image search) layout */
     compact?: boolean
+    /** Show similarity % badge on each card — only pass true for ADMIN role */
+    showSimilarityBadge?: boolean
 }
 
 const BREAKPOINTS_DEFAULT = {
@@ -44,7 +47,7 @@ const BREAKPOINTS_COMPACT = {
     480: 1,
 }
 
-export function MasonryGrid({ results, onCardClick, onSearchSimilar, compact = false }: MasonryGridProps) {
+export function MasonryGrid({ results, onCardClick, onSearchSimilar, compact = false, showSimilarityBadge = false }: MasonryGridProps) {
     const breakpoints = compact ? BREAKPOINTS_COMPACT : BREAKPOINTS_DEFAULT
     return (
         <Masonry
@@ -62,6 +65,7 @@ export function MasonryGrid({ results, onCardClick, onSearchSimilar, compact = f
                         result={result}
                         onClick={onCardClick}
                         onSearchSimilar={onSearchSimilar}
+                        showSimilarityBadge={showSimilarityBadge}
                     />
                 </div>
             ))}

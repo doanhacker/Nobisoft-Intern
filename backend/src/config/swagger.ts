@@ -214,8 +214,48 @@ const options: swaggerJsdoc.Options = {
             height: { type: 'integer', example: 1080 },
             fileSize: { type: 'integer', example: 245760 },
             fileFormat: { type: 'string', example: 'jpg' },
-            similarityScore: { type: 'number', format: 'float', example: 0.97 },
+            similarityScore: {
+              type: 'number',
+              format: 'float',
+              example: 0.97,
+              description: 'Điểm tương đồng, chỉ được trả về cho tài khoản ADMIN',
+            },
             createdAt: { type: 'string', format: 'date-time' },
+          },
+        },
+
+        SearchTextOcrResultItem: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            imageUrl: { type: 'string', example: 'http://localhost:8000/storage/images/index/uuid.jpg' },
+            width: { type: 'integer', nullable: true, example: 1920 },
+            height: { type: 'integer', nullable: true, example: 1080 },
+            fileSize: { type: 'integer', nullable: true, example: 245760 },
+            fileFormat: { type: 'string', nullable: true, example: 'jpg' },
+            createdAt: { type: 'string', format: 'date-time' },
+            ocrMatches: {
+              type: 'array',
+              items: { $ref: '#/components/schemas/OcrMatchLine' },
+            },
+          },
+        },
+
+        OcrMatchLine: {
+          type: 'object',
+          properties: {
+            rawText: { type: 'string', example: 'cực hài' },
+            confidenceScore: { type: 'number', example: 0.95 },
+            boundingBoxes: {
+              type: 'object',
+              nullable: true,
+              properties: {
+                x: { type: 'number', example: 120 },
+                y: { type: 'number', example: 45 },
+                width: { type: 'number', example: 200 },
+                height: { type: 'number', example: 30 },
+              },
+            },
           },
         },
 
@@ -240,30 +280,35 @@ const options: swaggerJsdoc.Options = {
           },
         },
 
-        SearchHistoryItem: {
-          type: 'object',
-          properties: {
-            id: { type: 'string', format: 'uuid' },
-            searchType: { type: 'string', enum: ['IMAGE_ONLY', 'TEXT_SEMANTIC', 'TEXT_OCR'] },
-            queryImagePath: { type: 'string', nullable: true },
-            queryText: { type: 'string', nullable: true },
-            clickedImage: {
-              nullable: true,
-              type: 'object',
-              properties: {
-                id: { type: 'string', format: 'uuid' },
-                imageUrl: { type: 'string', example: 'http://localhost:8000/storage/images/index/uuid.jpg' },
-                width: { type: 'integer' },
-                height: { type: 'integer' },
-              },
-            },
-            createdAt: { type: 'string', format: 'date-time' },
-          },
-        },
-
         SearchType: {
           type: 'string',
           enum: ['IMAGE_ONLY', 'TEXT_SEMANTIC', 'TEXT_OCR'],
+        },
+
+        HistoryQueryImage: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            imageUrl: { type: 'string', example: 'http://localhost:8000/storage/images/search/uuid.jpg' },
+            width: { type: 'integer', nullable: true, example: 1200 },
+            height: { type: 'integer', nullable: true, example: 800 },
+            fileSize: { type: 'integer', nullable: true, example: 245760 },
+            fileFormat: { type: 'string', nullable: true, example: 'jpg' },
+          },
+        },
+
+        UserSearchHistoryItem: {
+          type: 'object',
+          properties: {
+            id: { type: 'string', format: 'uuid' },
+            searchType: { $ref: '#/components/schemas/SearchType' },
+            queryImage: {
+              nullable: true,
+              allOf: [{ $ref: '#/components/schemas/HistoryQueryImage' }],
+            },
+            queryText: { type: 'string', nullable: true, example: 'black cat' },
+            createdAt: { type: 'string', format: 'date-time' },
+          },
         },
       },
     },

@@ -27,7 +27,7 @@ docker compose up -d --build
 Chúng tôi đã chuẩn bị sẵn bộ dữ liệu đã được AI xử lý (PostgreSQL JSON + Qdrant vectors) trong thư mục `datasets/exported-data`. Để nạp dữ liệu này vào hệ thống mới chạy:
 
 ```bash
-docker exec -it backend npx tsx src/scripts/import-data.ts --clear
+docker exec -it indexing-worker dotnet indexing-worker.dll --seed --clear
 ```
 
 *(Cờ `--clear` sẽ tự động xóa sạch rác trong DB nếu có và nạp dữ liệu từ đầu. Lệnh chạy cực nhanh trong vài giây).*
@@ -52,6 +52,8 @@ Chi tiết body request và response, bạn có thể xem trực tiếp giao di�
 | Method | Endpoint | Yêu cầu JWT | Mô tả |
 |--------|----------|-------------|-------|
 | `POST` | `/search/image` | ✅ | Tìm kiếm ảnh tương tự. Nhận 1 file ảnh, gửi qua AI lấy vector và truy vấn Qdrant để tìm 20 ảnh giống nhất. |
+| `GET` | `/search/text?mode=semantic` | ✅ | Tìm ảnh theo mô tả văn bản (dùng AI semantic embedding). |
+| `GET` | `/search/text?mode=ocr` | ✅ | Tìm ảnh chứa text khớp từ khóa (dùng OCR text matching). Hỗ trợ multi-word search. |
 
 ### 2.3 — Nhóm Admin (Quản lý Ảnh & User)
 
@@ -133,3 +135,32 @@ Khi Admin muốn xóa một bức ảnh rác hoặc lỗi ra khỏi hệ thống
 3. Backend phát tín hiệu sang Qdrant để xóa vector tương ứng.
 4. (Tuỳ chọn) Backend xóa file ảnh vật lý nằm trong thư mục `/storage`.
 Luồng này đảm bảo không bao giờ để lại "dữ liệu mồ côi" trong hệ thống tìm kiếm đa cơ sở dữ liệu.
+
+### Luồng 4: Tìm kiếm bằng text OCR (OCR Text Search)
+
+Đây là luồng tìm ảnh dựa trên nội dung text đã được OCR nhận diện trong ảnh. Hỗ trợ tìm kiếm đa từ (multi-word) xuyên qua nhiều dòng OCR khác nhau.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant BE as Backend
+    participant PG as PostgreSQL
+
+    User->>BE: 1. GET /search/text?q=meme hài hước&mode=ocr
+    BE->>BE: 2. Normalize → "meme hai huoc"<br/>Tokenize → ["meme", "hai", "huoc"]
+    BE->>PG: 3. Raw SQL: Tìm ảnh chứa TẤT CẢ tokens<br/>GROUP BY image_id<br/>HAVING COUNT(DISTINCT matched) = 3
+    PG-->>BE: 4. Matched Image IDs
+    BE->>BE: 5. Phân trang (page/limit)
+    BE->>PG: 6. Lấy chi tiết ảnh + OCR lines matched<br/>(rawText, confidenceScore, boundingBoxes)
+    PG-->>BE: 7. Images + OCR data
+    BE->>PG: 8. Lưu search_history (TEXT_OCR)
+    BE-->>User: 9. Trả kết quả: ảnh + ocrMatches[]
+```
+
+**Chi tiết:**
+
+- **Multi-word matching:** Keyword "hài hước" được tách thành ["hai", "huoc"]. Mỗi từ có thể nằm ở dòng OCR khác nhau trong cùng 1 ảnh. Ảnh chỉ match khi chứa **tất cả** các từ.
+- **Normalize tiếng Việt:** Tất cả dấu tiếng Việt được loại bỏ trước khi so sánh ("hài" → "hai", "hước" → "huoc").
+- **GIN trigram index:** Sử dụng PostgreSQL `pg_trgm` extension + GIN index để tối ưu query `ILIKE '%keyword%'`, tránh full table scan.
+- **Response khác Semantic:** Không trả `similarityScore`. Thay vào đó trả `ocrMatches[]` — danh sách các dòng OCR matched kèm toạ độ `boundingBoxes` (x, y, width, height) để FE có thể highlight vùng text trên ảnh.
+- **Phân trang:** Pagination info nằm trong `meta` (PaginationMeta) thay vì trong `data`.

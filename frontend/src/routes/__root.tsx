@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { createRootRoute, Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/router-devtools'
-import { ScanSearch, LogIn, LogOut, Search, UserCircle2, Menu, X, LayoutDashboard, UploadCloud } from 'lucide-react'
+import { ScanSearch, LogIn, LogOut, Search, UserCircle2, Menu, X, LayoutDashboard, UploadCloud, Sparkles } from 'lucide-react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ThemeProvider } from '@/context/ThemeContext'
 import { AuthProvider } from '@/context/AuthContext'
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
 import { ToastProvider } from '@/components/ui/Toast'
+import { UploadProvider } from '@/context/UploadContext'
 
 // Routes that use their own full-page layout (no shared header/footer)
 const FULL_PAGE_ROUTES = ['/results']
@@ -176,7 +177,7 @@ function AppShell() {
             {isAuthenticated && (
               <>
                 <NavLink to="/search" icon={<Search className="size-3.5" />}>
-                  Search
+                  Tìm kiếm
                 </NavLink>
                 <NavLink to="/upload" icon={<UploadCloud className="size-3.5" />}>
                   Tải ảnh lên
@@ -375,11 +376,13 @@ function RootComponent() {
   return (
     <ThemeProvider defaultTheme="system">
       <AuthProvider>
-        <ToastProvider>
-          <TooltipProvider>
-            <AppShell />
-          </TooltipProvider>
-        </ToastProvider>
+        <UploadProvider>
+          <ToastProvider>
+            <TooltipProvider>
+              <AppShell />
+            </TooltipProvider>
+          </ToastProvider>
+        </UploadProvider>
       </AuthProvider>
     </ThemeProvider>
   )

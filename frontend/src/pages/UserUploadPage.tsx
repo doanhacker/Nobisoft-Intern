@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useRef } from 'react'
 import {
   UploadCloud,
   X,
@@ -14,7 +14,8 @@ import {
   StopCircle,
 } from 'lucide-react'
 import { uploadUserImages } from '@/services/userUploadService'
-import type { UserUploadResult, BatchProgressEvent } from '@/services/userUploadService'
+import type { UploadPhaseProgress, IndexingPhaseProgress, BatchIndexingStatus, UserUploadResult } from '@/services/userUploadService'
+import { useUploadContext } from '@/context/UploadContext'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
@@ -24,20 +25,8 @@ import { cn } from '@/lib/utils'
 // ============================================================
 
 const MAX_FILES = 1000
-const BATCH_SIZE = 5
-const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB per file
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/avif']
-
-// ============================================================
-// Helpers
-// ============================================================
-
-
-
-
-function calcTotalBatches(count: number) {
-  return Math.ceil(count / BATCH_SIZE)
-}
 
 // ============================================================
 // HowItWorks Banner
@@ -104,7 +93,7 @@ interface UploadDropZoneProps {
 }
 
 function UploadDropZone({ onFilesSelected, disabled, fileCount }: UploadDropZoneProps) {
-  const [isDragActive, setIsDragActive] = useState(false)
+  const [isDragActive, setIsDragActive] = React.useState(false)
   const fileInputRef = React.useRef<HTMLInputElement>(null)
   const toast = useToast()
 
@@ -123,6 +112,29 @@ function UploadDropZone({ onFilesSelected, disabled, fileCount }: UploadDropZone
     }
     return valid
   }
+
+  // ── Clipboard paste ─────────────────────────────────────────
+  React.useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      if (disabled) return
+      const items = e.clipboardData?.items
+      if (!items) return
+      const imageFiles: File[] = []
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          const file = items[i].getAsFile()
+          if (file) imageFiles.push(file)
+        }
+      }
+      if (imageFiles.length > 0) {
+        const valid = validateAndFilter(imageFiles)
+        if (valid.length > 0) onFilesSelected(valid)
+      }
+    }
+    document.addEventListener('paste', handlePaste)
+    return () => document.removeEventListener('paste', handlePaste)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [disabled])
 
   const handleDragEnter = useCallback(
     (e: React.DragEvent) => {
@@ -200,31 +212,30 @@ function UploadDropZone({ onFilesSelected, disabled, fileCount }: UploadDropZone
         id="user-upload-input"
       />
 
-      {/* Icon */}
       <div
         className={cn(
           'flex items-center justify-center size-16 sm:size-20 rounded-2xl mb-5 transition-all duration-300',
-          isDragActive
-            ? 'bg-primary/20 text-primary scale-110'
-            : 'bg-muted/60 text-muted-foreground',
+          isDragActive ? 'bg-primary/20 text-primary scale-110' : 'bg-muted/60 text-muted-foreground',
         )}
       >
         <UploadCloud className="size-8 sm:size-10" strokeWidth={1.5} />
       </div>
 
-      {/* Text */}
       <p className="font-bold text-base sm:text-lg text-foreground mb-1 text-center">
         {isDragActive ? 'Thả ảnh vào đây!' : 'Kéo & thả ảnh vào đây'}
       </p>
-      <p className="text-sm text-muted-foreground text-center mb-4">
+      <p className="text-sm text-muted-foreground text-center mb-3">
         hoặc{' '}
         <span className="text-primary font-semibold underline-offset-2 hover:underline">
           bấm để chọn ảnh
         </span>{' '}
         từ thiết bị
       </p>
+      <p className="text-xs text-muted-foreground/60 flex items-center gap-1.5 mb-4">
+        <kbd className="inline-flex items-center rounded border border-border/60 bg-muted px-1.5 py-0.5 font-mono text-[10px]">Ctrl+V</kbd>
+        để dán ảnh từ clipboard
+      </p>
 
-      {/* Constraints */}
       <div className="flex flex-wrap gap-2 justify-center">
         {['JPG, PNG, WebP, AVIF', `Tối đa ${MAX_FILES.toLocaleString()} ảnh`, 'Mỗi ảnh < 10MB'].map((tag) => (
           <span
@@ -246,106 +257,133 @@ function UploadDropZone({ onFilesSelected, disabled, fileCount }: UploadDropZone
 }
 
 // ============================================================
-// UploadProgress — batch progress bar with status text
+// UploadingCard — Phase 1
 // ============================================================
 
-interface UploadProgressProps {
-  batchIndex: number
-  totalBatches: number
-  percent: number
+interface UploadingCardProps {
+  totalFiles: number
+  uploadPercent: number
   isCancelled: boolean
+  onCancel: () => void
 }
 
-function UploadProgress({ batchIndex, totalBatches, percent, isCancelled }: UploadProgressProps) {
-  const isDone = percent === 100
-
+function UploadingCard({ totalFiles, uploadPercent, isCancelled, onCancel }: UploadingCardProps) {
   return (
-    <div className="space-y-2">
-      <div className="flex items-center justify-between text-xs text-muted-foreground">
-        <span>
-          {isCancelled
-            ? '⛔ Đã huỷ — dừng sau batch hiện tại'
-            : isDone
-              ? '✅ Hoàn tất tất cả batch'
-              : `Đang xử lý batch ${batchIndex} / ${totalBatches}`}
-        </span>
-        <span className="font-semibold tabular-nums">{percent}%</span>
+    <div className="rounded-2xl border border-border/60 bg-card p-6 space-y-5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2.5">
+          <div className="relative flex items-center justify-center size-8 rounded-full bg-primary/10">
+            <Loader2 className="size-4 animate-spin text-primary" />
+          </div>
+          <div>
+            <p className="font-semibold text-foreground text-sm">
+              Đang tải {totalFiles.toLocaleString()} ảnh lên...
+            </p>
+            <p className="text-xs text-muted-foreground">Vui lòng không đóng trang</p>
+          </div>
+        </div>
+        <Button
+          id="user-upload-cancel"
+          variant="outline"
+          size="sm"
+          onClick={onCancel}
+          disabled={isCancelled}
+          className="text-destructive border-destructive/40 hover:bg-destructive/10 gap-1.5 shrink-0"
+        >
+          <StopCircle className="size-3.5" />
+          {isCancelled ? 'Đang dừng...' : 'Huỷ'}
+        </Button>
       </div>
-      <div className="h-2.5 bg-muted rounded-full overflow-hidden">
-        <div
-          className={cn(
-            'h-full rounded-full transition-all duration-500 ease-out',
-            isCancelled
-              ? 'bg-amber-500'
-              : isDone
-                ? 'bg-emerald-500'
-                : 'gradient-brand',
-          )}
-          style={{ width: `${percent}%` }}
-        />
+
+      <div className="space-y-2">
+        <div className="flex items-center justify-between text-xs text-muted-foreground">
+          <span className="flex items-center gap-1.5">
+            <UploadCloud className="size-3.5" />
+            {isCancelled ? 'Đã huỷ — dừng sau lần gửi hiện tại' : 'Đang gửi ảnh lên máy chủ'}
+          </span>
+          <span className="font-semibold tabular-nums text-foreground">{uploadPercent}%</span>
+        </div>
+        <div className="h-2.5 bg-muted rounded-full overflow-hidden">
+          <div
+            className={cn(
+              'h-full rounded-full transition-all duration-500 ease-out',
+              isCancelled ? 'bg-amber-500' : 'gradient-brand',
+            )}
+            style={{ width: `${uploadPercent}%` }}
+          />
+        </div>
       </div>
     </div>
   )
 }
 
 // ============================================================
-// LiveResultList — accumulates results in real time
+// DoneCard — Summary after completion
 // ============================================================
 
-interface LiveResultListProps {
+interface DoneCardProps {
   results: UserUploadResult[]
+  finalStatus: BatchIndexingStatus
 }
 
-function LiveResultList({ results }: LiveResultListProps) {
-  if (results.length === 0) return null
-
+function DoneCard({ results, finalStatus }: DoneCardProps) {
   const successCount = results.filter((r) => r.success).length
   const failCount = results.length - successCount
+  const indexingFailed = finalStatus === 'FAILED'
 
   return (
     <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border/50 bg-muted/20">
-        <h3 className="font-bold text-foreground flex items-center gap-2 text-sm">
-          <CheckCircle2 className="size-4 text-emerald-500" />
-          Kết quả ({results.length} ảnh đã xử lý)
-        </h3>
-        <div className="flex gap-2">
-          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
-            {successCount} thành công
-          </span>
-          {failCount > 0 && (
-            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-red-500/10 text-red-600 border border-red-500/20">
-              {failCount} thất bại
-            </span>
-          )}
+      <div
+        className={cn(
+          'flex items-center gap-3 px-5 py-4 border-b border-border/50',
+          indexingFailed ? 'bg-amber-500/5' : 'bg-emerald-500/5',
+        )}
+      >
+        {indexingFailed ? (
+          <AlertCircle className="size-5 text-amber-500 shrink-0" />
+        ) : (
+          <CheckCircle2 className="size-5 text-emerald-500 shrink-0" />
+        )}
+        <div className="flex-1">
+          <h3 className="font-bold text-foreground text-sm">
+            {indexingFailed ? 'Upload hoàn tất, có lỗi xử lý' : 'Hoàn tất! Ảnh đã sẵn sàng tìm kiếm'}
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            {indexingFailed
+              ? 'Một số ảnh có thể chưa được tìm kiếm ngay. Vui lòng thử lại sau.'
+              : 'Bạn có thể tìm lại ảnh bất kỳ lúc nào bằng mô tả hoặc ảnh tương tự.'}
+          </p>
         </div>
       </div>
 
-      {/* List — latest results at top */}
-      <div className="divide-y divide-border/40 max-h-64 overflow-y-auto">
-        {[...results].reverse().map((result, idx) => (
-          <div key={idx} className="flex items-center gap-3 px-5 py-2.5 text-sm">
-            {result.success ? (
-              <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />
-            ) : (
-              <AlertCircle className="size-4 text-destructive shrink-0" />
-            )}
-            <span className="flex-1 font-medium text-foreground truncate" title={result.filename}>
-              {result.filename}
+      <div className="flex divide-x divide-border/40">
+        <div className="flex-1 flex flex-col items-center py-4">
+          <span className="text-2xl font-black text-foreground tabular-nums">
+            {successCount.toLocaleString()}
+          </span>
+          <span className="text-xs text-muted-foreground mt-0.5">ảnh đã tải lên</span>
+        </div>
+        {failCount > 0 && (
+          <div className="flex-1 flex flex-col items-center py-4">
+            <span className="text-2xl font-black text-destructive tabular-nums">
+              {failCount.toLocaleString()}
             </span>
-            {result.success ? (
-              <span className="text-xs text-muted-foreground whitespace-nowrap">Đã thêm ✓</span>
-            ) : (
-              <span
-                className="text-xs text-destructive truncate max-w-[180px]"
-                title={result.error}
-              >
-                {result.error || 'Lỗi không xác định'}
-              </span>
-            )}
+            <span className="text-xs text-muted-foreground mt-0.5">ảnh thất bại</span>
           </div>
-        ))}
+        )}
+        <div className="flex-1 flex flex-col items-center py-4">
+          <span
+            className={cn(
+              'text-2xl font-black tabular-nums',
+              indexingFailed ? 'text-amber-500' : 'text-emerald-500',
+            )}
+          >
+            {indexingFailed ? '⚠' : '✓'}
+          </span>
+          <span className="text-xs text-muted-foreground mt-0.5">
+            {indexingFailed ? 'Lỗi xử lý' : 'Đã lập chỉ mục'}
+          </span>
+        </div>
       </div>
     </div>
   )
@@ -356,31 +394,30 @@ function LiveResultList({ results }: LiveResultListProps) {
 // ============================================================
 
 export function UserUploadPage() {
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
-  const [isUploading, setIsUploading] = useState(false)
-  const [isCancelled, setIsCancelled] = useState(false)
+  // ── Context (persisted state) ─────────────────────────────
+  const { session, updateSession, clearSession, abortControllerRef } = useUploadContext()
+  const {
+    phase,
+    uploadPercent,
+    isCancelled,
+    uploadResults,
+    finalStatus,
+    totalUploadedSession,
+    totalFilesUploading,
+  } = session
 
-  // Progress state
-  const [batchIndex, setBatchIndex] = useState(0)
-  const [totalBatches, setTotalBatches] = useState(0)
-  const [percent, setPercent] = useState(0)
+  // Local-only state (not worth persisting)
+  const [selectedFiles, setSelectedFiles] = React.useState<File[]>([])
 
-  // Results accumulate in real-time
-  const [liveResults, setLiveResults] = useState<UserUploadResult[]>([])
-  const [totalUploaded, setTotalUploaded] = useState(0)
-
-  const abortControllerRef = useRef<AbortController | null>(null)
   const toast = useToast()
+  // Keep a stable ref to abortController for cancel
+  const localAbortRef = useRef<AbortController | null>(null)
 
-  // ── File selection ────────────────────────────────────────
+  // ── File selection ─────────────────────────────────────────
 
   const handleFilesSelected = (newFiles: File[]) => {
-    // Reset results when picking fresh files (only if not mid-upload)
-    if (!isUploading && liveResults.length > 0) setLiveResults([])
-
     setSelectedFiles((prev) => {
       const combined = [...prev, ...newFiles]
-      // Deduplicate by name + size
       const unique = combined.filter(
         (v, i, a) => a.findIndex((t) => t.name === v.name && t.size === v.size) === i,
       )
@@ -396,11 +433,22 @@ export function UserUploadPage() {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
-  // ── Cancel ────────────────────────────────────────────────
+  const userCancelledRef = React.useRef(false)
+
+  // ── Cancel (upload phase only) ─────────────────────────────
 
   const handleCancel = () => {
+    userCancelledRef.current = true
     abortControllerRef.current?.abort()
-    setIsCancelled(true)
+    localAbortRef.current?.abort()
+    updateSession({ isCancelled: true })
+  }
+
+  // ── Reset ─────────────────────────────────────────────────
+
+  const handleReset = () => {
+    clearSession()
+    setSelectedFiles([])
   }
 
   // ── Upload ────────────────────────────────────────────────
@@ -408,61 +456,102 @@ export function UserUploadPage() {
   const handleUpload = async () => {
     if (selectedFiles.length === 0) return
 
-    const batches = calcTotalBatches(selectedFiles.length)
-    setIsUploading(true)
-    setIsCancelled(false)
-    setPercent(0)
-    setBatchIndex(0)
-    setTotalBatches(batches)
-    setLiveResults([])
+    userCancelledRef.current = false
+
+    // If currently indexing a previous batch, abort its polling loop quietly so we can start fresh.
+    if (isIndexing) {
+      abortControllerRef.current?.abort()
+    }
+
+    const filesToUpload = [...selectedFiles]
+
+    updateSession({
+      phase: 'uploading',
+      isCancelled: false,
+      uploadPercent: 0,
+      indexingPercent: 0,
+      uploadResults: [],
+      batchId: null,
+      totalFilesUploading: filesToUpload.length,
+    })
+    setSelectedFiles([])
 
     const controller = new AbortController()
     abortControllerRef.current = controller
+    localAbortRef.current = controller
 
     try {
-      const allResults = await uploadUserImages(
-        selectedFiles,
-        (event: BatchProgressEvent) => {
-          setBatchIndex(event.batchIndex)
-          setPercent(event.percent)
-          setLiveResults((prev) => [...prev, ...event.batchResults])
+      const { results, finalStatus: status } = await uploadUserImages(
+        filesToUpload,
+        {
+          onUploadProgress: (e: UploadPhaseProgress) => {
+            updateSession({ uploadPercent: e.uploadPercent })
+          },
+          onIndexingProgress: (e: IndexingPhaseProgress) => {
+            updateSession({
+              phase: 'indexing',
+              indexingPercent: e.indexingPercent,
+              processedImages: e.processedImages,
+              totalImages: e.totalImages,
+              indexingStatus: e.status,
+            })
+          },
         },
         controller.signal,
       )
 
-      const successCount = allResults.filter((r) => r.success).length
-      const failCount = allResults.length - successCount
-      const wasCancelled = controller.signal.aborted
+      const successCount = results.filter((r) => r.success).length
+      const failCount = results.length - successCount
+      const wasUserCancelled = userCancelledRef.current
 
-      setTotalUploaded((n) => n + successCount)
-      setSelectedFiles([])
+      updateSession({
+        uploadResults: results,
+        finalStatus: status,
+        totalUploadedSession: totalUploadedSession + successCount,
+        phase: 'done',
+      })
 
-      if (wasCancelled) {
-        toast.warning(`Đã huỷ. ${successCount} ảnh đã được upload thành công trước khi dừng.`)
+      if (wasUserCancelled) {
+        toast.warning(`Đã huỷ. ${successCount} ảnh đã được tải lên trước khi dừng.`)
       } else if (failCount === 0) {
         toast.success(`${successCount} ảnh đã được thêm vào thư viện thành công 🎉`)
       } else if (successCount === 0) {
-        toast.error('Tất cả ảnh đều upload thất bại. Vui lòng thử lại.')
+        toast.error('Tất cả ảnh đều tải lên thất bại. Vui lòng thử lại.')
       } else {
         toast.warning(`${successCount} ảnh thành công, ${failCount} ảnh thất bại.`)
       }
     } catch (error: any) {
-      // AbortError is expected when user cancels — don't show a generic error toast
       if (error?.name === 'AbortError' || error?.code === 'ERR_CANCELED') {
-        // handled above via signal.aborted check
+        // handled via wasCancelled above
       } else {
         console.error('Upload error:', error)
+        updateSession({ phase: 'error' })
         toast.error(error?.response?.data?.message || 'Có lỗi xảy ra. Vui lòng thử lại.')
       }
-    } finally {
-      setIsUploading(false)
-      setPercent(100)
     }
   }
 
-  const isIdle = !isUploading && liveResults.length === 0
-  const isDone = !isUploading && liveResults.length > 0
-  const batches = calcTotalBatches(selectedFiles.length)
+  // ── Derived ───────────────────────────────────────────────
+
+  const isIdle = phase === 'idle'
+  const isUploading = phase === 'uploading'
+  const isIndexing = phase === 'indexing'
+  const isDone = phase === 'done'
+  const isError = phase === 'error'
+  // Drop zone only disabled during active upload, not during background indexing
+  const isDropZoneDisabled = isUploading
+
+  // Toast when indexing completes in background (phase: indexing → done)
+  const prevPhaseRef = React.useRef(phase)
+  React.useEffect(() => {
+    if (prevPhaseRef.current === 'indexing' && phase === 'done') {
+      toast.success('Ảnh đã được phân tích xong và sẵn sàng tìm kiếm! 🌟', {
+        description: `${uploadResults.filter((r) => r.success).length.toLocaleString()} ảnh đã được lập chỉ mục.`,
+      })
+    }
+    prevPhaseRef.current = phase
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase])
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-background">
@@ -493,24 +582,34 @@ export function UserUploadPage() {
         </div>
 
         {/* ── Session stats ── */}
-        {totalUploaded > 0 && (
+        {totalUploadedSession > 0 && (
           <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
             <CheckCircle2 className="size-4 text-emerald-500" />
             <span>
               Phiên này đã tải lên thành công{' '}
-              <strong className="text-foreground">{totalUploaded.toLocaleString()}</strong> ảnh
+              <strong className="text-foreground">{totalUploadedSession.toLocaleString()}</strong> ảnh
             </span>
           </div>
         )}
 
-        {/* ── How it works ── */}
+        {/* ── How it works (idle only) ── */}
         {isIdle && <HowItWorksBanner />}
 
-        {/* ── Drop zone (hide while uploading or done) ── */}
+        {/* ── Background indexing indicator (minimal, non-blocking) ── */}
+        {isIndexing && (
+          <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-violet-500/20 bg-violet-500/5 text-sm">
+            <Sparkles className="size-4 text-violet-500 animate-pulse shrink-0" />
+            <p className="text-violet-700 dark:text-violet-300 text-xs font-medium flex-1">
+              AI đang phân tích ảnh trong nền… Bạn có thể tiếp tục upload ảnh mới.
+            </p>
+          </div>
+        )}
+
+        {/* ── Drop zone (hidden only during active upload) ── */}
         {!isUploading && (
           <UploadDropZone
             onFilesSelected={handleFilesSelected}
-            disabled={isUploading}
+            disabled={isDropZoneDisabled}
             fileCount={selectedFiles.length}
           />
         )}
@@ -524,11 +623,6 @@ export function UserUploadPage() {
                 <h3 className="font-bold text-foreground text-sm">
                   Đã chọn{' '}
                   <span className="text-primary">{selectedFiles.length.toLocaleString()}</span> ảnh
-                  {selectedFiles.length > BATCH_SIZE && (
-                    <span className="ml-1 text-muted-foreground font-normal">
-                      ({batches} batch × {BATCH_SIZE} ảnh)
-                    </span>
-                  )}
                 </h3>
               </div>
               <Button
@@ -541,7 +635,7 @@ export function UserUploadPage() {
               </Button>
             </div>
 
-            {/* Thumbnail grid — cap at 60 previews for performance */}
+            {/* Thumbnail grid — cap at 60 previews */}
             <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1.5">
               {selectedFiles.slice(0, 60).map((file, idx) => (
                 <div
@@ -554,7 +648,6 @@ export function UserUploadPage() {
                     className="w-full h-full object-cover"
                     onLoad={(e) => URL.revokeObjectURL((e.target as HTMLImageElement).src)}
                   />
-                  {/* Remove button */}
                   <button
                     onClick={() => handleRemoveFile(idx)}
                     className="absolute -top-1 -right-1 flex items-center justify-center size-4 rounded-full bg-background border border-border/60 text-muted-foreground hover:bg-destructive hover:text-white hover:border-destructive transition-all opacity-0 group-hover:opacity-100 shadow-sm"
@@ -588,71 +681,51 @@ export function UserUploadPage() {
                 Tải {selectedFiles.length.toLocaleString()} ảnh lên thư viện
               </Button>
               <p className="text-xs text-muted-foreground text-center">
-                Sẽ gửi tuần tự {batches} batch × {BATCH_SIZE} ảnh — ảnh được xử lý ngay khi từng
-                batch hoàn tất
+                Ảnh sẽ được AI phân tích tự động sau khi tải lên
               </p>
             </div>
           </div>
         )}
 
-        {/* ── Uploading state ── */}
+        {/* ── Phase 1: Uploading ── */}
         {isUploading && (
-          <div className="rounded-2xl border border-border/60 bg-card p-6 space-y-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Loader2 className="size-4 animate-spin text-primary" />
-                <span className="font-semibold text-foreground text-sm">
-                  Đang upload {selectedFiles.length.toLocaleString()} ảnh...
-                </span>
-              </div>
-              <Button
-                id="user-upload-cancel"
-                variant="outline"
-                size="sm"
-                onClick={handleCancel}
-                disabled={isCancelled}
-                className="text-destructive border-destructive/40 hover:bg-destructive/10 gap-1.5"
-              >
-                <StopCircle className="size-3.5" />
-                {isCancelled ? 'Đang dừng...' : 'Huỷ'}
-              </Button>
+          <UploadingCard
+            totalFiles={totalFilesUploading}
+            uploadPercent={uploadPercent}
+            isCancelled={isCancelled}
+            onCancel={handleCancel}
+          />
+        )}
+
+        {/* ── Phase 2: Indexing — hidden (runs in background) ── */}
+        {/* IndexingCard intentionally removed — user sees a minimal banner above instead. */}
+
+        {/* ── Error state ── */}
+        {isError && (
+          <div className="rounded-2xl border border-destructive/30 bg-destructive/5 p-6 flex items-center gap-4">
+            <AlertCircle className="size-6 text-destructive shrink-0" />
+            <div className="flex-1">
+              <p className="font-semibold text-foreground text-sm">Đã xảy ra lỗi</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Vui lòng kiểm tra kết nối mạng và thử lại.
+              </p>
             </div>
-
-            <UploadProgress
-              batchIndex={batchIndex}
-              totalBatches={totalBatches}
-              percent={percent}
-              isCancelled={isCancelled}
-            />
-
-            {/* Live results while uploading */}
-            {liveResults.length > 0 && <LiveResultList results={liveResults} />}
+            <Button variant="outline" size="sm" onClick={handleReset}>
+              Thử lại
+            </Button>
           </div>
         )}
 
-        {/* ── Done: full results + next action ── */}
+        {/* ── Done: summary + next actions ── */}
         {isDone && (
           <div className="space-y-4">
-            <LiveResultList results={liveResults} />
+            <DoneCard results={uploadResults} finalStatus={finalStatus} />
 
             <div className="flex flex-col sm:flex-row items-center gap-3">
-              {/* Upload more */}
-              <Button
-                variant="outline"
-                onClick={() => {
-                  setLiveResults([])
-                  setIsCancelled(false)
-                  setPercent(0)
-                  setBatchIndex(0)
-                  setTotalBatches(0)
-                }}
-                className="w-full sm:w-auto"
-              >
+              <Button variant="outline" onClick={handleReset} className="w-full sm:w-auto">
                 <UploadCloud className="size-4 mr-2" />
                 Tải thêm ảnh
               </Button>
-
-              {/* Go search */}
               <Button variant="brand" asChild className="w-full sm:w-auto">
                 <a href="/search">
                   <Search className="size-4 mr-2" />

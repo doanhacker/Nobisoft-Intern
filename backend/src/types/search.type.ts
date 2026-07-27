@@ -27,6 +27,10 @@ export interface SearchImageResultItem {
   createdAt: Date;
 }
 
+export type SearchImageResponseItem = Omit<SearchImageResultItem, 'similarityScore'> & {
+  similarityScore?: number;
+};
+
 export interface SearchImageResult {
   searchHistoryId: string;
   results: SearchImageResultItem[];
@@ -38,13 +42,84 @@ export interface SearchImageResult {
 export interface SearchImageData {
   searchHistoryId: string;
   searchType: 'IMAGE_ONLY';
+  results: SearchImageResponseItem[];
+}
+
+export type SearchImageResponse = ApiResponse<SearchImageData>;
+
+interface SearchTextBaseInput {
+  userId: string;
+  page: number;
+  limit: number;
+}
+
+export type SearchTextSemanticInput =
+  | (SearchTextBaseInput & {
+      queryText: string;
+    })
+  | (SearchTextBaseInput & {
+      searchHistoryId: string;
+    });
+
+export interface SearchTextSemanticResult {
+  searchHistoryId: string;
   results: SearchImageResultItem[];
   total: number;
   page: number;
   limit: number;
 }
 
-export type SearchImageResponse = ApiResponse<SearchImageData>;
+export interface SearchTextSemanticData {
+  searchHistoryId: string;
+  searchType: 'TEXT_SEMANTIC';
+  results: SearchImageResponseItem[];
+}
+
+export type SearchTextSemanticResponse = ApiResponse<SearchTextSemanticData>;
+
+// ============================
+// OCR Search
+// ============================
+
+export type SearchTextOcrInput =
+  | (SearchTextBaseInput & { queryText: string })
+  | (SearchTextBaseInput & { searchHistoryId: string });
+
+export interface OcrMatchLine {
+  rawText: string;
+  confidenceScore: number;
+  boundingBoxes: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null;
+}
+
+export interface SearchTextOcrResultItem {
+  id: string;
+  imageUrl: string;
+  width: number | null;
+  height: number | null;
+  fileSize: number | null;
+  fileFormat: string | null;
+  createdAt: Date;
+  ocrMatches: OcrMatchLine[];
+}
+
+export interface SearchTextOcrResult {
+  searchHistoryId: string;
+  results: SearchTextOcrResultItem[];
+  total: number;
+}
+
+export interface SearchTextOcrData {
+  searchHistoryId: string;
+  searchType: 'TEXT_OCR';
+  results: SearchTextOcrResultItem[];
+}
+
+export type SearchTextOcrResponse = ApiResponse<SearchTextOcrData>;
 
 export type CreateSearchHistoryInput =
   | {
@@ -70,6 +145,11 @@ export interface ImageSearchHistoryQuery {
     path: string;
     fileFormat: string;
   };
+}
+
+export interface TextSearchHistoryQuery {
+  id: string;
+  queryText: string;
 }
 
 export interface SearchClickInput {

@@ -1,6 +1,6 @@
-import { cn } from '@/lib/utils'
 import type { SearchResult } from './MasonryGrid'
 import { Search } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 // ============================================================
 // ImageResultCard — Single image tile in masonry grid
@@ -10,23 +10,31 @@ interface ImageResultCardProps {
     result: SearchResult
     onClick: (result: SearchResult) => void
     onSearchSimilar: (result: SearchResult) => void
+    /** When true (ADMIN role), renders the similarity % badge */
+    showSimilarityBadge?: boolean
     style?: React.CSSProperties
 }
 
-// Helper: similarity score color
-function getSimilarityStyle(score: number): { label: string; className: string } {
-    if (score >= 0.8) return { label: `${Math.round(score * 100)}%`, className: 'similarity-high' }
-    if (score >= 0.5) return { label: `${Math.round(score * 100)}%`, className: 'similarity-medium' }
-    return { label: `${Math.round(score * 100)}%`, className: 'similarity-low' }
+/** Returns Tailwind colour classes based on similarity score (0–1) */
+function getSimilarityStyle(score: number): { bg: string; text: string; border: string } {
+    if (score >= 0.8) {
+        return { bg: 'bg-emerald-500/80', text: 'text-white', border: 'border-emerald-400/60' }
+    }
+    if (score >= 0.6) {
+        return { bg: 'bg-sky-500/80', text: 'text-white', border: 'border-sky-400/60' }
+    }
+    return { bg: 'bg-amber-500/80', text: 'text-white', border: 'border-amber-400/60' }
 }
 
 export function ImageResultCard({
     result,
     onClick,
     onSearchSimilar,
+    showSimilarityBadge = false,
     style,
 }: ImageResultCardProps) {
-    const sim = getSimilarityStyle(result.similarityScore)
+    const hasSimilarityBadge = showSimilarityBadge && result.similarityScore != null
+    const simStyle = hasSimilarityBadge ? getSimilarityStyle(result.similarityScore!) : null
 
     return (
         <div
@@ -72,18 +80,22 @@ export function ImageResultCard({
                 </div>
             </div>
 
-            {/* ── Similarity Score Badge ── */}
-            <div
-                className={cn(
-                    'absolute top-2 right-2 px-2 py-0.5 rounded-full text-[11px] font-bold',
-                    'backdrop-blur-sm border shadow-sm',
-                    sim.className,
-                )}
-            >
-                {sim.label}
-            </div>
+            {/* ── Similarity Score Badge — ADMIN only (top-right corner) ── */}
+            {hasSimilarityBadge && simStyle && (
+                <div
+                    className={cn(
+                        'absolute top-2 right-2 px-2 py-0.5 rounded-full',
+                        'text-[11px] font-bold backdrop-blur-sm border shadow-sm',
+                        'transition-opacity duration-200',
+                        simStyle.bg, simStyle.text, simStyle.border,
+                    )}
+                    title={`Độ tương đồng: ${Math.round(result.similarityScore! * 100)}%`}
+                >
+                    {Math.round(result.similarityScore! * 100)}%
+                </div>
+            )}
 
-            {/* ── OCR text badge ── */}
+            {/* ── OCR text badge (top-left) ── */}
             {result.ocrText && (
                 <div className="absolute top-2 left-2 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-black/50 backdrop-blur-sm border border-white/20 text-white">
                     OCR

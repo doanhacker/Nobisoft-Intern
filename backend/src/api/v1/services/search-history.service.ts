@@ -6,6 +6,7 @@ import type {
   ImageSearchHistoryQuery,
   SaveSearchClickResult,
   SearchClickInput,
+  TextSearchHistoryQuery,
 } from '../../../types/search.type.js';
 import { deleteImageFromDisk, saveImageToDisk } from '../../../utils/storage.util.js';
 
@@ -101,6 +102,33 @@ export async function getImageSearchHistory(
       path: history.queryImage.path,
       fileFormat: history.queryImage.fileFormat ?? '',
     }
+  };
+}
+
+export async function getTextSearchHistory(
+  userId: string,
+  searchHistoryId: string,
+  searchType: 'TEXT_SEMANTIC' | 'TEXT_OCR',
+): Promise<TextSearchHistoryQuery | null> {
+  const history = await prisma.searchHistory.findFirst({
+    where: {
+      id: searchHistoryId,
+      userId,
+      searchType,
+    },
+    select: {
+      id: true,
+      queryText: true,
+    },
+  });
+
+  if (!history?.queryText) {
+    return null;
+  }
+
+  return {
+    id: history.id,
+    queryText: history.queryText,
   };
 }
 

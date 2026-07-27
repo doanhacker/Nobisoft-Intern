@@ -1,5 +1,6 @@
 import asyncio
 import json
+from time import perf_counter
 
 from fastapi import APIRouter, File, Form, HTTPException, Request, UploadFile
 
@@ -93,6 +94,7 @@ async def index_batch(
 
     # Mỗi ảnh là một task riêng. IndexingService giới hạn toàn cục tối đa
     # 4 tác vụ inference CPU chạy đồng thời, kể cả khi có nhiều request.
+    batch_started_at = perf_counter()
     results = await asyncio.gather(
         *(
             service.process_image(
@@ -107,11 +109,17 @@ async def index_batch(
         1 for result in results if result.success
     )
     failed = len(results) - succeeded
+    processing_time_ms = round(
+        (perf_counter() - batch_started_at) * 1000,
+        2,
+    )
 
     return BatchIndexingResponse(
-        success=failed == 0,
+        # Batch request succeeded; per-image failures are reported in results.
+        success=True,
         total=len(results),
         succeeded=succeeded,
         failed=failed,
+        processing_time_ms=processing_time_ms,
         results=results,
     )

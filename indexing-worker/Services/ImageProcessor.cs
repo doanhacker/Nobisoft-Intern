@@ -160,9 +160,10 @@ public class ImageProcessor
                 }
                 else
                 {
+                    _logger.LogWarning("Không tìm thấy ảnh gốc {Id} trong bộ nhớ, dùng giá trị mặc định", result.ImageId);
                     originalExt = "jpg";
-                    originalWidth = result.Metadata?.Width ?? 0;
-                    originalHeight = result.Metadata?.Height ?? 0;
+                    originalWidth = 0;
+                    originalHeight = 0;
                     imagePath = "";
                 }
 
@@ -380,7 +381,7 @@ public class ImageProcessor
                     {
                         IndexId = indexGuid.Value,
                         RawText = ocr.Text,
-                        NormalizedText = ocr.NormalizedText,
+                        NormalizedText = NormalizeText(ocr.Text),
                         ConfidenceScore = ocr.Confidence,
                         BoundingBoxes = boundingJson
                     }, tx
@@ -438,5 +439,24 @@ public class ImageProcessor
         var uri = new Uri(databaseUrl);
         var userInfo = uri.UserInfo.Split(':');
         return $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]}";
+    }
+
+    private static string NormalizeText(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return string.Empty;
+
+        var normalizedString = input.Normalize(System.Text.NormalizationForm.FormD);
+        var stringBuilder = new System.Text.StringBuilder(capacity: normalizedString.Length);
+
+        foreach (var c in normalizedString)
+        {
+            var unicodeCategory = System.Globalization.CharUnicodeInfo.GetUnicodeCategory(c);
+            if (unicodeCategory != System.Globalization.UnicodeCategory.NonSpacingMark)
+            {
+                stringBuilder.Append(c);
+            }
+        }
+
+        return stringBuilder.ToString().Normalize(System.Text.NormalizationForm.FormC).ToLowerInvariant();
     }
 }

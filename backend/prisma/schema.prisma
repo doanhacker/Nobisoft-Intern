@@ -37,6 +37,7 @@ model User {
   deletedAt  DateTime? @db.Timestamptz()
 
   searchHistories SearchHistory[]
+  batches         BatchIndex[]
 
   @@index([nameSearch])
   @@map("users")
@@ -44,6 +45,7 @@ model User {
 
 model BatchIndex {
   id              String      @id @default(uuid()) @db.Uuid
+  uploadedBy      String?     @db.Uuid
   totalImages     Int         @default(0)
   successCount    Int         @default(0)
   failedCount     Int         @default(0)
@@ -52,8 +54,10 @@ model BatchIndex {
   createdAt       DateTime    @default(now()) @db.Timestamptz()
   updatedAt       DateTime    @updatedAt @db.Timestamptz()
 
-  imageIndexes ImageIndex[]
+  uploadedByUser User?        @relation(fields: [uploadedBy], references: [id], onDelete: SetNull)
+  imageIndexes   ImageIndex[]
 
+  @@index([uploadedBy])
   @@map("batch_index")
 }
 
@@ -99,6 +103,7 @@ model ImageOcr {
   imageIndex ImageIndex @relation(fields: [imageIndexId], references: [id], onDelete: Cascade)
 
   @@index([imageIndexId])
+  @@index([normalizedText])
   @@map("image_ocr")
 }
 

@@ -14,7 +14,10 @@ import { Route as StyleGuideRouteImport } from './routes/style-guide'
 import { Route as SearchRouteImport } from './routes/search'
 import { Route as ResultsRouteImport } from './routes/results'
 import { Route as RegisterRouteImport } from './routes/register'
+import { Route as RecommendationsRouteImport } from './routes/recommendations'
+import { Route as MyImagesRouteImport } from './routes/my-images'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as HistoryRouteImport } from './routes/history'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
@@ -50,9 +53,24 @@ const RegisterRoute = RegisterRouteImport.update({
   path: '/register',
   getParentRoute: () => rootRouteImport,
 } as any)
+const RecommendationsRoute = RecommendationsRouteImport.update({
+  id: '/recommendations',
+  path: '/recommendations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyImagesRoute = MyImagesRouteImport.update({
+  id: '/my-images',
+  path: '/my-images',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HistoryRoute = HistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DashboardRoute = DashboardRouteImport.update({
@@ -105,7 +123,10 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/dashboard': typeof DashboardRoute
+  '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
+  '/my-images': typeof MyImagesRoute
+  '/recommendations': typeof RecommendationsRoute
   '/register': typeof RegisterRoute
   '/results': typeof ResultsRoute
   '/search': typeof SearchRoute
@@ -121,7 +142,10 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/dashboard': typeof DashboardRoute
+  '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
+  '/my-images': typeof MyImagesRoute
+  '/recommendations': typeof RecommendationsRoute
   '/register': typeof RegisterRoute
   '/results': typeof ResultsRoute
   '/search': typeof SearchRoute
@@ -139,7 +163,10 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/dashboard': typeof DashboardRoute
+  '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
+  '/my-images': typeof MyImagesRoute
+  '/recommendations': typeof RecommendationsRoute
   '/register': typeof RegisterRoute
   '/results': typeof ResultsRoute
   '/search': typeof SearchRoute
@@ -158,7 +185,10 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/dashboard'
+    | '/history'
     | '/login'
+    | '/my-images'
+    | '/recommendations'
     | '/register'
     | '/results'
     | '/search'
@@ -174,7 +204,10 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/dashboard'
+    | '/history'
     | '/login'
+    | '/my-images'
+    | '/recommendations'
     | '/register'
     | '/results'
     | '/search'
@@ -191,7 +224,10 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/dashboard'
+    | '/history'
     | '/login'
+    | '/my-images'
+    | '/recommendations'
     | '/register'
     | '/results'
     | '/search'
@@ -209,7 +245,10 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   DashboardRoute: typeof DashboardRoute
+  HistoryRoute: typeof HistoryRoute
   LoginRoute: typeof LoginRoute
+  MyImagesRoute: typeof MyImagesRoute
+  RecommendationsRoute: typeof RecommendationsRoute
   RegisterRoute: typeof RegisterRoute
   ResultsRoute: typeof ResultsRoute
   SearchRoute: typeof SearchRoute
@@ -254,11 +293,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof RegisterRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/recommendations': {
+      id: '/recommendations'
+      path: '/recommendations'
+      fullPath: '/recommendations'
+      preLoaderRoute: typeof RecommendationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-images': {
+      id: '/my-images'
+      path: '/my-images'
+      fullPath: '/my-images'
+      preLoaderRoute: typeof MyImagesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/login': {
       id: '/login'
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/history': {
+      id: '/history'
+      path: '/history'
+      fullPath: '/history'
+      preLoaderRoute: typeof HistoryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/dashboard': {
@@ -361,7 +421,10 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   DashboardRoute: DashboardRoute,
+  HistoryRoute: HistoryRoute,
   LoginRoute: LoginRoute,
+  MyImagesRoute: MyImagesRoute,
+  RecommendationsRoute: RecommendationsRoute,
   RegisterRoute: RegisterRoute,
   ResultsRoute: ResultsRoute,
   SearchRoute: SearchRoute,

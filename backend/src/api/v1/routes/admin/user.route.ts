@@ -99,8 +99,13 @@ userRouter.get('/', validateUserListQuery, userController.getUsers);
  *     tags: [Admin - Users]
  *     summary: Lấy lịch sử tìm kiếm của người dùng
  *     description: |
- *       Trả về danh sách lịch sử tìm kiếm phân trang của một user cụ thể, bao gồm ảnh đã click (nếu có).
- *       Hỗ trợ lọc theo loại tìm kiếm. Chỉ Admin mới có quyền truy cập.
+ *       Trả về danh sách lịch sử tìm kiếm phân trang của một user cụ thể.
+ *       Hỗ trợ lọc theo loại tìm kiếm và khoảng thời gian. Chỉ Admin mới có quyền truy cập.
+ *       Có thể lọc theo khoảng thời gian:
+ *       - Chỉ nhập fromDate: lấy lịch sử từ ngày đó trở đi.
+ *       - Chỉ nhập toDate: lấy lịch sử đến hết ngày đó.
+ *       - Nhập cả fromDate và toDate: lấy lịch sử trong khoảng thời gian đó.
+ *       - Không nhập fromDate và toDate: lấy toàn bộ lịch sử.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -122,15 +127,28 @@ userRouter.get('/', validateUserListQuery, userController.getUsers);
  *         name: limit
  *         schema:
  *           type: integer
- *           minimum: 1
- *           maximum: 100
+ *           enum: [20]
  *           default: 20
- *         description: Số kết quả mỗi trang (mặc định 20, tối đa 100)
+ *         description: Cố định 20 lịch sử mỗi trang
  *       - in: query
  *         name: searchType
  *         schema:
  *           $ref: '#/components/schemas/SearchType'
  *         description: Lọc theo loại tìm kiếm (IMAGE_ONLY, TEXT_SEMANTIC, TEXT_OCR)
+ *       - in: query
+ *         name: fromDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Lấy lịch sử từ ngày này, định dạng YYYY-MM-DD
+ *         example: '2026-07-01'
+ *       - in: query
+ *         name: toDate
+ *         schema:
+ *           type: string
+ *           format: date
+ *         description: Lấy lịch sử đến hết ngày này, định dạng YYYY-MM-DD
+ *         example: '2026-07-23'
  *     responses:
  *       200:
  *         description: Lấy lịch sử thành công
@@ -148,7 +166,7 @@ userRouter.get('/', validateUserListQuery, userController.getUsers);
  *                 data:
  *                   type: array
  *                   items:
- *                     $ref: '#/components/schemas/SearchHistoryItem'
+ *                     $ref: '#/components/schemas/UserSearchHistoryItem'
  *                 meta:
  *                   $ref: '#/components/schemas/PaginationMeta'
  *       401:

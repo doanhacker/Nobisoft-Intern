@@ -89,6 +89,26 @@ export function ImageSearchModal({
     return () => window.removeEventListener('keydown', handler)
   }, [onClose])
 
+  // ── Clipboard paste ─────────────────────────────────────────
+  React.useEffect(() => {
+    const handlePaste = (e: ClipboardEvent) => {
+      const items = e.clipboardData?.items
+      if (!items) return
+      for (let i = 0; i < items.length; i++) {
+        if (items[i].type.startsWith('image/')) {
+          const file = items[i].getAsFile()
+          if (file) {
+            processFile(file)
+            break
+          }
+        }
+      }
+    }
+    document.addEventListener('paste', handlePaste)
+    return () => document.removeEventListener('paste', handlePaste)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // ── File processing ───────────────────────────────────────
   const processFile = (file: File) => {
     setError(null)
@@ -332,6 +352,10 @@ export function ImageSearchModal({
                         <span className="text-primary font-semibold underline underline-offset-2">click để chọn file</span>
                       </p>
                       <p className="text-xs text-muted-foreground/70">JPG, PNG, WebP · Tối đa {MAX_SIZE_MB}MB</p>
+                      <p className="text-xs text-muted-foreground/50 flex items-center justify-center gap-1 mt-0.5">
+                        <kbd className="inline-flex items-center rounded border border-border/60 bg-muted px-1.5 py-0.5 font-mono text-[10px]">Ctrl+V</kbd>
+                        để dán ảnh từ clipboard
+                      </p>
                     </>
                   )}
                 </div>

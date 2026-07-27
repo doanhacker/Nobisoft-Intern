@@ -1,4 +1,5 @@
 import * as React from 'react'
+import { createPortal } from 'react-dom'
 import { X, Download, Search, ExternalLink, FileText, Maximize2, Ruler } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { SearchResult } from './MasonryGrid'
@@ -31,24 +32,20 @@ export function ImageDetailModal({ result, onClose, onSearchSimilar }: ImageDeta
     return () => window.removeEventListener('keydown', handler)
   }, [result, onClose])
 
-  // Prevent body scroll when open
+  // Prevent body scroll when open without losing scroll position
   React.useEffect(() => {
-    if (result) document.body.style.overflow = 'hidden'
-    else document.body.style.overflow = ''
-    return () => { document.body.style.overflow = '' }
+    if (!result) return
+    const scrollY = window.scrollY
+    document.body.style.overflow = 'hidden'
+    return () => {
+      document.body.style.overflow = ''
+      window.scrollTo({ top: scrollY, behavior: 'instant' })
+    }
   }, [result])
 
   if (!result) return null
 
-  const score = Math.round(result.similarityScore * 100)
-  const scoreClass =
-    result.similarityScore >= 0.8
-      ? 'text-green-500 bg-green-500/10 border-green-500/30'
-      : result.similarityScore >= 0.5
-        ? 'text-amber-500 bg-amber-500/10 border-amber-500/30'
-        : 'text-muted-foreground bg-muted border-border'
-
-  return (
+  return createPortal(
     <>
       {/* ── Backdrop ── */}
       <div
@@ -114,26 +111,6 @@ export function ImageDetailModal({ result, onClose, onSearchSimilar }: ImageDeta
 
           {/* Content */}
           <div className="flex-1 p-4 space-y-5">
-            {/* Similarity score */}
-            <div className="space-y-1.5">
-              <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Độ tương đồng
-              </p>
-              <div className="flex items-center gap-2">
-                <div
-                  className={cn('px-3 py-1 rounded-full text-sm font-bold border', scoreClass)}
-                >
-                  {score}%
-                </div>
-                <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-700 gradient-brand"
-                    style={{ width: `${score}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-
             {/* Title */}
             {result.title && (
               <div className="space-y-1">
@@ -232,6 +209,7 @@ export function ImageDetailModal({ result, onClose, onSearchSimilar }: ImageDeta
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   )
 }
