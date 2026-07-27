@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { createRootRoute, Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/router-devtools'
-import { ScanSearch, LogIn, LogOut, Search, UserCircle2, Menu, X, LayoutDashboard, UploadCloud, History, Sparkles } from 'lucide-react'
+import { ScanSearch, LogIn, LogOut, Search, UserCircle2, Menu, X, LayoutDashboard, UploadCloud, Sparkles } from 'lucide-react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ThemeProvider } from '@/context/ThemeContext'
 import { AuthProvider } from '@/context/AuthContext'
@@ -177,16 +177,10 @@ function AppShell() {
             {isAuthenticated && (
               <>
                 <NavLink to="/search" icon={<Search className="size-3.5" />}>
-                  Search
-                </NavLink>
-                <NavLink to="/recommendations" icon={<Sparkles className="size-3.5" />}>
-                  Gợi ý
+                  Tìm kiếm
                 </NavLink>
                 <NavLink to="/upload" icon={<UploadCloud className="size-3.5" />}>
                   Tải ảnh lên
-                </NavLink>
-                <NavLink to="/history" icon={<History className="size-3.5" />}>
-                  Lịch sử
                 </NavLink>
               </>
             )}
@@ -285,25 +279,11 @@ function AppShell() {
                       Tìm kiếm
                     </MobileNavLink>
                     <MobileNavLink
-                      to="/recommendations"
-                      icon={<Sparkles className="size-4 text-muted-foreground" />}
-                      onClick={() => setMenuOpen(false)}
-                    >
-                      Gợi ý dành cho bạn
-                    </MobileNavLink>
-                    <MobileNavLink
                       to="/upload"
                       icon={<UploadCloud className="size-4 text-muted-foreground" />}
                       onClick={() => setMenuOpen(false)}
                     >
                       Tải ảnh lên
-                    </MobileNavLink>
-                    <MobileNavLink
-                      to="/history"
-                      icon={<History className="size-4 text-muted-foreground" />}
-                      onClick={() => setMenuOpen(false)}
-                    >
-                      Lịch sử tìm kiếm
                     </MobileNavLink>
                   </>
                 )}

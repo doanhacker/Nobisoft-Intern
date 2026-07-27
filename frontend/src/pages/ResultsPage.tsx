@@ -19,6 +19,7 @@ import { ImageSearchModal } from '@/components/results/ImageSearchModal'
 import { searchByImageFile, searchByImagePage, getPendingImageFile, setPendingImageFile, fetchImageAsFile, recordSearchClick, searchByTextNew, searchByTextPage } from '@/services/searchService'
 import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
+import { AuthContext } from '@/context/AuthContext'
 
 // ============================================================
 // ResultsPage — Pinterest-style layout
@@ -184,6 +185,7 @@ export function ResultsPage() {
   const search = useSearch({ from: '/results' }) as ResultsSearch
   const navigate = useNavigate()
   const { error: toastError } = useToast()
+  const auth = React.useContext(AuthContext)
 
   // ── State ──
   const [results, setResults] = React.useState<SearchResult[]>([])
@@ -219,6 +221,8 @@ export function ResultsPage() {
   const abortRef = React.useRef<AbortController | null>(null)
 
   const { mode, q, query_id, imageId } = search
+  // Show similarity badge only to ADMIN users, and only for image/semantic modes (not OCR)
+  const showSimilarityBadge = Boolean(auth?.isAdmin) && (mode === 'image' || mode === 'semantic')
 
   // ── Fetch results ─────────────────────────────────────────
   const fetchResults = React.useCallback(
@@ -497,6 +501,7 @@ export function ResultsPage() {
                   onCardClick={handleCardClick}
                   onSearchSimilar={handleSearchSimilar}
                   compact={isSplitView}
+                  showSimilarityBadge={showSimilarityBadge}
                 />
                 
                 {/* Pagination */}
