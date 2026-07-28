@@ -4,7 +4,6 @@ import {
   LayoutDashboard,
   Users,
   Images,
-  UploadCloud,
   ScanSearch,
   ChevronRight,
 } from 'lucide-react'
@@ -29,11 +28,6 @@ const NAV_ITEMS = [
     to: '/admin/images',
     label: 'Kho ảnh',
     icon: Images,
-  },
-  {
-    to: '/admin/indexing',
-    label: 'Index ảnh',
-    icon: UploadCloud,
   },
 ] as const
 

@@ -22,33 +22,46 @@ export interface SearchResult {
 interface MasonryGridProps {
     results: SearchResult[]
     onCardClick: (result: SearchResult) => void
-    onSearchSimilar: (result: SearchResult) => void
+    onSearchSimilar?: (result: SearchResult) => void
+    onDelete?: (result: SearchResult) => void
     /** Compact mode: fewer columns for split-view (image search) layout */
     compact?: boolean
     /** Show similarity % badge on each card — only pass true for ADMIN role */
     showSimilarityBadge?: boolean
+    /** Optional custom breakpoint columns configuration */
+    breakpointCols?: Record<string, number> | number
 }
 
 const BREAKPOINTS_DEFAULT = {
-    default: 4,
-    1280: 4,
-    1024: 3,
-    768: 2,
+    default: 6,
+    1536: 6,
+    1280: 5,
+    1024: 4,
+    768: 3,
     640: 2,
     480: 1,
 }
 
 const BREAKPOINTS_COMPACT = {
-    default: 3,
-    1280: 3,
-    1024: 2,
+    default: 4,
+    1536: 4,
+    1280: 4,
+    1024: 3,
     768: 2,
     640: 1,
     480: 1,
 }
 
-export function MasonryGrid({ results, onCardClick, onSearchSimilar, compact = false, showSimilarityBadge = false }: MasonryGridProps) {
-    const breakpoints = compact ? BREAKPOINTS_COMPACT : BREAKPOINTS_DEFAULT
+export function MasonryGrid({
+    results,
+    onCardClick,
+    onSearchSimilar,
+    onDelete,
+    compact = false,
+    showSimilarityBadge = false,
+    breakpointCols,
+}: MasonryGridProps) {
+    const breakpoints = breakpointCols ?? (compact ? BREAKPOINTS_COMPACT : BREAKPOINTS_DEFAULT)
     return (
         <Masonry
             breakpointCols={breakpoints}
@@ -65,6 +78,7 @@ export function MasonryGrid({ results, onCardClick, onSearchSimilar, compact = f
                         result={result}
                         onClick={onCardClick}
                         onSearchSimilar={onSearchSimilar}
+                        onDelete={onDelete}
                         showSimilarityBadge={showSimilarityBadge}
                     />
                 </div>

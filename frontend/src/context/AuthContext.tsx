@@ -59,6 +59,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const data = await loginApi(payload)
       setToken(data.accessToken)
       setUser(data.user)
+    } catch (err) {
+      // Re-throw so callers (e.g. LoginPage) can display the error
+      throw err
     } finally {
       setIsLoading(false)
     }

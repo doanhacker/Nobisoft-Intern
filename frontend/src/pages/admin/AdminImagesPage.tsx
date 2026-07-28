@@ -4,19 +4,19 @@ import { useNavigate, useSearch } from '@tanstack/react-router'
 import {
   Images,
   Trash2,
-  Eye,
   ChevronLeft,
   ChevronRight,
   AlertCircle,
   Filter,
   X,
-  FileImage,
   Loader2,
 } from 'lucide-react'
 import { getImages, getImageDetail, deleteImage } from '@/services/adminImageService'
+import { fetchImageAsFile, setPendingImageFile } from '@/services/searchService'
+import { SkeletonGrid } from '@/components/results/SkeletonGrid'
+import { MasonryGrid, type SearchResult } from '@/components/results/MasonryGrid'
 import type { AdminImageItem } from '@/types/admin'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
@@ -26,15 +26,6 @@ import { cn } from '@/lib/utils'
 // ============================================================
 
 const PAGE_SIZE = 20
-
-// ── Image card ────────────────────────────────────────────────
-
-interface ImageCardProps {
-  image: AdminImageItem
-  onView: (image: AdminImageItem) => void
-  onDelete: (image: AdminImageItem) => void
-  isDeleting: boolean
-}
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
@@ -50,86 +41,17 @@ function formatDate(dateStr: string) {
   }).format(new Date(dateStr))
 }
 
-function ImageCard({ image, onView, onDelete, isDeleting }: ImageCardProps) {
-  const [imgError, setImgError] = React.useState(false)
-  const indexedAt = image.imageIndex?.indexedAt
-    ? formatDate(image.imageIndex.indexedAt)
-    : formatDate(image.createdAt)
-  const ocrPreview = image.imageIndex?.ocrLines
-    ?.slice(0, 2)
-    .map((l) => l.rawText)
-    .join(' · ')
-
-  return (
-    <div className="group relative bg-card border border-border/60 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
-      {/* Thumbnail */}
-      <div className="relative aspect-square bg-muted/40 overflow-hidden">
-        {imgError ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-muted-foreground">
-            <FileImage className="size-8" />
-            <span className="text-xs">Không tải được</span>
-          </div>
-        ) : (
-          <img
-            src={image.imageUrl}
-            alt={image.imageUrl.split('/').pop() ?? 'image'}
-            className="size-full object-cover transition-transform duration-200 group-hover:scale-105"
-            onError={() => setImgError(true)}
-            loading="lazy"
-          />
-        )}
-
-        {/* Hover overlay */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-200 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-          <button
-            onClick={() => onView(image)}
-            className="flex items-center justify-center size-9 rounded-full bg-white/90 text-gray-800 hover:bg-white transition-colors shadow"
-            title="Xem chi tiết"
-          >
-            <Eye className="size-4" />
-          </button>
-          <button
-            onClick={() => onDelete(image)}
-            disabled={isDeleting}
-            className="flex items-center justify-center size-9 rounded-full bg-destructive/90 text-white hover:bg-destructive transition-colors shadow disabled:opacity-50"
-            title="Xoá ảnh"
-          >
-            {isDeleting ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Trash2 className="size-4" />
-            )}
-          </button>
-        </div>
-
-        {/* Format badge */}
-        <div className="absolute top-2 right-2">
-          <Badge variant="secondary" className="text-[10px] uppercase font-bold px-1.5 py-0.5">
-            {image.fileFormat}
-          </Badge>
-        </div>
-      </div>
-
-      {/* Info */}
-      <div className="p-2.5 space-y-0.5">
-        <p className="text-xs font-semibold text-foreground truncate" title={image.imageUrl}>
-          {image.imageUrl.split('/').pop() ?? image.id}
-        </p>
-        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-          <span>
-            {image.width}×{image.height}
-          </span>
-          <span>{formatBytes(image.fileSize)}</span>
-        </div>
-        <p className="text-[10px] text-muted-foreground">{indexedAt}</p>
-        {ocrPreview && (
-          <p className="text-[10px] text-muted-foreground truncate italic" title={ocrPreview}>
-            "{ocrPreview}"
-          </p>
-        )}
-      </div>
-    </div>
-  )
+function mapAdminImageToSearchResult(img: AdminImageItem): SearchResult {
+  return {
+    id: img.id,
+    thumbnailUrl: img.imageUrl,
+    fullUrl: img.imageUrl,
+    title: img.imageUrl.split('/').pop() ?? img.id,
+    width: img.width ?? undefined,
+    height: img.height ?? undefined,
+    aspectRatio: img.width && img.height ? `${img.width} / ${img.height}` : undefined,
+    ocrText: img.imageIndex?.ocrLines?.map((l) => l.rawText).join(' '),
+  }
 }
 
 // ── Filter bar ────────────────────────────────────────────────
@@ -224,7 +146,7 @@ function ImageDetailModal({ imageId, onClose, onDelete, isDeleting }: ImageDetai
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
       onClick={onClose}
     >
       <div
@@ -248,14 +170,13 @@ function ImageDetailModal({ imageId, onClose, onDelete, isDeleting }: ImageDetai
         ) : image ? (
           <>
             {/* Image preview */}
-            <div className="aspect-video bg-muted/50 overflow-hidden rounded-t-2xl">
+            <div className="aspect-video bg-muted/50 overflow-hidden rounded-t-2xl flex items-center justify-center">
               <img src={image.imageUrl} alt="preview" className="size-full object-contain" />
             </div>
 
             {/* Metadata */}
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <MetaItem label="ID" value={image.id} mono />
                 <MetaItem label="Định dạng" value={image.fileFormat.toUpperCase()} />
                 <MetaItem label="Kích thước" value={`${image.width}×${image.height}px`} />
                 <MetaItem label="Dung lượng" value={formatBytes(image.fileSize)} />
@@ -264,15 +185,7 @@ function ImageDetailModal({ imageId, onClose, onDelete, isDeleting }: ImageDetai
                   value={
                     image.imageIndex?.indexedAt
                       ? formatDate(image.imageIndex.indexedAt)
-                      : '—'
-                  }
-                />
-                <MetaItem
-                  label="Thời gian xử lý"
-                  value={
-                    image.imageIndex?.processDurationMs
-                      ? `${image.imageIndex.processDurationMs}ms`
-                      : '—'
+                      : formatDate(image.createdAt)
                   }
                 />
               </div>
@@ -285,7 +198,7 @@ function ImageDetailModal({ imageId, onClose, onDelete, isDeleting }: ImageDetai
                   </p>
                   <div className="bg-muted/40 rounded-lg p-3 space-y-1 max-h-32 overflow-y-auto">
                     {image.imageIndex.ocrLines.map((line, i) => (
-                      <p key={i} className="text-xs text-foreground">
+                      <p key={i} className="text-xs text-foreground font-mono">
                         {line.rawText}{' '}
                         <span className="text-muted-foreground">
                           ({Math.round(line.confidenceScore * 100)}%)
@@ -297,7 +210,7 @@ function ImageDetailModal({ imageId, onClose, onDelete, isDeleting }: ImageDetai
               )}
 
               {/* Actions */}
-              <div className="flex justify-end pt-2 border-t border-border/50">
+              <div className="flex justify-end items-center pt-3 border-t border-border/50">
                 <Button
                   variant="destructive"
                   size="sm"
@@ -353,7 +266,7 @@ function DeleteConfirmDialog({ image, onConfirm, onCancel, isDeleting }: DeleteC
   if (!image) return null
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
       onClick={onCancel}
     >
       <div
@@ -404,7 +317,6 @@ export function AdminImagesPage() {
 
   const [viewingImageId, setViewingImageId] = React.useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = React.useState<AdminImageItem | null>(null)
-  const [deletingId, setDeletingId] = React.useState<string | null>(null)
 
   const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['admin', 'images', { page, fileFormat, fromDate, toDate }],
@@ -422,17 +334,14 @@ export function AdminImagesPage() {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteImage(id),
-    onMutate: (id) => setDeletingId(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['admin', 'images'] })
       toast.success('Đã xoá ảnh thành công')
       setPendingDelete(null)
       setViewingImageId(null)
-      setDeletingId(null)
     },
     onError: () => {
       toast.error('Xoá ảnh thất bại, vui lòng thử lại')
-      setDeletingId(null)
     },
   })
 
@@ -441,8 +350,40 @@ export function AdminImagesPage() {
   const totalDocs = data?.meta?.totalDocs ?? 0
   const hasFilter = fileFormat || fromDate || toDate
 
+  const searchResults = React.useMemo(
+    () => images.map(mapAdminImageToSearchResult),
+    [images],
+  )
+
   const clearFilter = () =>
     navigate({ to: '/admin/images', search: { page: 1, fileFormat: '', fromDate: '', toDate: '' } })
+
+  const handleCardClick = (result: SearchResult) => {
+    setViewingImageId(result.id)
+  }
+
+  const handleDeleteCard = async (result: SearchResult) => {
+    const found = images.find((i) => i.id === result.id)
+    if (found) {
+      setPendingDelete(found)
+    }
+  }
+
+  const handleSearchSimilar = async (result: SearchResult) => {
+    try {
+      const urlToFetch = result.fullUrl ?? result.thumbnailUrl
+      const file = await fetchImageAsFile(urlToFetch)
+      const newQueryId = `upload-${Date.now()}`
+      setPendingImageFile(file)
+      navigate({
+        to: '/results',
+        search: { mode: 'image', q: '', query_id: newQueryId, page: 1 },
+      })
+    } catch (err) {
+      console.error(err)
+      toast.error('Không thể tải ảnh để tìm kiếm')
+    }
+  }
 
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
@@ -451,10 +392,10 @@ export function AdminImagesPage() {
         <div>
           <h1 className="text-2xl font-black text-foreground flex items-center gap-2">
             <Images className="size-6 text-primary" />
-            Kho ảnh
+            Kho ảnh hệ thống
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {isLoading ? 'Đang tải...' : `${totalDocs.toLocaleString('vi-VN')} ảnh đã index`}
+            {isLoading ? 'Đang tải...' : `${totalDocs.toLocaleString('vi-VN')} ảnh đã index trong hệ thống`}
           </p>
         </div>
       </div>
@@ -478,17 +419,7 @@ export function AdminImagesPage() {
 
       {/* Grid */}
       {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-          {Array.from({ length: 20 }).map((_, i) => (
-            <div key={i} className="rounded-xl overflow-hidden">
-              <Skeleton className="aspect-square w-full" />
-              <div className="p-2.5 space-y-1.5">
-                <Skeleton className="h-3 w-3/4" />
-                <Skeleton className="h-2.5 w-1/2" />
-              </div>
-            </div>
-          ))}
-        </div>
+        <SkeletonGrid count={20} />
       ) : isError ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
           <AlertCircle className="size-10 text-destructive" />
@@ -517,23 +448,18 @@ export function AdminImagesPage() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-          {images.map((image) => (
-            <ImageCard
-              key={image.id}
-              image={image}
-              onView={(img) => setViewingImageId(img.id)}
-              onDelete={(img) => setPendingDelete(img)}
-              isDeleting={deletingId === image.id}
-            />
-          ))}
-        </div>
+        <MasonryGrid
+          results={searchResults}
+          onCardClick={handleCardClick}
+          onSearchSimilar={handleSearchSimilar}
+          onDelete={handleDeleteCard}
+        />
       )}
 
       {/* Pagination */}
       {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
+        <div className="flex items-center justify-between pt-4">
+          <p className="text-sm text-muted-foreground font-medium">
             Trang {page} / {totalPages}
           </p>
           <div className="flex gap-1.5">
@@ -575,7 +501,7 @@ export function AdminImagesPage() {
           const img = images.find((i) => i.id === id)
           if (img) setPendingDelete(img)
         }}
-        isDeleting={deletingId === viewingImageId}
+        isDeleting={deleteMutation.isPending}
       />
 
       {/* Delete Confirm */}

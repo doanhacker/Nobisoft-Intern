@@ -1,6 +1,6 @@
 import * as React from 'react'
 import { Link, useNavigate, useRouterState } from '@tanstack/react-router'
-import { ScanSearch, Home, Search, LayoutDashboard, LogOut, UserCircle2, LogIn, Sparkles } from 'lucide-react'
+import { ScanSearch, Home, Search, LogOut, UserCircle2, LogIn } from 'lucide-react'
 import { ThemeToggle } from '@/components/ui/ThemeToggle'
 import { useAuth } from '@/hooks/useAuth'
 import { cn } from '@/lib/utils'
@@ -124,30 +124,13 @@ export function ResultsSidebar({ className }: ResultsSidebarProps) {
           />
         )}
 
-        {isAuthenticated && (
-          <SidebarIconButton
-            to="/recommendations"
-            icon={Sparkles}
-            label="Gợi ý dành cho bạn"
-            active={pathname === '/recommendations'}
-          />
-        )}
-
-        {isAuthenticated && (
-          <SidebarIconButton
-            to="/dashboard"
-            icon={LayoutDashboard}
-            label="Dashboard"
-            active={pathname === '/dashboard'}
-          />
-        )}
       </nav>
 
       {/* ── Bottom controls ── */}
       <div className="flex flex-col items-center gap-2 mt-auto">
         {/* Theme toggle */}
-        <span className="flex items-center justify-center size-11 rounded-2xl hover:bg-muted/80 transition-colors cursor-pointer [&>button]:size-11 [&>button]:rounded-2xl">
-          <ThemeToggle />
+        <span className="flex items-center justify-center size-11 rounded-2xl hover:bg-muted/80 transition-colors cursor-pointer [&>div]:relative">
+          <ThemeToggle menuAlign="left" menuPosition="top" />
         </span>
 
         {/* User / Auth */}
@@ -166,12 +149,13 @@ export function ResultsSidebar({ className }: ResultsSidebarProps) {
         )}
 
         {isAuthenticated && (
-          <div
-            className="size-9 rounded-full gradient-brand flex items-center justify-center text-white text-xs font-bold shadow-sm cursor-default"
-            title={user?.name ?? 'User'}
+          <Link
+            to="/dashboard"
+            className="size-9 rounded-full gradient-brand flex items-center justify-center text-white text-xs font-bold shadow-sm hover:scale-110 transition-transform duration-200"
+            title={`Dashboard (${user?.name ?? 'User'})`}
           >
             {user?.name?.charAt(0).toUpperCase() ?? <UserCircle2 className="size-4" />}
-          </div>
+          </Link>
         )}
       </div>
     </aside>

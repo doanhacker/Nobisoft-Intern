@@ -491,7 +491,7 @@ export function ResultsPage() {
             )}
 
             {/* Loading skeleton */}
-            {status === 'loading' && <SkeletonGrid count={20} />}
+            {status === 'loading' && <SkeletonGrid count={20} compact={isSplitView} />}
 
             {/* Results grid */}
             {status === 'success' && results.length > 0 && (

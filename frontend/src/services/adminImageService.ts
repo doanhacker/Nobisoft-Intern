@@ -24,29 +24,29 @@ export interface ImageDetailResponse {
 }
 
 /**
- * GET /admin/images
+ * GET /images
  * Danh sách ảnh đã index, hỗ trợ lọc và phân trang
  */
 export async function getImages(params: ImageListParams = {}): Promise<ImageListResponse> {
-  const { data } = await axiosClient.get<ImageListResponse>('/admin/images', {
+  const { data } = await axiosClient.get<ImageListResponse>('/images', {
     params,
   })
   return data
 }
 
 /**
- * GET /admin/images/:id
+ * GET /images/:id
  * Chi tiết 1 ảnh (kèm toàn bộ OCR data)
  */
 export async function getImageDetail(id: string): Promise<ImageDetailResponse> {
-  const { data } = await axiosClient.get<ImageDetailResponse>(`/admin/images/${id}`)
+  const { data } = await axiosClient.get<ImageDetailResponse>(`/images/${id}`)
   return data
 }
 
 /**
- * DELETE /admin/images/:id
+ * DELETE /images/:id
  * Xoá ảnh khỏi hệ thống (cascade: PostgreSQL + Qdrant + disk)
  */
 export async function deleteImage(id: string): Promise<void> {
-  await axiosClient.delete(`/admin/images/${id}`)
+  await axiosClient.delete(`/images/${id}`)
 }
