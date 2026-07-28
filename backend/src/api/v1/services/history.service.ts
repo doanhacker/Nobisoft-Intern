@@ -1,5 +1,6 @@
 import { prisma } from '../../../config/prisma.js';
 import type { Prisma } from '../../../generated/prisma/client.js';
+import { endOfBangkokDay, startOfBangkokDay } from '../../../utils/date.util.js';
 import type {
   SearchHistoryListQuery,
   UserSearchHistoryServiceResult,
@@ -29,8 +30,8 @@ export async function getUserSearchHistory(
     ...(fromDate || toDate
       ? {
         createdAt: {
-          ...(fromDate ? { gte: fromDate } : {}),
-          ...(toDate ? { lte: endOfDay(toDate) } : {}),
+          ...(fromDate ? { gte: startOfBangkokDay(fromDate) } : {}),
+          ...(toDate ? { lte: endOfBangkokDay(toDate) } : {}),
         },
       }
       : {}),
@@ -99,10 +100,4 @@ function resolveImageUrl(imagePath: string): string {
 
   const cleanPath = imagePath.replace(/\\/g, '/').replace(/^\//, '');
   return `${BACKEND_URL}/${cleanPath}`;
-}
-
-function endOfDay(date: Date): Date {
-  const endDate = new Date(date);
-  endDate.setUTCHours(23, 59, 59, 999);
-  return endDate;
 }
