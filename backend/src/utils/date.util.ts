@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const BANGKOK_OFFSET_MS = 7 * 60 * 60 * 1000;
+const HO_CHI_MINH_OFFSET_MS = 7 * 60 * 60 * 1000;
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
 export const dateOnlySchema = z
@@ -21,22 +21,22 @@ export const dateOnlySchema = z
   }, 'Ngày không hợp lệ')
   .transform((value) => new Date(`${value}T00:00:00.000Z`));
 
-function bangkokDayStart(date: Date): Date {
+function hoChiMinhDayStart(date: Date): Date {
   const utcMidnight = Date.UTC(
     date.getUTCFullYear(),
     date.getUTCMonth(),
     date.getUTCDate(),
   );
 
-  return new Date(utcMidnight - BANGKOK_OFFSET_MS);
+  return new Date(utcMidnight - HO_CHI_MINH_OFFSET_MS);
 }
 
-export function startOfBangkokDay(date: Date): Date {
-  return bangkokDayStart(date);
+export function startOfHoChiMinhDay(date: Date): Date {
+  return hoChiMinhDayStart(date);
 }
 
-export function endOfBangkokDay(date: Date): Date {
+export function endOfHoChiMinhDay(date: Date): Date {
   return new Date(
-    bangkokDayStart(date).getTime() + MILLISECONDS_PER_DAY - 1,
+    hoChiMinhDayStart(date).getTime() + MILLISECONDS_PER_DAY - 1,
   );
 }

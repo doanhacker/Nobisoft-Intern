@@ -1,6 +1,6 @@
 import { prisma } from '../../../config/prisma.js';
 import type { Prisma } from '../../../generated/prisma/client.js';
-import { endOfBangkokDay, startOfBangkokDay } from '../../../utils/date.util.js';
+import { endOfHoChiMinhDay, startOfHoChiMinhDay } from '../../../utils/date.util.js';
 import type {
   SearchHistoryListQuery,
   UserSearchHistoryServiceResult,
@@ -30,8 +30,8 @@ export async function getUserSearchHistory(
     ...(fromDate || toDate
       ? {
         createdAt: {
-          ...(fromDate ? { gte: startOfBangkokDay(fromDate) } : {}),
-          ...(toDate ? { lte: endOfBangkokDay(toDate) } : {}),
+          ...(fromDate ? { gte: startOfHoChiMinhDay(fromDate) } : {}),
+          ...(toDate ? { lte: endOfHoChiMinhDay(toDate) } : {}),
         },
       }
       : {}),
