@@ -44,14 +44,14 @@ const historyRouter = Router();
  *         schema:
  *           type: string
  *           format: date
- *         description: Lấy lịch sử từ ngày này, định dạng YYYY-MM-DD
+ *         description: Lấy lịch sử từ ngày này, định dạng YYYY-MM-DD, theo múi giờ Asia/Ho_Chi_Minh
  *         example: '2026-07-01'
  *       - in: query
  *         name: toDate
  *         schema:
  *           type: string
  *           format: date
- *         description: Lấy lịch sử đến hết ngày này, định dạng YYYY-MM-DD
+ *         description: Lấy lịch sử đến hết ngày này, định dạng YYYY-MM-DD, theo múi giờ Asia/Ho_Chi_Minh
  *         example: '2026-07-23'
  *     responses:
  *       200:
