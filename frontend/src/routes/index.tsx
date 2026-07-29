@@ -12,8 +12,8 @@ export const Route = createFileRoute('/')({
   component: HomePage,
   validateSearch: (
     search: Record<string, unknown>,
-  ): { page?: number; imageId?: string } => ({
-    page: Number(search.page ?? 1),
+  ): { imageId?: string } => ({
+    // `page` removed — infinite scroll manages page internally in HomePage
     imageId: (search.imageId as string) ?? undefined,
   }),
 })

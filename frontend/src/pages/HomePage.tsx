@@ -1,13 +1,12 @@
 import * as React from 'react'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import {
-  ChevronLeft,
-  ChevronRight,
   RefreshCw,
   Sparkles,
   ImageIcon,
   FileText,
   Zap,
+  CheckCircle2,
 } from 'lucide-react'
 import { MasonryGrid, type SearchResult } from '@/components/results/MasonryGrid'
 import { SkeletonGrid } from '@/components/results/SkeletonGrid'
@@ -16,14 +15,13 @@ import { getRecommendations } from '@/services/recommendationService'
 import { fetchImageAsFile, setPendingImageFile } from '@/services/searchService'
 import { useToast } from '@/components/ui/Toast'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
 
 // ============================================================
 // HomePage — Pinterest-style recommendations feed + hero section
+// Infinite scroll: IntersectionObserver loads next page automatically
 // ============================================================
 
 interface HomeSearch {
-  page?: number
   imageId?: string
 }
 
@@ -37,7 +35,6 @@ const FEATURES = [
 
 function HeroSection({ compact = false }: { compact?: boolean }) {
   if (compact) {
-    // Compact banner shown above the masonry grid — info only, no action buttons
     return (
       <div
         className="relative overflow-hidden rounded-2xl mb-6 px-6 py-5"
@@ -78,7 +75,7 @@ function HeroSection({ compact = false }: { compact?: boolean }) {
     )
   }
 
-  // Full hero — shown when user hasn't built history yet (info only, no CTA buttons)
+  // Full hero — shown when user hasn't built history yet
   return (
     <div
       className="relative overflow-hidden rounded-3xl mb-8 px-8 py-16 sm:py-20"
@@ -162,9 +159,6 @@ function HeroSection({ compact = false }: { compact?: boolean }) {
   )
 }
 
-// ── Empty state when user has no click history ────────────────
-// Replaced by HeroSection (full variant) below
-
 // ── Error state ───────────────────────────────────────────────
 
 function ErrorState({ onRetry }: { onRetry: () => void }) {
@@ -179,73 +173,33 @@ function ErrorState({ onRetry }: { onRetry: () => void }) {
   )
 }
 
-// ── Pagination ────────────────────────────────────────────────
+// ── Load More Indicator ───────────────────────────────────────
 
-interface PaginationProps {
-  currentPage: number
+function LoadMoreIndicator({
+  isLoading,
+  hasMore,
+  total,
+  count,
+}: {
+  isLoading: boolean
+  hasMore: boolean
   total: number
-  limit: number
-  onPageChange: (page: number) => void
-}
-
-function Pagination({ currentPage, total, limit, onPageChange }: PaginationProps) {
-  const totalPages = Math.ceil(total / limit)
-  if (totalPages <= 1) return null
-
-  const pages: (number | string)[] = []
-  if (totalPages <= 7) {
-    for (let i = 1; i <= totalPages; i++) pages.push(i)
-  } else {
-    pages.push(1)
-    if (currentPage > 3) pages.push('...')
-    const start = Math.max(2, currentPage - 1)
-    const end = Math.min(totalPages - 1, currentPage + 1)
-    for (let i = start; i <= end; i++) pages.push(i)
-    if (currentPage < totalPages - 2) pages.push('...')
-    pages.push(totalPages)
+  count: number
+}) {
+  if (isLoading) {
+    return <SkeletonGrid count={8} className="mt-3" />
   }
-
-  return (
-    <div className="mt-10 mb-6 flex justify-center items-center gap-2">
-      <button
-        type="button"
-        disabled={currentPage <= 1}
-        onClick={() => onPageChange(currentPage - 1)}
-        className="p-2 border border-border/60 bg-background rounded-xl disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted transition-colors"
-        title="Trang trước"
-      >
-        <ChevronLeft className="size-4" />
-      </button>
-
-      {pages.map((p, i) => (
-        <button
-          key={`${p}-${i}`}
-          disabled={p === '...'}
-          onClick={() => { if (p !== '...') onPageChange(p as number) }}
-          className={cn(
-            'w-9 h-9 flex items-center justify-center rounded-xl border text-sm font-medium transition-colors',
-            p === '...'
-              ? 'border-transparent bg-transparent cursor-default'
-              : currentPage === p
-                ? 'bg-primary text-primary-foreground border-primary'
-                : 'border-border/60 bg-background hover:bg-muted cursor-pointer',
-          )}
-        >
-          {p}
-        </button>
-      ))}
-
-      <button
-        type="button"
-        disabled={currentPage >= totalPages}
-        onClick={() => onPageChange(currentPage + 1)}
-        className="p-2 border border-border/60 bg-background rounded-xl disabled:opacity-40 disabled:cursor-not-allowed hover:bg-muted transition-colors"
-        title="Trang sau"
-      >
-        <ChevronRight className="size-4" />
-      </button>
-    </div>
-  )
+  if (!hasMore && count > 0) {
+    return (
+      <div className="flex justify-center items-center gap-2 py-8 animate-fade-in">
+        <CheckCircle2 className="size-4 text-muted-foreground/50" />
+        <span className="text-sm text-muted-foreground/70">
+          Đã hiển thị tất cả {total} ảnh
+        </span>
+      </div>
+    )
+  }
+  return null
 }
 
 // ── Main component ────────────────────────────────────────────
@@ -255,34 +209,52 @@ export function HomePage() {
   const navigate = useNavigate()
   const { error: toastError } = useToast()
 
-  const currentPage = search.page ?? 1
   const activeImageId = search.imageId
 
+  // ── Accumulated results (append-only while scrolling)
   const [results, setResults] = React.useState<SearchResult[]>([])
   const [total, setTotal] = React.useState<number>(0)
-  const [limit, setLimit] = React.useState<number>(20)
   const [status, setStatus] = React.useState<'loading' | 'success' | 'insufficient' | 'error'>('loading')
   const [selectedResult, setSelectedResult] = React.useState<SearchResult | null>(null)
 
+  // ── Infinite scroll state
+  const [currentPage, setCurrentPage] = React.useState<number>(1)
+  const [hasMore, setHasMore] = React.useState<boolean>(false)
+  const [isLoadingMore, setIsLoadingMore] = React.useState<boolean>(false)
+
+  // Refs
   const savedScrollY = React.useRef<number>(0)
   const abortRef = React.useRef<AbortController | null>(null)
+  const loadMoreAbortRef = React.useRef<AbortController | null>(null)
+  const sentinelRef = React.useRef<HTMLDivElement>(null)
+  // Limit is always 20 for recommendations, store as ref to avoid stale closure
+  const limitRef = React.useRef<number>(20)
 
-  const fetchRecommendations = React.useCallback(async (page: number) => {
+  // ── fetchInitial: load page 1 ─────────────────────────────────
+  const fetchInitial = React.useCallback(async () => {
     abortRef.current?.abort()
+    loadMoreAbortRef.current?.abort()
     const controller = new AbortController()
     abortRef.current = controller
 
     setStatus('loading')
+    setResults([])
+    setCurrentPage(1)
+    setHasMore(false)
+    setIsLoadingMore(false)
+
     try {
-      const res = await getRecommendations(page, 20, controller.signal)
+      const res = await getRecommendations(1, 20, controller.signal)
       if (res.insufficientHistory) {
         setStatus('insufficient')
-        setResults([])
         setTotal(0)
+        setHasMore(false)
       } else {
         setResults(res.results)
         setTotal(res.total)
-        setLimit(res.limit)
+        limitRef.current = res.limit
+        setCurrentPage(1)
+        setHasMore(res.results.length < res.total)
         setStatus('success')
       }
     } catch (err: unknown) {
@@ -293,12 +265,64 @@ export function HomePage() {
     }
   }, [toastError])
 
-  React.useEffect(() => {
-    fetchRecommendations(currentPage)
-    return () => abortRef.current?.abort()
-  }, [currentPage, fetchRecommendations])
+  // ── fetchMore: append next page ───────────────────────────────
+  const fetchMore = React.useCallback(async () => {
+    if (isLoadingMore || !hasMore) return
 
-  // Sync modal with URL param
+    loadMoreAbortRef.current?.abort()
+    const controller = new AbortController()
+    loadMoreAbortRef.current = controller
+
+    const nextPage = currentPage + 1
+    setIsLoadingMore(true)
+
+    try {
+      const res = await getRecommendations(nextPage, limitRef.current, controller.signal)
+      if (res.insufficientHistory || res.results.length === 0) {
+        setHasMore(false)
+        return
+      }
+      setResults((prev) => [...prev, ...res.results])
+      setTotal(res.total)
+      setCurrentPage(nextPage)
+      setHasMore(res.page < res.totalPages)
+    } catch (err: unknown) {
+      if ((err as { name?: string }).name === 'CanceledError' || (err as { name?: string }).name === 'AbortError') return
+      console.error('Error loading more recommendations:', err)
+      toastError('Không thể tải thêm nội dung')
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [isLoadingMore, hasMore, currentPage, toastError])
+
+  // ── Effect: initial load on mount ────────────────────────────
+  React.useEffect(() => {
+    fetchInitial()
+    return () => {
+      abortRef.current?.abort()
+      loadMoreAbortRef.current?.abort()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // run once on mount
+
+  // ── Effect: IntersectionObserver for infinite scroll ──────────
+  React.useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasMore && !isLoadingMore) {
+          fetchMore()
+        }
+      },
+      { threshold: 0.1, rootMargin: '300px 0px' },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, isLoadingMore, fetchMore])
+
+  // ── Effect: Sync modal with URL param ─────────────────────────
   React.useEffect(() => {
     if (activeImageId) {
       const found = results.find((r) => r.id === activeImageId)
@@ -308,12 +332,14 @@ export function HomePage() {
     }
   }, [activeImageId, results])
 
+  // ── Handlers ─────────────────────────────────────────────────
+
   const handleCardClick = (result: SearchResult) => {
     savedScrollY.current = window.scrollY
     setSelectedResult(result)
     navigate({
       to: '.',
-      search: { page: currentPage, imageId: result.id },
+      search: { imageId: result.id },
       replace: true,
       resetScroll: false,
     } as any)
@@ -324,7 +350,7 @@ export function HomePage() {
     setSelectedResult(null)
     navigate({
       to: '.',
-      search: { page: currentPage },
+      search: {},
       replace: true,
       resetScroll: false,
     } as any)
@@ -341,7 +367,7 @@ export function HomePage() {
       setPendingImageFile(file)
       navigate({
         to: '/results',
-        search: { mode: 'image', q: '', query_id: newQueryId, page: 1 },
+        search: { mode: 'image', q: '', query_id: newQueryId },
       })
     } catch (err) {
       console.error(err)
@@ -349,11 +375,7 @@ export function HomePage() {
     }
   }
 
-  const handlePageChange = (page: number) => {
-    navigate({ to: '.', search: { page } } as any)
-    window.scrollTo({ top: 0, behavior: 'smooth' })
-  }
-
+  // ── Render ────────────────────────────────────────────────────
   return (
     <div className="px-4 sm:px-6 lg:px-8 py-6 max-w-[1800px] mx-auto min-h-[calc(100vh-4rem)]">
       {status === 'loading' && <SkeletonGrid count={20} />}
@@ -361,7 +383,7 @@ export function HomePage() {
       {/* Full hero replaces the old DiscoverState */}
       {status === 'insufficient' && <HeroSection compact={false} />}
 
-      {status === 'error' && <ErrorState onRetry={() => fetchRecommendations(currentPage)} />}
+      {status === 'error' && <ErrorState onRetry={fetchInitial} />}
 
       {status === 'success' && results.length > 0 && (
         <>
@@ -384,12 +406,18 @@ export function HomePage() {
             results={results}
             onCardClick={handleCardClick}
             onSearchSimilar={handleSearchSimilar}
+            isLoadingMore={isLoadingMore}
           />
-          <Pagination
-            currentPage={currentPage}
+
+          {/* ── Infinite scroll sentinel ── */}
+          <div ref={sentinelRef} className="w-full h-4" aria-hidden="true" />
+
+          {/* Load more indicator / end of results */}
+          <LoadMoreIndicator
+            isLoading={isLoadingMore}
+            hasMore={hasMore}
             total={total}
-            limit={limit}
-            onPageChange={handlePageChange}
+            count={results.length}
           />
         </>
       )}

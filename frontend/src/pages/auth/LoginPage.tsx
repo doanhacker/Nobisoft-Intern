@@ -12,27 +12,43 @@ import { cn } from '@/lib/utils'
 // ============================================================
 
 export function LoginPage() {
-  const { login, isLoading } = useAuth()
+  const { login } = useAuth()
   const navigate = useNavigate()
 
   const [email, setEmail] = React.useState('')
   const [password, setPassword] = React.useState('')
   const [showPassword, setShowPassword] = React.useState(false)
   const [error, setError] = React.useState<string | null>(null)
+  const [isSubmitting, setIsSubmitting] = React.useState(false)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (isSubmitting) return
     setError(null)
+    setIsSubmitting(true)
     try {
       await login({ email, password })
       navigate({ to: '/search' })
     } catch (err: unknown) {
+      const axiosErr = err as {
+        response?: {
+          data?: {
+            detail?: string
+            message?: string
+            error?: string
+          }
+        }
+        message?: string
+      }
       const msg =
-        (err as { response?: { data?: { detail?: string; message?: string } } })?.response?.data
-          ?.detail ??
-        (err as { response?: { data?: { message?: string } } })?.response?.data?.message ??
+        axiosErr?.response?.data?.detail ??
+        axiosErr?.response?.data?.message ??
+        axiosErr?.response?.data?.error ??
+        axiosErr?.message ??
         'Email hoặc mật khẩu không đúng. Vui lòng thử lại.'
       setError(msg)
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -125,7 +141,7 @@ export function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                disabled={isLoading}
+                disabled={isSubmitting}
                 className="h-10"
               />
             </div>
@@ -151,7 +167,7 @@ export function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  disabled={isLoading}
+                  disabled={isSubmitting}
                   className="h-10 pr-10"
                 />
                 <button
@@ -173,9 +189,9 @@ export function LoginPage() {
               variant="glow"
               size="lg"
               className="w-full"
-              disabled={isLoading || !email || !password}
+              disabled={isSubmitting || !email || !password}
             >
-              {isLoading ? (
+              {isSubmitting ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
                   Đang đăng nhập...
