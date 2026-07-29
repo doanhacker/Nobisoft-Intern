@@ -64,6 +64,7 @@ export async function upsertImageVector(
 export async function deleteImageVector(imageId: string): Promise<void> {
   await qdrantClient.delete(QDRANT_COLLECTION_NAME, {
     points: [imageId],
+    wait: true,
   });
 }
 
