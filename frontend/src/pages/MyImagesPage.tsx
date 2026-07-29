@@ -14,6 +14,7 @@ import {
   Info,
   AlertTriangle,
   Search,
+  CheckCircle2,
 } from 'lucide-react'
 import {
   getMyImages,
@@ -194,9 +195,6 @@ function DayGroup({ group, onImageClick, onSearchSimilar, onDelete }: DayGroupPr
           <CalendarDays className="size-3.5 text-primary" />
         </div>
         <span className="font-bold text-sm text-foreground">{group.label}</span>
-        <span className="text-xs text-muted-foreground font-medium">
-          {group.images.length} ảnh
-        </span>
         <div className="flex-1 h-px bg-border/50 ml-1" />
       </div>
 
@@ -468,8 +466,11 @@ export function MyImagesPage() {
     }
   }, [])
 
+  // Refs
+  const sentinelRef = React.useRef<HTMLDivElement>(null)
+
   // ── Load more ──────────────────────────────────────────────
-  const handleLoadMore = async () => {
+  const handleLoadMore = React.useCallback(async () => {
     if (isLoadingMore || !hasMore) return
     setIsLoadingMore(true)
     try {
@@ -485,7 +486,23 @@ export function MyImagesPage() {
     } finally {
       setIsLoadingMore(false)
     }
-  }
+  }, [isLoadingMore, hasMore, page, toast])
+
+  // ── Effect: IntersectionObserver ──────────────────────────────
+  React.useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasMore && !isLoadingMore) {
+          handleLoadMore()
+        }
+      },
+      { threshold: 0.1, rootMargin: '300px 0px' },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, isLoadingMore, handleLoadMore])
 
   // ── Delete ────────────────────────────────────────────────
   const handleDelete = async (id: string) => {
@@ -514,7 +531,7 @@ export function MyImagesPage() {
       setPendingImageFile(file)
       navigate({
         to: '/results',
-        search: { mode: 'image', q: '', query_id: newQueryId, page: 1 },
+        search: { mode: 'image', q: '', query_id: newQueryId },
       })
     } catch (err) {
       console.error(err)
@@ -608,35 +625,25 @@ export function MyImagesPage() {
             </div>
           )}
 
-          {/* ── Load more ── */}
+          {/* Infinite scroll sentinel */}
+          <div ref={sentinelRef} className="w-full h-4" aria-hidden="true" />
+
+          {/* ── Load more indicator / end of results ── */}
           {!isInitialLoading && images.length > 0 && (
             <div className="flex flex-col items-center gap-3 pt-4 pb-8">
-              {hasMore ? (
-                <Button
-                  id="my-images-load-more"
-                  variant="outline"
-                  size="lg"
-                  onClick={handleLoadMore}
-                  disabled={isLoadingMore}
-                  className="min-w-[200px]"
-                >
-                  {isLoadingMore ? (
-                    <>
-                      <Loader2 className="size-4 animate-spin" />
-                      Đang tải thêm...
-                    </>
-                  ) : (
-                    <>
-                      <Images className="size-4" />
-                      Tải thêm ảnh
-                    </>
-                  )}
-                </Button>
-              ) : (
-                <p className="text-xs text-muted-foreground font-medium py-2">
-                  ✓ Đã hiển thị tất cả {totalDocs.toLocaleString()} ảnh
-                </p>
-              )}
+              {isLoadingMore ? (
+                <div className="flex justify-center items-center gap-2 py-4 animate-fade-in">
+                  <Loader2 className="size-4 animate-spin text-primary" />
+                  <span className="text-sm text-muted-foreground">Đang tải thêm ảnh...</span>
+                </div>
+              ) : !hasMore ? (
+                <div className="flex justify-center items-center gap-2 py-8 animate-fade-in">
+                  <CheckCircle2 className="size-4 text-muted-foreground/50" />
+                  <span className="text-sm text-muted-foreground/70">
+                    Đã hiển thị tất cả {totalDocs.toLocaleString('vi-VN')} ảnh
+                  </span>
+                </div>
+              ) : null}
             </div>
           )}
         </div>

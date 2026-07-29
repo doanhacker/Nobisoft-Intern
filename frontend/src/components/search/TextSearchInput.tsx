@@ -114,7 +114,6 @@ export function TextSearchInput({
           onChange={(e) => onChange(e.target.value)}
           onFocus={() => setIsFocused(true)}
           onBlur={() => setIsFocused(false)}
-          onKeyDown={(e) => e.key === 'Enter' && value.trim() && onSearch()}
           placeholder={placeholders[placeholderIdx]}
           aria-label={config.label}
           className={cn(
