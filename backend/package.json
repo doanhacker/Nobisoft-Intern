@@ -24,7 +24,8 @@
     "init:qdrant": "tsx src/scripts/init-qdrant.ts",
     "init:db-extensions": "tsx src/scripts/init-db-extensions.ts",
     "import:unsplash": "tsx src/scripts/import-unsplash.ts",
-    "import:data": "tsx src/scripts/import-data.ts"
+    "import:data": "tsx src/scripts/import-data.ts",
+    "push:rabbitmq": "tsx src/scripts/push-to-rabbitmq.ts"
   },
   "dependencies": {
     "@prisma/adapter-pg": "^7.8.0",
