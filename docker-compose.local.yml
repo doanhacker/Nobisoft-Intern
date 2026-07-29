@@ -1,0 +1,139 @@
+services:
+  backend:
+    build: ./backend
+    container_name: backend
+    ports:
+      - "${BACKEND_PORT}:8000"
+    environment:
+      - PORT=8000
+      - NODE_ENV=production
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-VisualSearchEngine}?schema=public
+      - AI_SERVICE_URL=http://ai:9000
+      - QDRANT_URL=http://qdrant:6333
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+      - SEARCH_MIN_SCORE_IMAGE=${SEARCH_MIN_SCORE_IMAGE}
+      - SEARCH_MIN_SCORE_SEMANTIC=${SEARCH_MIN_SCORE_SEMANTIC}
+      - SEARCH_MAX_RESULTS=${SEARCH_MAX_RESULTS}
+      - RECOMMENDATION_CLICK_LIMIT=${RECOMMENDATION_CLICK_LIMIT:-30}
+      - STORAGE_DIR=${STORAGE_DIR}
+      - JWT_ACCESS_SECRET=${JWT_ACCESS_SECRET}
+      - JWT_ACCESS_EXPIRES_IN=${JWT_ACCESS_EXPIRES_IN}
+      - BACKEND_URL=${BACKEND_URL}
+      - ALLOWED_ORIGINS=${FRONTEND_URL},${BACKEND_URL}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - ADMIN_NAME=${ADMIN_NAME}
+      - ADMIN_PASSWORD=${ADMIN_PASSWORD}
+    command: sh -c "npx prisma db push && npm run init:db-extensions && npm run seed:admin && npm start"
+    depends_on:
+      database:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      ai-service:
+        condition: service_started
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./storage:/app/storage
+      - ./datasets:/app/datasets
+
+  indexing-worker:
+    build: ./indexing-worker
+    container_name: indexing-worker
+    environment:
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER:-guest}:${RABBITMQ_PASSWORD:-guest}@rabbitmq:5672
+      - AI_SERVICE_URL=http://ai:9000
+      - QDRANT_URL=http://qdrant:6333
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@database:5432/${POSTGRES_DB:-VisualSearchEngine}?schema=public
+      - STORAGE_DIR=./storage
+    depends_on:
+      database:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      ai-service:
+        condition: service_started
+      qdrant:
+        condition: service_healthy
+    restart: unless-stopped
+    volumes:
+      - ./storage:/app/storage
+      - ./datasets:/app/datasets
+
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    environment:
+      - VITE_API_URL=${VITE_API_URL}
+    ports:
+      - "80:5173"
+    depends_on:
+      - backend
+
+  ai-service:
+    build: ./ai-service
+    container_name: ai
+    env_file:
+      - .env
+    ports:
+      - "9000:9000"
+    volumes:
+      - ./ai-service/app:/app/app
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    container_name: rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  database:
+    image: pgvector/pgvector:pg16
+    container_name: database
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-VisualSearchEngine}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-VisualSearchEngine}" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    healthcheck:
+      test: [ "CMD-SHELL", "bash -c ':> /dev/tcp/localhost/6333'" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  qdrant_data:
+  rabbitmq_data:
+  storage:
