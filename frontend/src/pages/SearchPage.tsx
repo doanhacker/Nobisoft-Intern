@@ -76,7 +76,6 @@ export function SearchPage() {
         mode: state.mode,
         q: state.textQuery || '',
         ...(state.mode === 'image' ? { query_id: `upload-${Date.now()}` } : {}),
-        page: 1,
       },
     })
   }

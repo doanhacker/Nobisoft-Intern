@@ -34,11 +34,18 @@ axiosClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Clear stale credentials and redirect to login
+      // Clear stale credentials
       removeToken()
       removeUser()
-      // Use location.replace so we don't pollute history
-      window.location.replace('/login')
+
+      // Do NOT redirect/reload if request is from auth endpoints or already on /login page
+      const requestUrl = error.config?.url ?? ''
+      const isAuthEndpoint = requestUrl.includes('/auth/login') || requestUrl.includes('/auth/register')
+      const isAlreadyOnLoginPage = window.location.pathname === '/login'
+
+      if (!isAuthEndpoint && !isAlreadyOnLoginPage) {
+        window.location.replace('/login')
+      }
     }
     return Promise.reject(error)
   },

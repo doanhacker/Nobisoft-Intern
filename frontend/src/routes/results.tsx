@@ -8,7 +8,7 @@ const resultsSearchSchema = z.object({
   mode: z.enum(['image', 'semantic', 'ocr']).catch('semantic'),
   q: z.string().optional().default(''),
   query_id: z.string().optional(),
-  page: z.number().optional().default(1),
+  // `page` is removed — infinite scroll manages page internally in ResultsPage
   // Modal open state — imageId present = modal open
   imageId: z.string().optional(),
 })

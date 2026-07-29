@@ -62,8 +62,8 @@ export function SkeletonGrid({ count = 20, className, compact = false, breakpoin
         <div className={cn('w-full', className)}>
             <Masonry
                 breakpointCols={breakpointCols ?? defaultBreakpoints}
-                className="flex gap-4 w-full"
-                columnClassName="flex flex-col gap-4"
+                className="flex gap-3 w-full"
+                columnClassName="flex flex-col gap-3"
             >
                 {items.map((item, i) => (
                     <SkeletonCard key={i} height={item.height} delay={item.delay} />

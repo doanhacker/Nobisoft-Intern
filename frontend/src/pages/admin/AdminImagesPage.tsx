@@ -1,15 +1,14 @@
 import * as React from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import {
   Images,
   Trash2,
-  ChevronLeft,
-  ChevronRight,
   AlertCircle,
   Filter,
   X,
   Loader2,
+  CheckCircle2,
 } from 'lucide-react'
 import { getImages, getImageDetail, deleteImage } from '@/services/adminImageService'
 import { fetchImageAsFile, setPendingImageFile } from '@/services/searchService'
@@ -22,7 +21,8 @@ import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
 
 // ============================================================
-// AdminImagesPage
+// AdminImagesPage — Kho ảnh với infinite scroll
+// Lag fix: bỏ useQuery cho list, dùng plain fetch + IntersectionObserver
 // ============================================================
 
 const PAGE_SIZE = 20
@@ -64,6 +64,7 @@ interface FilterBarProps {
   onFromDateChange: (v: string) => void
   onToDateChange: (v: string) => void
   onClear: () => void
+  disabled?: boolean
 }
 
 function FilterBar({
@@ -74,6 +75,7 @@ function FilterBar({
   onFromDateChange,
   onToDateChange,
   onClear,
+  disabled,
 }: FilterBarProps) {
   const hasFilter = fileFormat || fromDate || toDate
   return (
@@ -84,8 +86,9 @@ function FilterBar({
       <select
         id="img-format-filter"
         value={fileFormat}
+        disabled={disabled}
         onChange={(e) => onFileFormatChange(e.target.value)}
-        className="h-8 rounded-lg border border-border/60 bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        className="h-8 rounded-lg border border-border/60 bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
       >
         <option value="">Tất cả định dạng</option>
         <option value="jpg">JPG</option>
@@ -98,8 +101,9 @@ function FilterBar({
         id="img-from-date"
         type="date"
         value={fromDate}
+        disabled={disabled}
         onChange={(e) => onFromDateChange(e.target.value)}
-        className="h-8 rounded-lg border border-border/60 bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        className="h-8 rounded-lg border border-border/60 bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
         placeholder="Từ ngày"
       />
 
@@ -108,20 +112,50 @@ function FilterBar({
         id="img-to-date"
         type="date"
         value={toDate}
+        disabled={disabled}
         onChange={(e) => onToDateChange(e.target.value)}
-        className="h-8 rounded-lg border border-border/60 bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        className="h-8 rounded-lg border border-border/60 bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
         placeholder="Đến ngày"
       />
 
       {/* Clear */}
       {hasFilter && (
-        <Button variant="ghost" size="sm" onClick={onClear} className="gap-1 text-muted-foreground">
+        <Button variant="ghost" size="sm" onClick={onClear} className="gap-1 text-muted-foreground" disabled={disabled}>
           <X className="size-3.5" />
           Xoá lọc
         </Button>
       )}
     </div>
   )
+}
+
+// ── Load More Indicator ───────────────────────────────────────
+
+function LoadMoreIndicator({
+  isLoading,
+  hasMore,
+  total,
+  count,
+}: {
+  isLoading: boolean
+  hasMore: boolean
+  total: number
+  count: number
+}) {
+  if (isLoading) {
+    return <SkeletonGrid count={8} className="mt-3" />
+  }
+  if (!hasMore && count > 0) {
+    return (
+      <div className="flex justify-center items-center gap-2 py-8 animate-fade-in">
+        <CheckCircle2 className="size-4 text-muted-foreground/50" />
+        <span className="text-sm text-muted-foreground/70">
+          Đã hiển thị tất cả {total.toLocaleString('vi-VN')} ảnh
+        </span>
+      </div>
+    )
+  }
+  return null
 }
 
 // ── Image detail modal ─────────────────────────────────────────
@@ -311,31 +345,145 @@ function DeleteConfirmDialog({ image, onConfirm, onCancel, isDeleting }: DeleteC
 
 export function AdminImagesPage() {
   const navigate = useNavigate()
-  const { page, fileFormat, fromDate, toDate } = useSearch({ from: '/admin/images' })
+  const { fileFormat, fromDate, toDate } = useSearch({ from: '/admin/images' })
   const toast = useToast()
   const queryClient = useQueryClient()
 
+  // ── UI state
   const [viewingImageId, setViewingImageId] = React.useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = React.useState<AdminImageItem | null>(null)
 
-  const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin', 'images', { page, fileFormat, fromDate, toDate }],
-    queryFn: () =>
-      getImages({
-        page,
+  // ── Infinite scroll state
+  const [images, setImages] = React.useState<AdminImageItem[]>([])
+  const [total, setTotal] = React.useState<number>(0)
+  const [currentPage, setCurrentPage] = React.useState<number>(1)
+  const [hasMore, setHasMore] = React.useState<boolean>(false)
+  const [status, setStatus] = React.useState<'loading' | 'success' | 'empty' | 'error'>('loading')
+  const [isLoadingMore, setIsLoadingMore] = React.useState<boolean>(false)
+
+  // Refs
+  const abortRef = React.useRef<AbortController | null>(null)
+  const loadMoreAbortRef = React.useRef<AbortController | null>(null)
+  const sentinelRef = React.useRef<HTMLDivElement>(null)
+
+  // Derive current filter params — stable object for effect deps
+  const filterKey = `${fileFormat ?? ''}|${fromDate ?? ''}|${toDate ?? ''}`
+
+  // ── fetchInitial: reset and load page 1 ───────────────────────
+  const fetchInitial = React.useCallback(async (
+    fmt?: string,
+    from?: string,
+    to?: string,
+  ) => {
+    abortRef.current?.abort()
+    loadMoreAbortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    setStatus('loading')
+    setImages([])
+    setCurrentPage(1)
+    setHasMore(false)
+    setIsLoadingMore(false)
+
+    try {
+      const res = await getImages({
+        page: 1,
+        limit: PAGE_SIZE,
+        fileFormat: (fmt as 'jpg' | 'png' | 'webp') || undefined,
+        fromDate: from || undefined,
+        toDate: to || undefined,
+      })
+
+      const items = res.data ?? []
+      setImages(items)
+      setTotal(res.meta.totalDocs)
+      setCurrentPage(1)
+      setHasMore(items.length < res.meta.totalDocs)
+      setStatus(items.length === 0 ? 'empty' : 'success')
+    } catch (err: unknown) {
+      if ((err as { name?: string }).name === 'CanceledError' || (err as { name?: string }).name === 'AbortError') return
+      console.error(err)
+      setStatus('error')
+      toast.error('Không thể tải danh sách ảnh')
+    }
+  }, [toast])
+
+  // ── fetchMore: append next page ───────────────────────────────
+  const fetchMore = React.useCallback(async () => {
+    if (isLoadingMore || !hasMore) return
+
+    loadMoreAbortRef.current?.abort()
+    const controller = new AbortController()
+    loadMoreAbortRef.current = controller
+
+    const nextPage = currentPage + 1
+    setIsLoadingMore(true)
+
+    try {
+      const res = await getImages({
+        page: nextPage,
         limit: PAGE_SIZE,
         fileFormat: (fileFormat as 'jpg' | 'png' | 'webp') || undefined,
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
-      }),
-    staleTime: 30_000,
-    placeholderData: (prev) => prev,
-  })
+      })
 
+      const items = res.data ?? []
+      setImages((prev) => [...prev, ...items])
+      setTotal(res.meta.totalDocs)
+      setCurrentPage(nextPage)
+      setHasMore(nextPage < res.meta.totalPages)
+    } catch (err: unknown) {
+      if ((err as { name?: string }).name === 'CanceledError' || (err as { name?: string }).name === 'AbortError') return
+      console.error(err)
+      toast.error('Không thể tải thêm ảnh')
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [isLoadingMore, hasMore, currentPage, fileFormat, fromDate, toDate, toast])
+
+  // ── Effect: reload when filters change ───────────────────────
+  React.useEffect(() => {
+    fetchInitial(fileFormat ?? '', fromDate ?? '', toDate ?? '')
+    return () => {
+      abortRef.current?.abort()
+      loadMoreAbortRef.current?.abort()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey]) // filterKey is stable and avoids fetchInitial reference churn
+
+  // ── Effect: IntersectionObserver ──────────────────────────────
+  React.useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasMore && !isLoadingMore) {
+          fetchMore()
+        }
+      },
+      { threshold: 0.1, rootMargin: '300px 0px' },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, isLoadingMore, fetchMore])
+
+  // ── Memoised grid results (stable reference while images don't change)
+  const searchResults = React.useMemo(
+    () => images.map(mapAdminImageToSearchResult),
+    [images],
+  )
+
+  // ── Delete mutation ───────────────────────────────────────────
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteImage(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'images'] })
+    onSuccess: (_, deletedId) => {
+      // Optimistically remove the deleted image from list — no full refetch needed
+      setImages((prev) => prev.filter((img) => img.id !== deletedId))
+      setTotal((prev) => Math.max(0, prev - 1))
+      // Invalidate detail query cache
+      queryClient.invalidateQueries({ queryKey: ['admin', 'images', deletedId] })
       toast.success('Đã xoá ảnh thành công')
       setPendingDelete(null)
       setViewingImageId(null)
@@ -345,28 +493,30 @@ export function AdminImagesPage() {
     },
   })
 
-  const images = data?.data ?? []
-  const totalPages = data?.meta?.totalPages ?? 1
-  const totalDocs = data?.meta?.totalDocs ?? 0
+  // ── Filter handlers ───────────────────────────────────────────
   const hasFilter = fileFormat || fromDate || toDate
+  const isFilterDisabled = status === 'loading' || isLoadingMore
 
-  const searchResults = React.useMemo(
-    () => images.map(mapAdminImageToSearchResult),
-    [images],
-  )
-
-  const clearFilter = () =>
-    navigate({ to: '/admin/images', search: { page: 1, fileFormat: '', fromDate: '', toDate: '' } })
-
-  const handleCardClick = (result: SearchResult) => {
-    setViewingImageId(result.id)
+  const handleFilterChange = (patch: { fileFormat?: string; fromDate?: string; toDate?: string }) => {
+    navigate({
+      to: '/admin/images',
+      search: {
+        fileFormat: patch.fileFormat ?? fileFormat ?? '',
+        fromDate: patch.fromDate ?? fromDate ?? '',
+        toDate: patch.toDate ?? toDate ?? '',
+      },
+    })
   }
 
-  const handleDeleteCard = async (result: SearchResult) => {
+  const clearFilter = () =>
+    navigate({ to: '/admin/images', search: { fileFormat: '', fromDate: '', toDate: '' } })
+
+  // ── Card handlers ─────────────────────────────────────────────
+  const handleCardClick = (result: SearchResult) => setViewingImageId(result.id)
+
+  const handleDeleteCard = (result: SearchResult) => {
     const found = images.find((i) => i.id === result.id)
-    if (found) {
-      setPendingDelete(found)
-    }
+    if (found) setPendingDelete(found)
   }
 
   const handleSearchSimilar = async (result: SearchResult) => {
@@ -375,16 +525,14 @@ export function AdminImagesPage() {
       const file = await fetchImageAsFile(urlToFetch)
       const newQueryId = `upload-${Date.now()}`
       setPendingImageFile(file)
-      navigate({
-        to: '/results',
-        search: { mode: 'image', q: '', query_id: newQueryId, page: 1 },
-      })
+      navigate({ to: '/results', search: { mode: 'image', q: '', query_id: newQueryId } })
     } catch (err) {
       console.error(err)
       toast.error('Không thể tải ảnh để tìm kiếm')
     }
   }
 
+  // ── Render ────────────────────────────────────────────────────
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}
@@ -395,7 +543,9 @@ export function AdminImagesPage() {
             Kho ảnh hệ thống
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {isLoading ? 'Đang tải...' : `${totalDocs.toLocaleString('vi-VN')} ảnh đã index trong hệ thống`}
+            {status === 'loading'
+              ? 'Đang tải...'
+              : `${total.toLocaleString('vi-VN')} ảnh đã index trong hệ thống`}
           </p>
         </div>
       </div>
@@ -405,30 +555,25 @@ export function AdminImagesPage() {
         fileFormat={fileFormat ?? ''}
         fromDate={fromDate ?? ''}
         toDate={toDate ?? ''}
-        onFileFormatChange={(v) =>
-          navigate({ to: '/admin/images', search: { page: 1, fileFormat: v, fromDate: fromDate ?? '', toDate: toDate ?? '' } })
-        }
-        onFromDateChange={(v) =>
-          navigate({ to: '/admin/images', search: { page: 1, fileFormat: fileFormat ?? '', fromDate: v, toDate: toDate ?? '' } })
-        }
-        onToDateChange={(v) =>
-          navigate({ to: '/admin/images', search: { page: 1, fileFormat: fileFormat ?? '', fromDate: fromDate ?? '', toDate: v } })
-        }
+        onFileFormatChange={(v) => handleFilterChange({ fileFormat: v })}
+        onFromDateChange={(v) => handleFilterChange({ fromDate: v })}
+        onToDateChange={(v) => handleFilterChange({ toDate: v })}
         onClear={clearFilter}
+        disabled={isFilterDisabled}
       />
 
       {/* Grid */}
-      {isLoading ? (
+      {status === 'loading' ? (
         <SkeletonGrid count={20} />
-      ) : isError ? (
+      ) : status === 'error' ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
           <AlertCircle className="size-10 text-destructive" />
           <p className="font-semibold">Không thể tải danh sách ảnh</p>
-          <Button variant="outline" onClick={() => refetch()}>
+          <Button variant="outline" onClick={() => fetchInitial(fileFormat ?? '', fromDate ?? '', toDate ?? '')}>
             Thử lại
           </Button>
         </div>
-      ) : images.length === 0 ? (
+      ) : status === 'empty' ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
           <div className="flex items-center justify-center size-16 rounded-2xl bg-muted/50">
             <Images className="size-8 text-muted-foreground" />
@@ -448,52 +593,29 @@ export function AdminImagesPage() {
           )}
         </div>
       ) : (
-        <MasonryGrid
-          results={searchResults}
-          onCardClick={handleCardClick}
-          onSearchSimilar={handleSearchSimilar}
-          onDelete={handleDeleteCard}
-        />
+        <>
+          <MasonryGrid
+            results={searchResults}
+            onCardClick={handleCardClick}
+            onSearchSimilar={handleSearchSimilar}
+            onDelete={handleDeleteCard}
+            isLoadingMore={isLoadingMore}
+          />
+
+          {/* Infinite scroll sentinel */}
+          <div ref={sentinelRef} className="w-full h-4" aria-hidden="true" />
+
+          {/* Load more indicator / end of results */}
+          <LoadMoreIndicator
+            isLoading={isLoadingMore}
+            hasMore={hasMore}
+            total={total}
+            count={images.length}
+          />
+        </>
       )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between pt-4">
-          <p className="text-sm text-muted-foreground font-medium">
-            Trang {page} / {totalPages}
-          </p>
-          <div className="flex gap-1.5">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={(page ?? 1) <= 1}
-              onClick={() =>
-                navigate({
-                  to: '/admin/images',
-                  search: { page: (page ?? 1) - 1, fileFormat: fileFormat ?? '', fromDate: fromDate ?? '', toDate: toDate ?? '' },
-                })
-              }
-            >
-              <ChevronLeft className="size-3.5" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={(page ?? 1) >= totalPages}
-              onClick={() =>
-                navigate({
-                  to: '/admin/images',
-                  search: { page: (page ?? 1) + 1, fileFormat: fileFormat ?? '', fromDate: fromDate ?? '', toDate: toDate ?? '' },
-                })
-              }
-            >
-              <ChevronRight className="size-3.5" />
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Detail Modal */}
+      {/* Detail Modal — uses useQuery (cached, lightweight) */}
       <ImageDetailModal
         imageId={viewingImageId}
         onClose={() => setViewingImageId(null)}

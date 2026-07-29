@@ -7,8 +7,7 @@ import {
   RefreshCw,
   FileText,
   Eye,
-  ChevronLeft,
-  ChevronRight,
+  CheckCircle2,
 } from 'lucide-react'
 import { MasonryGrid, type SearchResult } from '@/components/results/MasonryGrid'
 import { SkeletonGrid } from '@/components/results/SkeletonGrid'
@@ -22,18 +21,18 @@ import { cn } from '@/lib/utils'
 import { AuthContext } from '@/context/AuthContext'
 
 // ============================================================
-// ResultsPage — Pinterest-style layout
+// ResultsPage — Pinterest-style layout with Infinite Scroll
 // - Vertical sidebar left (68px)
 // - Sticky search bar at top
 // - Split view for image mode (query image left, results right)
 // - Full width for text modes (semantic/ocr)
+// - Infinite scroll: IntersectionObserver on sentinel div
 // ============================================================
 
 interface ResultsSearch {
   mode: SearchMode
   q: string
   query_id?: string
-  page: number
   imageId?: string
 }
 
@@ -104,12 +103,14 @@ function ResultsInfoBar({
   query,
   queryId,
   count,
+  total,
   isLoading,
 }: {
   mode: SearchMode
   query: string
   queryId?: string
   count: number
+  total: number
   isLoading: boolean
 }) {
   const ModeIcon = MODE_LABELS[mode].icon
@@ -129,12 +130,44 @@ function ResultsInfoBar({
           )}
           {queryId && !query && <>Kết quả tìm ảnh tương tự</>}
           {!isLoading && count > 0 && (
-            <span className="text-muted-foreground/70"> — {count} ảnh</span>
+            <span className="text-muted-foreground/70">
+              {' '}— {count}{total > count ? `/${total}` : ''} ảnh
+            </span>
           )}
         </p>
       )}
     </div>
   )
+}
+
+// ── Load More Indicator ──────────────────────────────────────
+function LoadMoreIndicator({
+  isLoading,
+  hasMore,
+  total,
+  count,
+  compact,
+}: {
+  isLoading: boolean
+  hasMore: boolean
+  total: number
+  count: number
+  compact?: boolean
+}) {
+  if (isLoading) {
+    return <SkeletonGrid count={8} compact={compact} className="mt-3" />
+  }
+  if (!hasMore && count > 0) {
+    return (
+      <div className="flex justify-center items-center gap-2 py-8 animate-fade-in">
+        <CheckCircle2 className="size-4 text-muted-foreground/50" />
+        <span className="text-sm text-muted-foreground/70">
+          Đã hiển thị tất cả {total} ảnh
+        </span>
+      </div>
+    )
+  }
+  return null
 }
 
 // ── Query Image Panel (split-view left panel) ─────────────────
@@ -188,24 +221,41 @@ export function ResultsPage() {
   const auth = React.useContext(AuthContext)
 
   // ── State ──
+
+  // Accumulated results (append-only while scrolling)
   const [results, setResults] = React.useState<SearchResult[]>([])
+  // Total result count returned by backend
   const [total, setTotal] = React.useState<number>(0)
-  const [limit, setLimit] = React.useState<number>(20)
+  // Initial load status
   const [status, setStatus] = React.useState<'idle' | 'loading' | 'success' | 'error' | 'empty'>('loading')
+  // Selected result for detail modal
   const [selectedResult, setSelectedResult] = React.useState<SearchResult | null>(null)
+
+  // ── Infinite scroll state ──
+  // Internal page counter (not in URL)
+  const [currentPage, setCurrentPage] = React.useState<number>(1)
+  // Are there more pages to load?
+  const [hasMore, setHasMore] = React.useState<boolean>(false)
+  // Is a "load more" request in-flight?
+  const [isLoadingMore, setIsLoadingMore] = React.useState<boolean>(false)
 
   // Image mode state — persisted across searches
   const [queryImageFile, setQueryImageFile] = React.useState<File | null>(null)
   const [queryImagePreviewUrl, setQueryImagePreviewUrl] = React.useState<string | null>(null)
   const [showImageModalFromPanel, setShowImageModalFromPanel] = React.useState(false)
 
-  // searchHistoryId returned by the backend on the first image search of a session.
-  // Passed to subsequent page-change calls so the backend does NOT create a duplicate history.
+  // searchHistoryId returned by the backend on the first search of a session.
+  // Passed to subsequent fetchMore calls so the backend does NOT create a duplicate history.
   const [searchHistoryId, setSearchHistoryId] = React.useState<string | null>(null)
 
+  // Sentinel div ref for IntersectionObserver
+  const sentinelRef = React.useRef<HTMLDivElement>(null)
+  const savedScrollY = React.useRef<number>(0)
+  const abortRef = React.useRef<AbortController | null>(null)
+  // Track the abort controller for load-more requests separately
+  const loadMoreAbortRef = React.useRef<AbortController | null>(null)
+
   // On mount: restore query image preview from sessionStorage when coming from /search page.
-  // The File object cannot be passed via URL, so SearchPage stores the blob URL in sessionStorage
-  // before navigating here. We read it once and clear it to avoid stale data.
   React.useEffect(() => {
     if (mode === 'image') {
       const pending = sessionStorage.getItem('pendingImagePreviewUrl')
@@ -217,17 +267,16 @@ export function ResultsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // intentionally run only on mount
 
-  const savedScrollY = React.useRef<number>(0)
-  const abortRef = React.useRef<AbortController | null>(null)
-
   const { mode, q, query_id, imageId } = search
   // Show similarity badge only to ADMIN users, and only for image/semantic modes (not OCR)
   const showSimilarityBadge = Boolean(auth?.isAdmin) && (mode === 'image' || mode === 'semantic')
 
-  // ── Fetch results ─────────────────────────────────────────
-  const fetchResults = React.useCallback(
-    async (fetchMode: SearchMode, fetchQuery: string, fetchPage: number, fetchQueryId?: string, overrideFile?: File | null) => {
+  // ── fetchInitial: page 1 — always a NEW search session ───────
+  // Called when mode/query changes. Resets all state and creates a new SearchHistory.
+  const fetchInitial = React.useCallback(
+    async (fetchMode: SearchMode, fetchQuery: string, fetchQueryId?: string, overrideFile?: File | null) => {
       if (abortRef.current) abortRef.current.abort()
+      if (loadMoreAbortRef.current) loadMoreAbortRef.current.abort()
       const controller = new AbortController()
       abortRef.current = controller
 
@@ -238,95 +287,73 @@ export function ResultsPage() {
 
       setStatus('loading')
       setResults([])
+      setCurrentPage(1)
+      setHasMore(false)
+      setIsLoadingMore(false)
 
       try {
         let data: SearchResult[]
-        let currentTotal = 0
-        let currentLimit = 20
+        let fetchedTotal = 0
+        let fetchedLimit = 20
+        let historyId: string
 
         if (fetchMode === 'image') {
-          // Determine whether this is a NEW search (has a file) or a PAGE CHANGE (has searchHistoryId).
-          //
-          // Priority:
-          //   1. overrideFile — explicit re-search triggered by handleSearch / handleSearchSimilar
-          //   2. pendingImageFile — file stored by SearchPage before navigating here
-          //   3. current searchHistoryId in state — pure page navigation (no new file)
-          // getPendingImageFile() peeks without clearing. We clear it explicitly
-          // with setPendingImageFile(null) only after Mode A succeeds. This is safe
-          // for React 18 Strict Mode: the double-invocation aborts the first request
-          // before it resolves, so setPendingImageFile(null) is never called by the
-          // first invocation — the file is still available for the second invocation.
+          // Determine file: override > pending > none
           const pendingFile = getPendingImageFile()
           const file = overrideFile !== undefined ? overrideFile : pendingFile
 
           if (file) {
             // ── Mode A: New search — send file, get back a fresh searchHistoryId ──
             const response = await searchByImageFile(file, controller.signal)
-            // Clear pending file only after a successful response so Strict Mode's
-            // second invocation (after abort) can still find and use the file.
             setPendingImageFile(null)
-            setSearchHistoryId(response.searchHistoryId)
+            historyId = response.searchHistoryId
             data = response.results
-            currentTotal = response.total
-            currentLimit = response.limit
+            fetchedTotal = response.total
+            fetchedLimit = response.limit
           } else if (searchHistoryId) {
-            // ── Mode B: Page navigation — send searchHistoryId, no new history created ──
-            const response = await searchByImagePage(searchHistoryId, fetchPage, controller.signal)
+            // ── Fallback: has history (e.g. switching pages then coming back) ──
+            // Use page 1 with the existing history — does NOT create a new history record
+            const response = await searchByImagePage(searchHistoryId, 1, controller.signal)
+            historyId = response.searchHistoryId
             data = response.results
-            currentTotal = response.total
-            currentLimit = response.limit
+            fetchedTotal = response.total
+            fetchedLimit = response.limit
           } else {
             // No file and no history (e.g. user refreshed directly on /results?mode=image)
             setStatus('idle')
             return
           }
         } else {
-          // Text-based modes (semantic / ocr) — call the real backend API.
-          // Strategy:
-          //   • If searchHistoryId is already in state AND the page hasn't reset to 1,
-          //     this is a pagination request → send searchHistoryId (no q).
-          //   • Otherwise this is a new search → send q from page 1.
-          //
-          // Note: the backend enforces that q and searchHistoryId are mutually exclusive.
-          const isTextMode = fetchMode === 'semantic' || fetchMode === 'ocr'
-          if (!isTextMode) return // guard: should never happen
-
-          if (searchHistoryId && fetchPage > 1) {
-            // ── Pagination: reuse existing session ──
-            const response = await searchByTextPage(
-              fetchMode as 'semantic' | 'ocr',
-              searchHistoryId,
-              fetchPage,
-              20,
-              controller.signal,
-            )
-            setSearchHistoryId(response.searchHistoryId)
-            data = response.results
-            currentTotal = response.total
-            currentLimit = response.limit
-          } else {
-            // ── New search: send q, always start at page 1 ──
-            const response = await searchByTextNew(
-              fetchMode as 'semantic' | 'ocr',
-              fetchQuery,
-              20,
-              controller.signal,
-            )
-            setSearchHistoryId(response.searchHistoryId)
-            data = response.results
-            currentTotal = response.total
-            currentLimit = response.limit
-          }
+          // ── Text modes: semantic / ocr ──
+          // Always send `q` for new search (never send searchHistoryId here)
+          // Backend rule: q XOR searchHistoryId — never send both
+          const response = await searchByTextNew(
+            fetchMode as 'semantic' | 'ocr',
+            fetchQuery,
+            20,
+            controller.signal,
+          )
+          historyId = response.searchHistoryId
+          data = response.results
+          fetchedTotal = response.total
+          fetchedLimit = response.limit
         }
+
+        setSearchHistoryId(historyId)
 
         if (data.length === 0) {
           setStatus('empty')
           setTotal(0)
+          setHasMore(false)
         } else {
           setResults(data)
-          setTotal(currentTotal)
-          setLimit(currentLimit)
+          setTotal(fetchedTotal)
+          setCurrentPage(1)
+          // Has more if fetched items < total
+          setHasMore(data.length < fetchedTotal)
           setStatus('success')
+          // Store the page limit for load-more calls
+          _limitRef.current = fetchedLimit
         }
       } catch (err) {
         if ((err as Error).name === 'AbortError' || (err as { code?: string }).code === 'ERR_CANCELED') return
@@ -334,22 +361,98 @@ export function ResultsPage() {
         setStatus('error')
         toastError('Không thể tải kết quả', {
           description: 'Kiểm tra kết nối mạng và thử lại.',
-          onRetry: () => fetchResults(fetchMode, fetchQuery, fetchPage, fetchQueryId, overrideFile),
+          onRetry: () => fetchInitial(fetchMode, fetchQuery, fetchQueryId, overrideFile),
         })
       }
     },
+    // searchHistoryId intentionally excluded: only used as fallback for image mode on re-mount.
+    // Including it would cause re-fetch loops.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    // queryImageFile removed: it is display-only; file selection is handled via
-    // consumePendingImageFile() and overrideFile, not via state fallback.
-    [toastError, searchHistoryId],
+    [toastError],
   )
 
-  React.useEffect(() => {
-    fetchResults(mode, q, search.page, query_id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, q, search.page, query_id])
+  // Limit ref so fetchMore closure has access without stale closure issue
+  const _limitRef = React.useRef<number>(20)
 
-  // Sync modal from URL
+  // ── fetchMore: load next page — uses searchHistoryId (no new history created) ──
+  const fetchMore = React.useCallback(async () => {
+    if (!searchHistoryId || isLoadingMore || !hasMore) return
+
+    if (loadMoreAbortRef.current) loadMoreAbortRef.current.abort()
+    const controller = new AbortController()
+    loadMoreAbortRef.current = controller
+
+    const nextPage = currentPage + 1
+    setIsLoadingMore(true)
+
+    try {
+      let data: SearchResult[]
+      let fetchedTotal = 0
+
+      if (mode === 'image') {
+        // Mode B: Page navigation — send searchHistoryId only, no new history created
+        const response = await searchByImagePage(searchHistoryId, nextPage, controller.signal)
+        data = response.results
+        fetchedTotal = response.total
+      } else {
+        // Text modes: send searchHistoryId only (never send q here — backend XOR rule)
+        const response = await searchByTextPage(
+          mode as 'semantic' | 'ocr',
+          searchHistoryId,
+          nextPage,
+          _limitRef.current,
+          controller.signal,
+        )
+        data = response.results
+        fetchedTotal = response.total
+      }
+
+      setResults((prev) => [...prev, ...data])
+      setTotal(fetchedTotal)
+      setCurrentPage(nextPage)
+      // Check if we have loaded everything
+      const allLoaded = results.length + data.length >= fetchedTotal
+      setHasMore(!allLoaded && data.length > 0)
+    } catch (err) {
+      if ((err as Error).name === 'AbortError' || (err as { code?: string }).code === 'ERR_CANCELED') return
+      // Handle "page out of range" gracefully — just mark hasMore as false
+      if ((err as { response?: { status?: number } }).response?.status === 400) {
+        setHasMore(false)
+        return
+      }
+      console.error(err)
+      toastError('Không thể tải thêm kết quả', {
+        description: 'Kiểm tra kết nối mạng và thử lại.',
+      })
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [searchHistoryId, isLoadingMore, hasMore, currentPage, mode, results.length, toastError])
+
+  // ── Effect: fire fetchInitial when URL search params change ──
+  React.useEffect(() => {
+    fetchInitial(mode, q, query_id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mode, q, query_id])
+
+  // ── Effect: IntersectionObserver for infinite scroll sentinel ──
+  React.useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasMore && !isLoadingMore) {
+          fetchMore()
+        }
+      },
+      { threshold: 0.1, rootMargin: '300px 0px' },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, isLoadingMore, fetchMore])
+
+  // ── Effect: Sync modal from URL ───────────────────────────────
   React.useEffect(() => {
     if (imageId) {
       const found = results.find((r) => r.id === imageId)
@@ -359,23 +462,23 @@ export function ResultsPage() {
     }
   }, [imageId, results])
 
-  // ── Handlers ─────────────────────────────────────────────
+  // ── Handlers ─────────────────────────────────────────────────
 
   const handleSearch = async (state: ResultsSearchState) => {
-    const params: Record<string, string | number> = { mode: state.mode, q: state.textQuery ?? '', page: 1 }
+    const params: Record<string, string> = { mode: state.mode, q: state.textQuery ?? '' }
     if (state.imageFile) {
       params.query_id = `upload-${Date.now()}`
       delete params.q
-      // Persist query image for split view and for the next fetchResults call
+      // Persist query image for split view and for the next fetchInitial call
       setQueryImageFile(state.imageFile)
       setQueryImagePreviewUrl(state.imagePreviewUrl)
-      // Store in module singleton so fetchResults can access it via URL-triggered effect
+      // Store in module singleton so fetchInitial can access it via URL-triggered effect
       setPendingImageFile(state.imageFile)
-      // Reset history so fetchResults uses Mode A (new search with file)
+      // Reset history so fetchInitial uses Mode A (new search with file)
       setSearchHistoryId(null)
     } else {
       // Clear image state when switching to text mode.
-      // Always reset searchHistoryId so the new query triggers a fresh search (not pagination).
+      // Reset searchHistoryId so the new query triggers a fresh search.
       setQueryImageFile(null)
       setQueryImagePreviewUrl(null)
       setPendingImageFile(null)
@@ -404,7 +507,7 @@ export function ResultsPage() {
     setSelectedResult(null)
     navigate({
       to: '/results',
-      search: { mode: search.mode, q: search.q, query_id: search.query_id, page: search.page },
+      search: { mode: search.mode, q: search.q, query_id: search.query_id },
       replace: true,
       resetScroll: false,
     })
@@ -418,17 +521,17 @@ export function ResultsPage() {
       setStatus('loading')
       const urlToFetch = result.fullUrl ?? result.thumbnailUrl
       const file = await fetchImageAsFile(urlToFetch)
-      
+
       const newQueryId = `upload-${Date.now()}`
       setQueryImageFile(file)
       setQueryImagePreviewUrl(urlToFetch)
       setPendingImageFile(file)
-      // New image = new search session — reset history so fetchResults uses Mode A
+      // New image = new search session — reset history so fetchInitial uses Mode A
       setSearchHistoryId(null)
-      
+
       navigate({
         to: '/results',
-        search: { mode: 'image', q: '', query_id: newQueryId, page: 1 },
+        search: { mode: 'image', q: '', query_id: newQueryId },
       })
     } catch (err) {
       console.error(err)
@@ -437,12 +540,12 @@ export function ResultsPage() {
     }
   }
 
-  const handleRetry = () => fetchResults(mode, q, search.page, query_id)
+  const handleRetry = () => fetchInitial(mode, q, query_id)
 
   // Is split view active: image mode + we have a query image
   const isSplitView = mode === 'image' && !!queryImagePreviewUrl
 
-  // ── Render ────────────────────────────────────────────────
+  // ── Render ────────────────────────────────────────────────────
   return (
     <div className="flex min-h-screen bg-background">
       {/* ── Sidebar (fixed, 68px) ── */}
@@ -485,12 +588,13 @@ export function ResultsPage() {
                 mode={mode}
                 query={q}
                 queryId={query_id}
-                count={total > 0 ? total : results.length}
+                count={results.length}
+                total={total}
                 isLoading={status === 'loading'}
               />
             )}
 
-            {/* Loading skeleton */}
+            {/* Initial loading skeleton */}
             {status === 'loading' && <SkeletonGrid count={20} compact={isSplitView} />}
 
             {/* Results grid */}
@@ -502,76 +606,20 @@ export function ResultsPage() {
                   onSearchSimilar={handleSearchSimilar}
                   compact={isSplitView}
                   showSimilarityBadge={showSimilarityBadge}
+                  isLoadingMore={isLoadingMore}
                 />
-                
-                {/* Pagination */}
-                {total > limit && (
-                  <div className="mt-8 mb-4 flex justify-center items-center gap-2 animate-fade-in">
-                    <button
-                      type="button"
-                      disabled={search.page <= 1}
-                      onClick={() => {
-                        navigate({ to: '/results', search: { ...search, page: search.page - 1 } })
-                        window.scrollTo({ top: 0, behavior: 'smooth' })
-                      }}
-                      className="p-2 border border-border/60 bg-background/60 backdrop-blur-sm rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted/80 hover:text-foreground transition-colors"
-                      title="Trang trước"
-                    >
-                      <ChevronLeft className="size-4" />
-                    </button>
-                    
-                    {(() => {
-                      const totalPages = Math.ceil(total / limit);
-                      const pages: (number | string)[] = [];
-                      if (totalPages <= 7) {
-                        for (let i = 1; i <= totalPages; i++) pages.push(i);
-                      } else {
-                        pages.push(1);
-                        if (search.page > 3) pages.push('...');
-                        const start = Math.max(2, search.page - 1);
-                        const end = Math.min(totalPages - 1, search.page + 1);
-                        for (let i = start; i <= end; i++) pages.push(i);
-                        if (search.page < totalPages - 2) pages.push('...');
-                        pages.push(totalPages);
-                      }
-                      
-                      return pages.map((p, i) => (
-                         <button
-                           key={`${p}-${i}`}
-                           disabled={p === '...'}
-                           onClick={() => {
-                             if (p !== '...') {
-                               navigate({ to: '/results', search: { ...search, page: p as number } })
-                               window.scrollTo({ top: 0, behavior: 'smooth' })
-                             }
-                           }}
-                           className={cn(
-                             "w-9 h-9 flex items-center justify-center rounded-xl border text-sm font-medium transition-colors",
-                             p === '...' ? "border-transparent bg-transparent cursor-default" :
-                             search.page === p
-                               ? "bg-primary text-primary-foreground border-primary"
-                               : "border-border/60 bg-background hover:bg-muted/80 cursor-pointer"
-                           )}
-                         >
-                           {p}
-                         </button>
-                      ));
-                    })()}
 
-                    <button
-                      type="button"
-                      disabled={search.page >= Math.ceil(total / limit)}
-                      onClick={() => {
-                        navigate({ to: '/results', search: { ...search, page: search.page + 1 } })
-                        window.scrollTo({ top: 0, behavior: 'smooth' })
-                      }}
-                      className="p-2 border border-border/60 bg-background/60 backdrop-blur-sm rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-muted/80 hover:text-foreground transition-colors"
-                      title="Trang sau"
-                    >
-                      <ChevronRight className="size-4" />
-                    </button>
-                  </div>
-                )}
+                {/* ── Infinite scroll sentinel ── */}
+                <div ref={sentinelRef} className="w-full h-4" aria-hidden="true" />
+
+                {/* Load more indicator / end of results */}
+                <LoadMoreIndicator
+                  isLoading={isLoadingMore}
+                  hasMore={hasMore}
+                  total={total}
+                  count={results.length}
+                  compact={isSplitView}
+                />
               </>
             )}
 
