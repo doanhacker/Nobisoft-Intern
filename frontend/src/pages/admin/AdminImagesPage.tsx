@@ -54,6 +54,22 @@ function mapAdminImageToSearchResult(img: AdminImageItem): SearchResult {
   }
 }
 
+function getPreviousDay(dateStr: string): string {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  if (isNaN(date.getTime())) return ''
+  date.setDate(date.getDate() - 1)
+  return date.toISOString().split('T')[0]
+}
+
+function getNextDay(dateStr: string): string {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  if (isNaN(date.getTime())) return ''
+  date.setDate(date.getDate() + 1)
+  return date.toISOString().split('T')[0]
+}
+
 // ── Filter bar ────────────────────────────────────────────────
 
 interface FilterBarProps {
@@ -102,6 +118,7 @@ function FilterBar({
         type="date"
         value={fromDate}
         disabled={disabled}
+        max={toDate ? getPreviousDay(toDate) : undefined}
         onChange={(e) => onFromDateChange(e.target.value)}
         className="h-8 rounded-lg border border-border/60 bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
         placeholder="Từ ngày"
@@ -113,6 +130,7 @@ function FilterBar({
         type="date"
         value={toDate}
         disabled={disabled}
+        min={fromDate ? getNextDay(fromDate) : undefined}
         onChange={(e) => onToDateChange(e.target.value)}
         className="h-8 rounded-lg border border-border/60 bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
         placeholder="Đến ngày"
@@ -498,12 +516,20 @@ export function AdminImagesPage() {
   const isFilterDisabled = status === 'loading' || isLoadingMore
 
   const handleFilterChange = (patch: { fileFormat?: string; fromDate?: string; toDate?: string }) => {
+    const newFromDate = patch.fromDate !== undefined ? patch.fromDate : (fromDate ?? '')
+    const newToDate = patch.toDate !== undefined ? patch.toDate : (toDate ?? '')
+
+    if (newFromDate && newToDate && newFromDate >= newToDate) {
+      toast.error('Từ ngày phải nhỏ hơn Đến ngày')
+      return
+    }
+
     navigate({
       to: '/admin/images',
       search: {
         fileFormat: patch.fileFormat ?? fileFormat ?? '',
-        fromDate: patch.fromDate ?? fromDate ?? '',
-        toDate: patch.toDate ?? toDate ?? '',
+        fromDate: newFromDate,
+        toDate: newToDate,
       },
     })
   }

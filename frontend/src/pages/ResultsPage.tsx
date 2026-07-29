@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useNavigate, useSearch } from '@tanstack/react-router'
+import { useNavigate, useSearch, useRouterState } from '@tanstack/react-router'
 import {
   Search,
   ImageIcon,
@@ -15,7 +15,7 @@ import { ImageDetailModal } from '@/components/results/ImageDetailModal'
 import { ResultsSidebar } from '@/components/results/ResultsSidebar'
 import { ResultsSearchBar, type ResultsSearchState, type SearchMode } from '@/components/results/ResultsSearchBar'
 import { ImageSearchModal } from '@/components/results/ImageSearchModal'
-import { searchByImageFile, searchByImagePage, getPendingImageFile, setPendingImageFile, fetchImageAsFile, recordSearchClick, searchByTextNew, searchByTextPage } from '@/services/searchService'
+import { searchByImageFile, searchByImagePage, getPendingImageFile, setPendingImageFile, fetchImageAsFile, recordSearchClick, searchByTextNew, searchByTextPage, resetTextSearchDeduplication } from '@/services/searchService'
 import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
 import { AuthContext } from '@/context/AuthContext'
@@ -131,7 +131,7 @@ function ResultsInfoBar({
           {queryId && !query && <>Kết quả tìm ảnh tương tự</>}
           {!isLoading && count > 0 && (
             <span className="text-muted-foreground/70">
-              {' '}— {count}{total > count ? `/${total}` : ''} ảnh
+              {' '}— {total} ảnh
             </span>
           )}
         </p>
@@ -217,6 +217,7 @@ function QueryImagePanel({
 export function ResultsPage() {
   const search = useSearch({ from: '/results' }) as ResultsSearch
   const navigate = useNavigate()
+  const pathname = useRouterState({ select: (s) => s.location.pathname })
   const { error: toastError } = useToast()
   const auth = React.useContext(AuthContext)
 
@@ -254,6 +255,8 @@ export function ResultsPage() {
   const abortRef = React.useRef<AbortController | null>(null)
   // Track the abort controller for load-more requests separately
   const loadMoreAbortRef = React.useRef<AbortController | null>(null)
+  // Track active search key to deduplicate initial fetch calls (e.g., React StrictMode double-run)
+  const activeFetchKeyRef = React.useRef<string>('')
 
   // On mount: restore query image preview from sessionStorage when coming from /search page.
   React.useEffect(() => {
@@ -275,12 +278,32 @@ export function ResultsPage() {
   // Called when mode/query changes. Resets all state and creates a new SearchHistory.
   const fetchInitial = React.useCallback(
     async (fetchMode: SearchMode, fetchQuery: string, fetchQueryId?: string, overrideFile?: File | null) => {
-      if (abortRef.current) abortRef.current.abort()
-      if (loadMoreAbortRef.current) loadMoreAbortRef.current.abort()
+      if (!pathname.startsWith('/results')) {
+        console.log(`[ResultsPage] fetchInitial aborted: current router pathname is "${pathname}" (not starting with /results)`);
+        return
+      }
+      const searchKey = `${fetchMode}:${fetchQuery}:${fetchQueryId || ''}:${overrideFile ? 'file' : ''}`
+      console.log(`[ResultsPage] fetchInitial called. Mode: ${fetchMode}, Query: "${fetchQuery}", QueryId: "${fetchQueryId || ''}", SearchKey: "${searchKey}", activeFetchKeyRef: "${activeFetchKeyRef.current}"`);
+
+      if (activeFetchKeyRef.current === searchKey) {
+        console.log(`[ResultsPage] fetchInitial DEDUPLICATED: searchKey "${searchKey}" matches activeFetchKeyRef`);
+        return
+      }
+      activeFetchKeyRef.current = searchKey
+
+      if (abortRef.current) {
+        console.log(`[ResultsPage] fetchInitial: Aborting previous search controller`);
+        abortRef.current.abort()
+      }
+      if (loadMoreAbortRef.current) {
+        console.log(`[ResultsPage] fetchInitial: Aborting previous loadMore controller`);
+        loadMoreAbortRef.current.abort()
+      }
       const controller = new AbortController()
       abortRef.current = controller
 
       if (fetchMode !== 'image' && !fetchQuery.trim()) {
+        console.log(`[ResultsPage] fetchInitial: Text mode with empty query, setting status to idle`);
         setStatus('idle')
         return
       }
@@ -303,7 +326,7 @@ export function ResultsPage() {
           const file = overrideFile !== undefined ? overrideFile : pendingFile
 
           if (file) {
-            // ── Mode A: New search — send file, get back a fresh searchHistoryId ──
+            console.log(`[ResultsPage] fetchInitial [Image]: Starting new search with image file`);
             const response = await searchByImageFile(file, controller.signal)
             setPendingImageFile(null)
             historyId = response.searchHistoryId
@@ -311,22 +334,19 @@ export function ResultsPage() {
             fetchedTotal = response.total
             fetchedLimit = response.limit
           } else if (searchHistoryId) {
-            // ── Fallback: has history (e.g. switching pages then coming back) ──
-            // Use page 1 with the existing history — does NOT create a new history record
+            console.log(`[ResultsPage] fetchInitial [Image]: Paginating page 1 using existing searchHistoryId: ${searchHistoryId}`);
             const response = await searchByImagePage(searchHistoryId, 1, controller.signal)
             historyId = response.searchHistoryId
             data = response.results
             fetchedTotal = response.total
             fetchedLimit = response.limit
           } else {
-            // No file and no history (e.g. user refreshed directly on /results?mode=image)
+            console.log(`[ResultsPage] fetchInitial [Image]: No file and no historyId, going to idle`);
             setStatus('idle')
             return
           }
         } else {
-          // ── Text modes: semantic / ocr ──
-          // Always send `q` for new search (never send searchHistoryId here)
-          // Backend rule: q XOR searchHistoryId — never send both
+          console.log(`[ResultsPage] fetchInitial [Text]: Calling searchByTextNew for mode: ${fetchMode}, query: "${fetchQuery}"`);
           const response = await searchByTextNew(
             fetchMode as 'semantic' | 'ocr',
             fetchQuery,
@@ -339,6 +359,7 @@ export function ResultsPage() {
           fetchedLimit = response.limit
         }
 
+        console.log(`[ResultsPage] fetchInitial succeeded. Setting searchHistoryId: ${historyId}, resultsCount: ${data.length}, total: ${fetchedTotal}`);
         setSearchHistoryId(historyId)
 
         if (data.length === 0) {
@@ -349,19 +370,25 @@ export function ResultsPage() {
           setResults(data)
           setTotal(fetchedTotal)
           setCurrentPage(1)
-          // Has more if fetched items < total
           setHasMore(data.length < fetchedTotal)
           setStatus('success')
-          // Store the page limit for load-more calls
           _limitRef.current = fetchedLimit
         }
       } catch (err) {
-        if ((err as Error).name === 'AbortError' || (err as { code?: string }).code === 'ERR_CANCELED') return
-        console.error(err)
+        if ((err as Error).name === 'AbortError' || (err as { code?: string }).code === 'ERR_CANCELED') {
+          console.log(`[ResultsPage] fetchInitial: Request was aborted/canceled`);
+          return
+        }
+        activeFetchKeyRef.current = ''
+        console.error(`[ResultsPage] fetchInitial failed:`, err)
         setStatus('error')
         toastError('Không thể tải kết quả', {
           description: 'Kiểm tra kết nối mạng và thử lại.',
-          onRetry: () => fetchInitial(fetchMode, fetchQuery, fetchQueryId, overrideFile),
+          onRetry: () => {
+            console.log(`[ResultsPage] fetchInitial: Retry clicked`);
+            activeFetchKeyRef.current = ''
+            fetchInitial(fetchMode, fetchQuery, fetchQueryId, overrideFile)
+          },
         })
       }
     },
@@ -376,9 +403,13 @@ export function ResultsPage() {
 
   // ── fetchMore: load next page — uses searchHistoryId (no new history created) ──
   const fetchMore = React.useCallback(async () => {
+    console.log(`[ResultsPage] fetchMore called. searchHistoryId: ${searchHistoryId}, currentPage: ${currentPage}, hasMore: ${hasMore}, isLoadingMore: ${isLoadingMore}`);
     if (!searchHistoryId || isLoadingMore || !hasMore) return
 
-    if (loadMoreAbortRef.current) loadMoreAbortRef.current.abort()
+    if (loadMoreAbortRef.current) {
+      console.log(`[ResultsPage] fetchMore: Aborting previous loadMore controller`);
+      loadMoreAbortRef.current.abort()
+    }
     const controller = new AbortController()
     loadMoreAbortRef.current = controller
 
@@ -390,12 +421,12 @@ export function ResultsPage() {
       let fetchedTotal = 0
 
       if (mode === 'image') {
-        // Mode B: Page navigation — send searchHistoryId only, no new history created
+        console.log(`[ResultsPage] fetchMore [Image]: Calling searchByImagePage with searchHistoryId ${searchHistoryId}, page ${nextPage}`);
         const response = await searchByImagePage(searchHistoryId, nextPage, controller.signal)
         data = response.results
         fetchedTotal = response.total
       } else {
-        // Text modes: send searchHistoryId only (never send q here — backend XOR rule)
+        console.log(`[ResultsPage] fetchMore [Text]: Calling searchByTextPage for mode: ${mode}, page: ${nextPage}`);
         const response = await searchByTextPage(
           mode as 'semantic' | 'ocr',
           searchHistoryId,
@@ -407,20 +438,23 @@ export function ResultsPage() {
         fetchedTotal = response.total
       }
 
+      console.log(`[ResultsPage] fetchMore succeeded. Received ${data.length} results, total: ${fetchedTotal}`);
       setResults((prev) => [...prev, ...data])
       setTotal(fetchedTotal)
       setCurrentPage(nextPage)
-      // Check if we have loaded everything
       const allLoaded = results.length + data.length >= fetchedTotal
       setHasMore(!allLoaded && data.length > 0)
     } catch (err) {
-      if ((err as Error).name === 'AbortError' || (err as { code?: string }).code === 'ERR_CANCELED') return
-      // Handle "page out of range" gracefully — just mark hasMore as false
+      if ((err as Error).name === 'AbortError' || (err as { code?: string }).code === 'ERR_CANCELED') {
+        console.log(`[ResultsPage] fetchMore: Request was aborted/canceled`);
+        return
+      }
       if ((err as { response?: { status?: number } }).response?.status === 400) {
+        console.log(`[ResultsPage] fetchMore: Received 400 (page out of range). Disabling hasMore`);
         setHasMore(false)
         return
       }
-      console.error(err)
+      console.error(`[ResultsPage] fetchMore failed:`, err)
       toastError('Không thể tải thêm kết quả', {
         description: 'Kiểm tra kết nối mạng và thử lại.',
       })
@@ -431,9 +465,12 @@ export function ResultsPage() {
 
   // ── Effect: fire fetchInitial when URL search params change ──
   React.useEffect(() => {
-    fetchInitial(mode, q, query_id)
+    console.log(`[ResultsPage] URL parameters useEffect triggered. Mode: ${mode}, Q: "${q}", QueryId: "${query_id || ''}", pathname: "${pathname}"`);
+    if (pathname.startsWith('/results')) {
+      fetchInitial(mode, q, query_id)
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, q, query_id])
+  }, [mode, q, query_id, pathname])
 
   // ── Effect: IntersectionObserver for infinite scroll sentinel ──
   React.useEffect(() => {
@@ -443,6 +480,7 @@ export function ResultsPage() {
     const observer = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting && hasMore && !isLoadingMore) {
+          console.log(`[ResultsPage] Sentinel intersection triggered fetchMore`);
           fetchMore()
         }
       },
@@ -465,25 +503,25 @@ export function ResultsPage() {
   // ── Handlers ─────────────────────────────────────────────────
 
   const handleSearch = async (state: ResultsSearchState) => {
+    console.log(`[ResultsPage] handleSearch submitted:`, state);
     const params: Record<string, string> = { mode: state.mode, q: state.textQuery ?? '' }
+    activeFetchKeyRef.current = ''
+    resetTextSearchDeduplication()
     if (state.imageFile) {
       params.query_id = `upload-${Date.now()}`
       delete params.q
-      // Persist query image for split view and for the next fetchInitial call
       setQueryImageFile(state.imageFile)
       setQueryImagePreviewUrl(state.imagePreviewUrl)
-      // Store in module singleton so fetchInitial can access it via URL-triggered effect
       setPendingImageFile(state.imageFile)
-      // Reset history so fetchInitial uses Mode A (new search with file)
       setSearchHistoryId(null)
     } else {
-      // Clear image state when switching to text mode.
-      // Reset searchHistoryId so the new query triggers a fresh search.
+      console.log(`[ResultsPage] handleSearch: Clearing image search parameters and searchHistoryId`);
       setQueryImageFile(null)
       setQueryImagePreviewUrl(null)
       setPendingImageFile(null)
       setSearchHistoryId(null)
     }
+    console.log(`[ResultsPage] handleSearch: Navigating to /results with search params:`, params);
     navigate({ to: '/results', search: params as unknown as ResultsSearch })
   }
 
@@ -519,6 +557,7 @@ export function ResultsPage() {
   const handleSearchSimilar = async (result: SearchResult) => {
     try {
       setStatus('loading')
+      activeFetchKeyRef.current = ''
       const urlToFetch = result.fullUrl ?? result.thumbnailUrl
       const file = await fetchImageAsFile(urlToFetch)
 
@@ -540,7 +579,10 @@ export function ResultsPage() {
     }
   }
 
-  const handleRetry = () => fetchInitial(mode, q, query_id)
+  const handleRetry = () => {
+    activeFetchKeyRef.current = ''
+    fetchInitial(mode, q, query_id)
+  }
 
   // Is split view active: image mode + we have a query image
   const isSplitView = mode === 'image' && !!queryImagePreviewUrl
