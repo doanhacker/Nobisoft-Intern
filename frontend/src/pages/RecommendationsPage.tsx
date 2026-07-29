@@ -158,7 +158,7 @@ export function RecommendationsPage() {
       setPendingImageFile(file)
       navigate({
         to: '/results',
-        search: { mode: 'image', q: '', query_id: newQueryId, page: 1 },
+        search: { mode: 'image', q: '', query_id: newQueryId },
       })
     } catch (err) {
       console.error(err)

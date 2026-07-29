@@ -61,8 +61,10 @@ export async function deleteImageFromDisk(relativePath: string): Promise<void> {
   const absolutePath = resolveStoredImagePath(relativePath);
   try {
     await fs.unlink(absolutePath);
-  } catch {
-    // File không tồn tại — bỏ qua
+  } catch (error) {
+    if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) {
+      throw error;
+    }
   }
 }
 

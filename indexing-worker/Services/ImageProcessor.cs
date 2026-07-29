@@ -87,10 +87,21 @@ public class ImageProcessor
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Lỗi resize ảnh {Id}", image.Id);
-                await UpdateIndexStatus(image.Id, "FAILED");
-                await IncrementBatchProgressAsync(batchId, 0, 1);
-                failed++;
+                _logger.LogWarning(ex, "Lỗi resize ảnh {Id}, gửi ảnh gốc cho AI", image.Id);
+                try
+                {
+                    var rawBytes = await File.ReadAllBytesAsync(filePath, ct);
+                    var ext = Path.GetExtension(filePath).TrimStart('.');
+                    // Width/Height = 0 → sẽ được AI hoặc bước sau cập nhật nếu cần
+                    preparedImages.Add((image, rawBytes, 0, 0, ext));
+                }
+                catch (Exception readEx)
+                {
+                    _logger.LogError(readEx, "Không thể đọc file gốc {Id}, bỏ qua", image.Id);
+                    await UpdateIndexStatus(image.Id, "FAILED");
+                    await IncrementBatchProgressAsync(batchId, 0, 1);
+                    failed++;
+                }
             }
         }
 
@@ -267,21 +278,77 @@ public class ImageProcessor
     {
         return await Task.Run(() =>
         {
-            using var image = new MagickImage(filePath);
-            int originalWidth = (int)image.Width;
-            int originalHeight = (int)image.Height;
+            var fileBytes = File.ReadAllBytes(filePath);
+            if (fileBytes.Length == 0)
+                throw new InvalidOperationException($"File rỗng (0 bytes): {filePath}");
 
-            if (image.Width > MaxResizeDimension || image.Height > MaxResizeDimension)
+            // Detect format thực tế qua magic bytes, không tin extension
+            var detectedFormat = DetectImageFormat(fileBytes);
+
+            MagickImage image;
+            if (detectedFormat != null)
             {
-                var size = new MagickGeometry(MaxResizeDimension, MaxResizeDimension);
-                image.Resize(size);
-                _logger.LogInformation("Resize ảnh (ImageMagick): {W}x{H} → {MaxDim}px max", originalWidth, originalHeight, MaxResizeDimension);
+                // Ép ImageMagick đọc đúng format thật
+                var settings = new MagickReadSettings { Format = detectedFormat.Value };
+                image = new MagickImage(fileBytes, settings);
+            }
+            else
+            {
+                // Fallback: để ImageMagick tự detect
+                image = new MagickImage(fileBytes);
             }
 
-            image.Format = MagickFormat.Jpeg; // Đảm bảo đầu ra luôn là JPEG
-            return (image.ToByteArray(), originalWidth, originalHeight);
+            using (image)
+            {
+                int originalWidth = (int)image.Width;
+                int originalHeight = (int)image.Height;
+
+                if (image.Width > MaxResizeDimension || image.Height > MaxResizeDimension)
+                {
+                    var size = new MagickGeometry(MaxResizeDimension, MaxResizeDimension);
+                    image.Resize(size);
+                    _logger.LogInformation("Resize ảnh (ImageMagick): {W}x{H} → {MaxDim}px max", originalWidth, originalHeight, MaxResizeDimension);
+                }
+
+                image.Format = MagickFormat.Jpeg; // Đảm bảo đầu ra luôn là JPEG
+                return (image.ToByteArray(), originalWidth, originalHeight);
+            }
         }, ct);
     }
+
+    /// <summary>
+    /// Detect image format thực tế bằng magic bytes (file signature).
+    /// Trả về null nếu không nhận ra → để ImageMagick tự xử lý.
+    /// </summary>
+    private static MagickFormat? DetectImageFormat(byte[] data)
+    {
+        if (data.Length < 4) return null;
+
+        // JPEG: FF D8 FF
+        if (data[0] == 0xFF && data[1] == 0xD8 && data[2] == 0xFF)
+            return MagickFormat.Jpeg;
+
+        // PNG: 89 50 4E 47
+        if (data[0] == 0x89 && data[1] == 0x50 && data[2] == 0x4E && data[3] == 0x47)
+            return MagickFormat.Png;
+
+        // WebP: RIFF....WEBP
+        if (data.Length >= 12 &&
+            data[0] == 0x52 && data[1] == 0x49 && data[2] == 0x46 && data[3] == 0x46 && // RIFF
+            data[8] == 0x57 && data[9] == 0x45 && data[10] == 0x42 && data[11] == 0x50)  // WEBP
+            return MagickFormat.WebP;
+
+        // GIF: GIF87a or GIF89a
+        if (data[0] == 0x47 && data[1] == 0x49 && data[2] == 0x46)
+            return MagickFormat.Gif;
+
+        // BMP: BM
+        if (data[0] == 0x42 && data[1] == 0x4D)
+            return MagickFormat.Bmp;
+
+        return null;
+    }
+
 
     // ── Gọi AI Service batch endpoint ──
 

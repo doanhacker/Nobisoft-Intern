@@ -33,7 +33,15 @@ const THEME_OPTIONS: ThemeOption[] = [
  * @example
  * <ThemeToggle />
  */
-export function ThemeToggle({ className }: { className?: string }) {
+export function ThemeToggle({
+  className,
+  menuAlign = 'right',
+  menuPosition = 'bottom',
+}: {
+  className?: string
+  menuAlign?: 'left' | 'right'
+  menuPosition?: 'top' | 'bottom'
+}) {
   const { theme, setTheme } = useTheme()
   const [open, setOpen] = React.useState(false)
   const ref = React.useRef<HTMLDivElement>(null)
@@ -90,8 +98,10 @@ export function ThemeToggle({ className }: { className?: string }) {
         <div
           role="menu"
           className={cn(
-            // Position: below the button, right-aligned
-            'absolute right-0 top-full mt-2 z-[var(--z-dropdown)]',
+            // Position: aligned by props
+            'absolute z-[var(--z-dropdown)]',
+            menuPosition === 'bottom' ? 'top-full mt-2' : 'bottom-full mb-2',
+            menuAlign === 'right' ? 'right-0' : 'left-0',
             // Size & shape
             'min-w-[140px] rounded-xl p-1.5',
             // Background: glassmorphism that works in both themes

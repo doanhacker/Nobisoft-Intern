@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { useQueries } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { Users, Images, UploadCloud, ArrowRight, Database, Activity } from 'lucide-react'
+import { Users, Images, ArrowRight, Database, Activity } from 'lucide-react'
 import { getUsers } from '@/services/adminUserService'
 import { getImages } from '@/services/adminImageService'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -164,13 +164,6 @@ export function AdminDashboardPage() {
           Thao tác nhanh
         </h2>
         <div className="space-y-2">
-          <QuickAction
-            to="/admin/indexing"
-            icon={UploadCloud}
-            title="Index ảnh mới"
-            description="Upload batch ảnh để thêm vào hệ thống tìm kiếm"
-            accent="gradient-brand"
-          />
           <QuickAction
             to="/admin/users"
             icon={Users}

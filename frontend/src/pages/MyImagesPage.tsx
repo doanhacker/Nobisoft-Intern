@@ -1,5 +1,6 @@
 import * as React from 'react'
-import { Link } from '@tanstack/react-router'
+import * as ReactDOM from 'react-dom'
+import { Link, useNavigate } from '@tanstack/react-router'
 import {
   Images,
   UploadCloud,
@@ -12,6 +13,8 @@ import {
   ImageOff,
   Info,
   AlertTriangle,
+  Search,
+  CheckCircle2,
 } from 'lucide-react'
 import {
   getMyImages,
@@ -19,6 +22,9 @@ import {
   formatFileSize,
   type UserImage,
 } from '@/services/myImagesService'
+import { fetchImageAsFile, setPendingImageFile } from '@/services/searchService'
+import { SkeletonGrid } from '@/components/results/SkeletonGrid'
+import { MasonryGrid, type SearchResult } from '@/components/results/MasonryGrid'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
@@ -28,6 +34,22 @@ import { cn } from '@/lib/utils'
 // ============================================================
 
 const PAGE_SIZE = 20
+
+// ============================================================
+// Helper: Map UserImage -> SearchResult
+// ============================================================
+
+function mapUserImageToSearchResult(img: UserImage): SearchResult {
+  return {
+    id: img.id,
+    thumbnailUrl: img.imageUrl,
+    fullUrl: img.imageUrl,
+    title: img.filename,
+    width: img.width ?? undefined,
+    height: img.height ?? undefined,
+    aspectRatio: img.width && img.height ? `${img.width} / ${img.height}` : undefined,
+  }
+}
 
 // ============================================================
 // Date utilities
@@ -70,13 +92,6 @@ function formatDayLabel(dateKey: string): string {
   return `${day} tháng ${month}, ${year}`
 }
 
-function formatUploadTime(isoString: string): string {
-  const d = new Date(isoString)
-  const h = String(d.getHours()).padStart(2, '0')
-  const m = String(d.getMinutes()).padStart(2, '0')
-  return `${h}:${m}`
-}
-
 function formatFullDateTime(isoString: string): string {
   const d = new Date(isoString)
   const pad = (n: number) => String(n).padStart(2, '0')
@@ -109,29 +124,6 @@ function groupByDay(images: UserImage[]): ImageGroup[] {
       label: formatDayLabel(dateKey),
       images: imgs,
     }))
-}
-
-// ============================================================
-// Skeleton loader
-// ============================================================
-
-function ImageSkeleton() {
-  return (
-    <div className="aspect-square rounded-xl bg-muted/60 animate-pulse border border-border/40" />
-  )
-}
-
-function SkeletonGroup() {
-  return (
-    <div className="space-y-3">
-      <div className="h-5 w-36 rounded-full bg-muted/60 animate-pulse" />
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-        {Array.from({ length: 8 }).map((_, i) => (
-          <ImageSkeleton key={i} />
-        ))}
-      </div>
-    </div>
-  )
 }
 
 // ============================================================
@@ -168,139 +160,33 @@ function EmptyState() {
 }
 
 // ============================================================
-// Delete confirmation popover (inline, above the image)
-// ============================================================
-
-interface DeleteConfirmProps {
-  onConfirm: (e: React.MouseEvent) => void
-  onCancel: (e: React.MouseEvent) => void
-  isDeleting: boolean
-}
-
-function DeleteConfirm({ onConfirm, onCancel, isDeleting }: DeleteConfirmProps) {
-  return (
-    <div
-      className="absolute inset-0 z-20 flex flex-col items-center justify-center rounded-xl bg-black/80 backdrop-blur-sm p-3 gap-2"
-      onClick={(e) => e.stopPropagation()}
-    >
-      <AlertTriangle className="size-5 text-amber-400 shrink-0" />
-      <p className="text-[11px] text-white font-semibold text-center leading-snug">
-        Xoá ảnh này?
-      </p>
-      <div className="flex gap-1.5">
-        <button
-          onClick={onCancel}
-          disabled={isDeleting}
-          className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-white/10 hover:bg-white/20 text-white transition-colors disabled:opacity-50"
-        >
-          Huỷ
-        </button>
-        <button
-          onClick={onConfirm}
-          disabled={isDeleting}
-          className="px-2.5 py-1 rounded-lg text-[11px] font-semibold bg-destructive hover:bg-destructive/80 text-white transition-colors disabled:opacity-50 flex items-center gap-1"
-        >
-          {isDeleting ? <Loader2 className="size-3 animate-spin" /> : <Trash2 className="size-3" />}
-          {isDeleting ? 'Đang xoá...' : 'Xoá'}
-        </button>
-      </div>
-    </div>
-  )
-}
-
-// ============================================================
-// Image card
-// ============================================================
-
-interface ImageCardProps {
-  image: UserImage
-  onClick: () => void
-  onDelete: (id: string) => Promise<void>
-}
-
-function ImageCard({ image, onClick, onDelete }: ImageCardProps) {
-  const [showConfirm, setShowConfirm] = React.useState(false)
-  const [isDeleting, setIsDeleting] = React.useState(false)
-
-  const handleDeleteClick = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setShowConfirm(true)
-  }
-
-  const handleConfirm = async (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setIsDeleting(true)
-    await onDelete(image.id)
-    setIsDeleting(false)
-    setShowConfirm(false)
-  }
-
-  const handleCancel = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    setShowConfirm(false)
-  }
-
-  return (
-    <div
-      className="group relative aspect-square rounded-xl overflow-hidden border border-border/50 bg-muted/40 cursor-pointer hover:border-primary/50 transition-all duration-200 hover:shadow-lg hover:shadow-primary/10 hover:scale-[1.01]"
-      onClick={onClick}
-    >
-      {/* Image */}
-      <img
-        src={image.imageUrl}
-        alt={image.filename}
-        className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-        loading="lazy"
-      />
-
-      {/* Hover overlay */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
-
-      {/* Bottom info on hover */}
-      <div className="absolute bottom-0 left-0 right-0 px-2.5 pb-2 pt-6 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
-        <p className="text-[10px] font-semibold text-white truncate leading-tight">
-          {image.filename}
-        </p>
-        <p className="text-[9px] text-white/70 mt-0.5">
-          {formatUploadTime(image.uploadedAt)} · {formatFileSize(image.size)}
-        </p>
-      </div>
-
-      {/* Delete button (top-right) */}
-      {!showConfirm && (
-        <button
-          onClick={handleDeleteClick}
-          className="absolute top-1.5 right-1.5 flex items-center justify-center size-6 rounded-lg bg-black/60 backdrop-blur-sm text-white/80 hover:bg-destructive hover:text-white transition-all duration-150 opacity-0 group-hover:opacity-100 shadow-sm z-10"
-          aria-label={`Xoá ${image.filename}`}
-          title="Xoá ảnh"
-        >
-          <Trash2 className="size-3" />
-        </button>
-      )}
-
-      {/* Delete confirmation overlay */}
-      {showConfirm && (
-        <DeleteConfirm
-          onConfirm={handleConfirm}
-          onCancel={handleCancel}
-          isDeleting={isDeleting}
-        />
-      )}
-    </div>
-  )
-}
-
-// ============================================================
 // Day group
 // ============================================================
 
 interface DayGroupProps {
   group: ImageGroup
-  onImageClick: (image: UserImage, allImages: UserImage[]) => void
+  onImageClick: (image: UserImage, groupImages: UserImage[]) => void
+  onSearchSimilar: (result: SearchResult) => void
   onDelete: (id: string) => Promise<void>
 }
 
-function DayGroup({ group, onImageClick, onDelete }: DayGroupProps) {
+function DayGroup({ group, onImageClick, onSearchSimilar, onDelete }: DayGroupProps) {
+  const searchResults = React.useMemo(
+    () => group.images.map(mapUserImageToSearchResult),
+    [group.images],
+  )
+
+  const handleCardClick = (result: SearchResult) => {
+    const found = group.images.find((img) => img.id === result.id)
+    if (found) {
+      onImageClick(found, group.images)
+    }
+  }
+
+  const handleDeleteCard = async (result: SearchResult) => {
+    await onDelete(result.id)
+  }
+
   return (
     <div className="space-y-3">
       {/* Sticky group header */}
@@ -309,23 +195,16 @@ function DayGroup({ group, onImageClick, onDelete }: DayGroupProps) {
           <CalendarDays className="size-3.5 text-primary" />
         </div>
         <span className="font-bold text-sm text-foreground">{group.label}</span>
-        <span className="text-xs text-muted-foreground font-medium">
-          {group.images.length} ảnh
-        </span>
         <div className="flex-1 h-px bg-border/50 ml-1" />
       </div>
 
-      {/* Image grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-        {group.images.map((img) => (
-          <ImageCard
-            key={img.id}
-            image={img}
-            onClick={() => onImageClick(img, group.images)}
-            onDelete={onDelete}
-          />
-        ))}
-      </div>
+      {/* Masonry Grid */}
+      <MasonryGrid
+        results={searchResults}
+        onCardClick={handleCardClick}
+        onSearchSimilar={onSearchSimilar}
+        onDelete={handleDeleteCard}
+      />
     </div>
   )
 }
@@ -339,10 +218,11 @@ interface LightboxProps {
   allImages: UserImage[]
   onClose: () => void
   onDelete: (id: string) => Promise<void>
+  onSearchSimilar: (result: SearchResult) => void
   onNavigate: (image: UserImage) => void
 }
 
-function Lightbox({ image, allImages, onClose, onDelete, onNavigate }: LightboxProps) {
+function Lightbox({ image, allImages, onClose, onDelete, onSearchSimilar, onNavigate }: LightboxProps) {
   const [isDeleting, setIsDeleting] = React.useState(false)
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false)
 
@@ -386,16 +266,16 @@ function Lightbox({ image, allImages, onClose, onDelete, onNavigate }: LightboxP
     }
   }, [])
 
-  return (
+  return ReactDOM.createPortal(
     <div
-      className="fixed inset-0 z-[200] flex items-center justify-center"
+      className="fixed inset-0 z-[9500] flex items-center justify-center"
       role="dialog"
       aria-modal="true"
       aria-label={`Xem ảnh: ${image.filename}`}
     >
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/88 backdrop-blur-md"
+        className="absolute inset-0 bg-black/92 backdrop-blur-md"
         onClick={onClose}
       />
 
@@ -416,6 +296,19 @@ function Lightbox({ image, allImages, onClose, onDelete, onNavigate }: LightboxP
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            {/* Search similar button */}
+            <button
+              onClick={() => {
+                onSearchSimilar(mapUserImageToSearchResult(image))
+                onClose()
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white/90 text-xs font-semibold transition-all duration-150 border border-white/10"
+              title="Tìm ảnh tương tự"
+            >
+              <Search className="size-3.5" />
+              <span className="hidden sm:inline">Tìm tương tự</span>
+            </button>
+
             {/* Delete button */}
             {!showDeleteConfirm ? (
               <button
@@ -513,7 +406,8 @@ function Lightbox({ image, allImages, onClose, onDelete, onNavigate }: LightboxP
           <span>Del xoá</span>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 
@@ -527,6 +421,9 @@ interface LightboxState {
 }
 
 export function MyImagesPage() {
+  const navigate = useNavigate()
+  const toast = useToast()
+
   // ── Data state ────────────────────────────────────────────
   const [images, setImages] = React.useState<UserImage[]>([])
   const [totalDocs, setTotalDocs] = React.useState(0)
@@ -540,8 +437,6 @@ export function MyImagesPage() {
 
   // ── Lightbox ───────────────────────────────────────────────
   const [lightbox, setLightbox] = React.useState<LightboxState | null>(null)
-
-  const toast = useToast()
 
   // ── Initial fetch ──────────────────────────────────────────
   React.useEffect(() => {
@@ -571,8 +466,11 @@ export function MyImagesPage() {
     }
   }, [])
 
+  // Refs
+  const sentinelRef = React.useRef<HTMLDivElement>(null)
+
   // ── Load more ──────────────────────────────────────────────
-  const handleLoadMore = async () => {
+  const handleLoadMore = React.useCallback(async () => {
     if (isLoadingMore || !hasMore) return
     setIsLoadingMore(true)
     try {
@@ -588,14 +486,30 @@ export function MyImagesPage() {
     } finally {
       setIsLoadingMore(false)
     }
-  }
+  }, [isLoadingMore, hasMore, page, toast])
+
+  // ── Effect: IntersectionObserver ──────────────────────────────
+  React.useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasMore && !isLoadingMore) {
+          handleLoadMore()
+        }
+      },
+      { threshold: 0.1, rootMargin: '300px 0px' },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, isLoadingMore, handleLoadMore])
 
   // ── Delete ────────────────────────────────────────────────
   const handleDelete = async (id: string) => {
     try {
       await deleteMyImage(id)
       setImages((prev) => prev.filter((img) => img.id !== id))
-      setTotalDocs((prev) => prev - 1)
+      setTotalDocs((prev) => Math.max(0, prev - 1))
       // Also update lightbox allImages if open
       if (lightbox) {
         const updated = lightbox.allImages.filter((img) => img.id !== id)
@@ -605,6 +519,23 @@ export function MyImagesPage() {
     } catch {
       toast.error('Không thể xoá ảnh. Vui lòng thử lại.')
       throw new Error('Delete failed') // re-throw so card UI can reset
+    }
+  }
+
+  // ── Search similar ─────────────────────────────────────────
+  const handleSearchSimilar = async (result: SearchResult) => {
+    try {
+      const urlToFetch = result.fullUrl ?? result.thumbnailUrl
+      const file = await fetchImageAsFile(urlToFetch)
+      const newQueryId = `upload-${Date.now()}`
+      setPendingImageFile(file)
+      navigate({
+        to: '/results',
+        search: { mode: 'image', q: '', query_id: newQueryId },
+      })
+    } catch (err) {
+      console.error(err)
+      toast.error('Không thể tải ảnh để tìm kiếm')
     }
   }
 
@@ -674,12 +605,7 @@ export function MyImagesPage() {
           </div>
 
           {/* ── Loading state ── */}
-          {isInitialLoading && (
-            <div className="space-y-10">
-              <SkeletonGroup />
-              <SkeletonGroup />
-            </div>
-          )}
+          {isInitialLoading && <SkeletonGrid count={12} />}
 
           {/* ── Empty state ── */}
           {!isInitialLoading && images.length === 0 && <EmptyState />}
@@ -692,41 +618,32 @@ export function MyImagesPage() {
                   key={group.dateKey}
                   group={group}
                   onImageClick={handleImageClick}
+                  onSearchSimilar={handleSearchSimilar}
                   onDelete={handleDelete}
                 />
               ))}
             </div>
           )}
 
-          {/* ── Load more ── */}
+          {/* Infinite scroll sentinel */}
+          <div ref={sentinelRef} className="w-full h-4" aria-hidden="true" />
+
+          {/* ── Load more indicator / end of results ── */}
           {!isInitialLoading && images.length > 0 && (
             <div className="flex flex-col items-center gap-3 pt-4 pb-8">
-              {hasMore ? (
-                <Button
-                  id="my-images-load-more"
-                  variant="outline"
-                  size="lg"
-                  onClick={handleLoadMore}
-                  disabled={isLoadingMore}
-                  className="min-w-[200px]"
-                >
-                  {isLoadingMore ? (
-                    <>
-                      <Loader2 className="size-4 animate-spin" />
-                      Đang tải thêm...
-                    </>
-                  ) : (
-                    <>
-                      <Images className="size-4" />
-                      Tải thêm ảnh
-                    </>
-                  )}
-                </Button>
-              ) : (
-                <p className="text-xs text-muted-foreground font-medium py-2">
-                  ✓ Đã hiển thị tất cả {totalDocs.toLocaleString()} ảnh
-                </p>
-              )}
+              {isLoadingMore ? (
+                <div className="flex justify-center items-center gap-2 py-4 animate-fade-in">
+                  <Loader2 className="size-4 animate-spin text-primary" />
+                  <span className="text-sm text-muted-foreground">Đang tải thêm ảnh...</span>
+                </div>
+              ) : !hasMore ? (
+                <div className="flex justify-center items-center gap-2 py-8 animate-fade-in">
+                  <CheckCircle2 className="size-4 text-muted-foreground/50" />
+                  <span className="text-sm text-muted-foreground/70">
+                    Đã hiển thị tất cả {totalDocs.toLocaleString('vi-VN')} ảnh
+                  </span>
+                </div>
+              ) : null}
             </div>
           )}
         </div>
@@ -739,6 +656,7 @@ export function MyImagesPage() {
           allImages={lightbox.allImages}
           onClose={handleLightboxClose}
           onDelete={handleDelete}
+          onSearchSimilar={handleSearchSimilar}
           onNavigate={handleLightboxNavigate}
         />
       )}

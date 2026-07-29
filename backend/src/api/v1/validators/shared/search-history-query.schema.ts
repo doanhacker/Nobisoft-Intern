@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { dateOnlySchema } from '../../../../utils/date.util.js';
 
 export const searchHistoryQuerySchema = z.object({
   page: z.coerce.number().int().min(1, 'Trang phải lớn hơn hoặc bằng 1').default(1),
@@ -11,8 +12,8 @@ export const searchHistoryQuerySchema = z.object({
     (value) => value === '' ? undefined : value,
     z.enum(['IMAGE_ONLY', 'TEXT_SEMANTIC', 'TEXT_OCR']).optional(),
   ),
-  fromDate: z.coerce.date('fromDate không hợp lệ').optional(),
-  toDate: z.coerce.date('toDate không hợp lệ').optional(),
+  fromDate: dateOnlySchema.optional(),
+  toDate: dateOnlySchema.optional(),
 }).refine(
   (data) => !data.fromDate || !data.toDate || data.fromDate <= data.toDate,
   {

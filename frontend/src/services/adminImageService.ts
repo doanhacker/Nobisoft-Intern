@@ -45,7 +45,7 @@ export async function getImageDetail(id: string): Promise<ImageDetailResponse> {
 
 /**
  * DELETE /admin/images/:id
- * Xoá ảnh khỏi hệ thống (cascade: PostgreSQL + Qdrant + disk)
+ * Xoá ảnh khỏi hệ thống (cascade: PostgreSQL + Qdrant + disk) — chỉ Admin
  */
 export async function deleteImage(id: string): Promise<void> {
   await axiosClient.delete(`/admin/images/${id}`)

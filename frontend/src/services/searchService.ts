@@ -333,11 +333,26 @@ function mapOcrItem(item: TextOcrResultItem): SearchResult {
 
 // ── New search — sends `q` ────────────────────────────────────
 
+let activeTextSearchPromise: {
+  key: string
+  time: number
+  promise: Promise<SearchByTextResult>
+} | null = null
+
 /**
- * First text search in a session.
- *
- * Always called with page=1 (backend enforces: new search must start at page 1).
+ * Reset text search deduplication cache (e.g. when user explicitly forces a fresh search).
+ */
+export function resetTextSearchDeduplication() {
+  activeTextSearchPromise = null
+}
+
+/**
+ * Performs a initial text-based search (semantic or OCR).
+ * Sends `q` + `mode` to backend, which creates a NEW `SearchHistory` record.
  * Returns `searchHistoryId` which must be stored in state for subsequent page changes.
+ *
+ * Requests for the same mode and query within 1.5 seconds are deduplicated
+ * to prevent duplicate history records caused by React StrictMode or double-submit.
  *
  * @param mode   'semantic' | 'ocr'
  * @param q      Search query (non-empty)
@@ -351,33 +366,62 @@ export async function searchByTextNew(
   limit = 20,
   signal?: AbortSignal,
 ): Promise<SearchByTextResult> {
-  if (mode === 'semantic') {
-    const { data } = await axiosClient.get<TextSemanticApiResponse>('/search/text', {
-      params: { q, mode: 'semantic', page: 1, limit: 20 },
-      signal,
-      timeout: 30_000,
-    })
-    return {
-      searchHistoryId: data.data.searchHistoryId,
-      results: data.data.results.map(mapSemanticItem),
-      total: data.meta.totalDocs,
-      page: data.meta.page,
-      limit: data.meta.limit,
-    }
-  } else {
-    const { data } = await axiosClient.get<TextOcrApiResponse>('/search/text', {
-      params: { q, mode: 'ocr', page: 1, limit },
-      signal,
-      timeout: 30_000,
-    })
-    return {
-      searchHistoryId: data.data.searchHistoryId,
-      results: data.data.results.map(mapOcrItem),
-      total: data.meta.totalDocs,
-      page: data.meta.page,
-      limit: data.meta.limit,
-    }
+  const key = `${mode}:${q.trim()}`
+  const now = Date.now()
+
+  console.log(`[searchByTextNew] Called. Mode: ${mode}, Query: "${q}", Limit: ${limit}`);
+
+  if (activeTextSearchPromise && activeTextSearchPromise.key === key && now - activeTextSearchPromise.time < 1500) {
+    console.log(`[searchByTextNew] DEDUPLICATION HIT: returning active promise for key "${key}"`);
+    return activeTextSearchPromise.promise
   }
+
+  console.log(`[searchByTextNew] DEDUPLICATION MISS: initiating new API call for key "${key}"`);
+
+  const searchPromise = (async () => {
+    try {
+      if (mode === 'semantic') {
+        console.log(`[searchByTextNew] [API Request] GET /search/text (mode: semantic, q: "${q}", page: 1)`);
+        const { data } = await axiosClient.get<TextSemanticApiResponse>('/search/text', {
+          params: { q, mode: 'semantic', page: 1, limit: 20 },
+          signal,
+          timeout: 30_000,
+        })
+        console.log(`[searchByTextNew] [API Response] Success. searchHistoryId: ${data.data.searchHistoryId}, total: ${data.meta.totalDocs}`);
+        return {
+          searchHistoryId: data.data.searchHistoryId,
+          results: data.data.results.map(mapSemanticItem),
+          total: data.meta.totalDocs,
+          page: data.meta.page,
+          limit: data.meta.limit,
+        }
+      } else {
+        console.log(`[searchByTextNew] [API Request] GET /search/text (mode: ocr, q: "${q}", page: 1, limit: ${limit})`);
+        const { data } = await axiosClient.get<TextOcrApiResponse>('/search/text', {
+          params: { q, mode: 'ocr', page: 1, limit },
+          signal,
+          timeout: 30_000,
+        })
+        console.log(`[searchByTextNew] [API Response] Success. searchHistoryId: ${data.data.searchHistoryId}, total: ${data.meta.totalDocs}`);
+        return {
+          searchHistoryId: data.data.searchHistoryId,
+          results: data.data.results.map(mapOcrItem),
+          total: data.meta.totalDocs,
+          page: data.meta.page,
+          limit: data.meta.limit,
+        }
+      }
+    } catch (err) {
+      console.error(`[searchByTextNew] [API Error] Failed for key "${key}":`, err);
+      if (activeTextSearchPromise?.key === key) {
+        activeTextSearchPromise = null
+      }
+      throw err
+    }
+  })()
+
+  activeTextSearchPromise = { key, time: now, promise: searchPromise }
+  return searchPromise
 }
 
 // ── Pagination — sends `searchHistoryId` ─────────────────────
@@ -402,31 +446,41 @@ export async function searchByTextPage(
   limit = 20,
   signal?: AbortSignal,
 ): Promise<SearchByTextResult> {
-  if (mode === 'semantic') {
-    const { data } = await axiosClient.get<TextSemanticApiResponse>('/search/text', {
-      params: { searchHistoryId, mode: 'semantic', page, limit: 20 },
-      signal,
-      timeout: 30_000,
-    })
-    return {
-      searchHistoryId: data.data.searchHistoryId,
-      results: data.data.results.map(mapSemanticItem),
-      total: data.meta.totalDocs,
-      page: data.meta.page,
-      limit: data.meta.limit,
+  console.log(`[searchByTextPage] Called. Mode: ${mode}, searchHistoryId: ${searchHistoryId}, Page: ${page}, Limit: ${limit}`);
+  try {
+    if (mode === 'semantic') {
+      console.log(`[searchByTextPage] [API Request] GET /search/text (mode: semantic, searchHistoryId: ${searchHistoryId}, page: ${page})`);
+      const { data } = await axiosClient.get<TextSemanticApiResponse>('/search/text', {
+        params: { searchHistoryId, mode: 'semantic', page, limit: 20 },
+        signal,
+        timeout: 30_000,
+      })
+      console.log(`[searchByTextPage] [API Response] Success. searchHistoryId: ${data.data.searchHistoryId}, total: ${data.meta.totalDocs}`);
+      return {
+        searchHistoryId: data.data.searchHistoryId,
+        results: data.data.results.map(mapSemanticItem),
+        total: data.meta.totalDocs,
+        page: data.meta.page,
+        limit: data.meta.limit,
+      }
+    } else {
+      console.log(`[searchByTextPage] [API Request] GET /search/text (mode: ocr, searchHistoryId: ${searchHistoryId}, page: ${page}, limit: ${limit})`);
+      const { data } = await axiosClient.get<TextOcrApiResponse>('/search/text', {
+        params: { searchHistoryId, mode: 'ocr', page, limit },
+        signal,
+        timeout: 30_000,
+      })
+      console.log(`[searchByTextPage] [API Response] Success. searchHistoryId: ${data.data.searchHistoryId}, total: ${data.meta.totalDocs}`);
+      return {
+        searchHistoryId: data.data.searchHistoryId,
+        results: data.data.results.map(mapOcrItem),
+        total: data.meta.totalDocs,
+        page: data.meta.page,
+        limit: data.meta.limit,
+      }
     }
-  } else {
-    const { data } = await axiosClient.get<TextOcrApiResponse>('/search/text', {
-      params: { searchHistoryId, mode: 'ocr', page, limit },
-      signal,
-      timeout: 30_000,
-    })
-    return {
-      searchHistoryId: data.data.searchHistoryId,
-      results: data.data.results.map(mapOcrItem),
-      total: data.meta.totalDocs,
-      page: data.meta.page,
-      limit: data.meta.limit,
-    }
+  } catch (err) {
+    console.error(`[searchByTextPage] [API Error] Failed for searchHistoryId ${searchHistoryId}, page ${page}:`, err);
+    throw err;
   }
 }

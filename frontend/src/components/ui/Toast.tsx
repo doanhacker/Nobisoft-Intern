@@ -36,6 +36,15 @@ export function useToast() {
   return ctx
 }
 
+// ── Duration constants ────────────────────────────────────────
+const TOAST_DURATIONS = {
+  success: 4000,
+  info: 4000,
+  warning: 6000,
+  error: 6000,
+  errorWithRetry: 10000, // auto-dismiss after 10s even when retry button shown
+} as const
+
 // ── Provider ─────────────────────────────────────────────────
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = React.useState<ToastItem[]>([])
@@ -47,7 +56,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const push = React.useCallback(
     (toast: Omit<ToastItem, 'id'>) => {
       const id = `toast-${Date.now()}-${Math.random().toString(36).slice(2)}`
-      const item: ToastItem = { duration: 5000, ...toast, id }
+      const item: ToastItem = { duration: TOAST_DURATIONS.info, ...toast, id }
       setToasts((prev) => [item, ...prev].slice(0, 5)) // max 5 toasts
       if (item.duration && item.duration > 0) {
         setTimeout(() => dismiss(id), item.duration)
@@ -57,19 +66,28 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   )
 
   const success = React.useCallback(
-    (message: string, opts?: Partial<ToastItem>) => push({ ...opts, type: 'success', message }),
+    (message: string, opts?: Partial<ToastItem>) =>
+      push({ duration: TOAST_DURATIONS.success, ...opts, type: 'success', message }),
     [push],
   )
   const error = React.useCallback(
-    (message: string, opts?: Partial<ToastItem>) => push({ ...opts, type: 'error', message, duration: opts?.onRetry ? 0 : 6000 }),
+    (message: string, opts?: Partial<ToastItem>) =>
+      push({
+        duration: opts?.onRetry ? TOAST_DURATIONS.errorWithRetry : TOAST_DURATIONS.error,
+        ...opts,
+        type: 'error',
+        message,
+      }),
     [push],
   )
   const warning = React.useCallback(
-    (message: string, opts?: Partial<ToastItem>) => push({ ...opts, type: 'warning', message }),
+    (message: string, opts?: Partial<ToastItem>) =>
+      push({ duration: TOAST_DURATIONS.warning, ...opts, type: 'warning', message }),
     [push],
   )
   const info = React.useCallback(
-    (message: string, opts?: Partial<ToastItem>) => push({ ...opts, type: 'info', message }),
+    (message: string, opts?: Partial<ToastItem>) =>
+      push({ duration: TOAST_DURATIONS.info, ...opts, type: 'info', message }),
     [push],
   )
 

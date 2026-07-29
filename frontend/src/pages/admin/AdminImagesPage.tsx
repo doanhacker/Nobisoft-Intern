@@ -1,40 +1,31 @@
 import * as React from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useNavigate, useSearch } from '@tanstack/react-router'
 import {
   Images,
   Trash2,
-  Eye,
-  ChevronLeft,
-  ChevronRight,
   AlertCircle,
   Filter,
   X,
-  FileImage,
   Loader2,
+  CheckCircle2,
 } from 'lucide-react'
 import { getImages, getImageDetail, deleteImage } from '@/services/adminImageService'
+import { fetchImageAsFile, setPendingImageFile } from '@/services/searchService'
+import { SkeletonGrid } from '@/components/results/SkeletonGrid'
+import { MasonryGrid, type SearchResult } from '@/components/results/MasonryGrid'
 import type { AdminImageItem } from '@/types/admin'
 import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
 
 // ============================================================
-// AdminImagesPage
+// AdminImagesPage — Kho ảnh với infinite scroll
+// Lag fix: bỏ useQuery cho list, dùng plain fetch + IntersectionObserver
 // ============================================================
 
 const PAGE_SIZE = 20
-
-// ── Image card ────────────────────────────────────────────────
-
-interface ImageCardProps {
-  image: AdminImageItem
-  onView: (image: AdminImageItem) => void
-  onDelete: (image: AdminImageItem) => void
-  isDeleting: boolean
-}
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`
@@ -50,86 +41,33 @@ function formatDate(dateStr: string) {
   }).format(new Date(dateStr))
 }
 
-function ImageCard({ image, onView, onDelete, isDeleting }: ImageCardProps) {
-  const [imgError, setImgError] = React.useState(false)
-  const indexedAt = image.imageIndex?.indexedAt
-    ? formatDate(image.imageIndex.indexedAt)
-    : formatDate(image.createdAt)
-  const ocrPreview = image.imageIndex?.ocrLines
-    ?.slice(0, 2)
-    .map((l) => l.rawText)
-    .join(' · ')
+function mapAdminImageToSearchResult(img: AdminImageItem): SearchResult {
+  return {
+    id: img.id,
+    thumbnailUrl: img.imageUrl,
+    fullUrl: img.imageUrl,
+    title: img.imageUrl.split('/').pop() ?? img.id,
+    width: img.width ?? undefined,
+    height: img.height ?? undefined,
+    aspectRatio: img.width && img.height ? `${img.width} / ${img.height}` : undefined,
+    ocrText: img.imageIndex?.ocrLines?.map((l) => l.rawText).join(' '),
+  }
+}
 
-  return (
-    <div className="group relative bg-card border border-border/60 rounded-xl overflow-hidden shadow-sm hover:shadow-md transition-all duration-200">
-      {/* Thumbnail */}
-      <div className="relative aspect-square bg-muted/40 overflow-hidden">
-        {imgError ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-1 text-muted-foreground">
-            <FileImage className="size-8" />
-            <span className="text-xs">Không tải được</span>
-          </div>
-        ) : (
-          <img
-            src={image.imageUrl}
-            alt={image.imageUrl.split('/').pop() ?? 'image'}
-            className="size-full object-cover transition-transform duration-200 group-hover:scale-105"
-            onError={() => setImgError(true)}
-            loading="lazy"
-          />
-        )}
+function getPreviousDay(dateStr: string): string {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  if (isNaN(date.getTime())) return ''
+  date.setDate(date.getDate() - 1)
+  return date.toISOString().split('T')[0]
+}
 
-        {/* Hover overlay */}
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-all duration-200 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100">
-          <button
-            onClick={() => onView(image)}
-            className="flex items-center justify-center size-9 rounded-full bg-white/90 text-gray-800 hover:bg-white transition-colors shadow"
-            title="Xem chi tiết"
-          >
-            <Eye className="size-4" />
-          </button>
-          <button
-            onClick={() => onDelete(image)}
-            disabled={isDeleting}
-            className="flex items-center justify-center size-9 rounded-full bg-destructive/90 text-white hover:bg-destructive transition-colors shadow disabled:opacity-50"
-            title="Xoá ảnh"
-          >
-            {isDeleting ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <Trash2 className="size-4" />
-            )}
-          </button>
-        </div>
-
-        {/* Format badge */}
-        <div className="absolute top-2 right-2">
-          <Badge variant="secondary" className="text-[10px] uppercase font-bold px-1.5 py-0.5">
-            {image.fileFormat}
-          </Badge>
-        </div>
-      </div>
-
-      {/* Info */}
-      <div className="p-2.5 space-y-0.5">
-        <p className="text-xs font-semibold text-foreground truncate" title={image.imageUrl}>
-          {image.imageUrl.split('/').pop() ?? image.id}
-        </p>
-        <div className="flex items-center justify-between text-[10px] text-muted-foreground">
-          <span>
-            {image.width}×{image.height}
-          </span>
-          <span>{formatBytes(image.fileSize)}</span>
-        </div>
-        <p className="text-[10px] text-muted-foreground">{indexedAt}</p>
-        {ocrPreview && (
-          <p className="text-[10px] text-muted-foreground truncate italic" title={ocrPreview}>
-            "{ocrPreview}"
-          </p>
-        )}
-      </div>
-    </div>
-  )
+function getNextDay(dateStr: string): string {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  if (isNaN(date.getTime())) return ''
+  date.setDate(date.getDate() + 1)
+  return date.toISOString().split('T')[0]
 }
 
 // ── Filter bar ────────────────────────────────────────────────
@@ -142,6 +80,7 @@ interface FilterBarProps {
   onFromDateChange: (v: string) => void
   onToDateChange: (v: string) => void
   onClear: () => void
+  disabled?: boolean
 }
 
 function FilterBar({
@@ -152,6 +91,7 @@ function FilterBar({
   onFromDateChange,
   onToDateChange,
   onClear,
+  disabled,
 }: FilterBarProps) {
   const hasFilter = fileFormat || fromDate || toDate
   return (
@@ -162,8 +102,9 @@ function FilterBar({
       <select
         id="img-format-filter"
         value={fileFormat}
+        disabled={disabled}
         onChange={(e) => onFileFormatChange(e.target.value)}
-        className="h-8 rounded-lg border border-border/60 bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        className="h-8 rounded-lg border border-border/60 bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
       >
         <option value="">Tất cả định dạng</option>
         <option value="jpg">JPG</option>
@@ -176,8 +117,10 @@ function FilterBar({
         id="img-from-date"
         type="date"
         value={fromDate}
+        disabled={disabled}
+        max={toDate ? getPreviousDay(toDate) : undefined}
         onChange={(e) => onFromDateChange(e.target.value)}
-        className="h-8 rounded-lg border border-border/60 bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        className="h-8 rounded-lg border border-border/60 bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
         placeholder="Từ ngày"
       />
 
@@ -186,20 +129,51 @@ function FilterBar({
         id="img-to-date"
         type="date"
         value={toDate}
+        disabled={disabled}
+        min={fromDate ? getNextDay(fromDate) : undefined}
         onChange={(e) => onToDateChange(e.target.value)}
-        className="h-8 rounded-lg border border-border/60 bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+        className="h-8 rounded-lg border border-border/60 bg-background px-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:opacity-50"
         placeholder="Đến ngày"
       />
 
       {/* Clear */}
       {hasFilter && (
-        <Button variant="ghost" size="sm" onClick={onClear} className="gap-1 text-muted-foreground">
+        <Button variant="ghost" size="sm" onClick={onClear} className="gap-1 text-muted-foreground" disabled={disabled}>
           <X className="size-3.5" />
           Xoá lọc
         </Button>
       )}
     </div>
   )
+}
+
+// ── Load More Indicator ───────────────────────────────────────
+
+function LoadMoreIndicator({
+  isLoading,
+  hasMore,
+  total,
+  count,
+}: {
+  isLoading: boolean
+  hasMore: boolean
+  total: number
+  count: number
+}) {
+  if (isLoading) {
+    return <SkeletonGrid count={8} className="mt-3" />
+  }
+  if (!hasMore && count > 0) {
+    return (
+      <div className="flex justify-center items-center gap-2 py-8 animate-fade-in">
+        <CheckCircle2 className="size-4 text-muted-foreground/50" />
+        <span className="text-sm text-muted-foreground/70">
+          Đã hiển thị tất cả {total.toLocaleString('vi-VN')} ảnh
+        </span>
+      </div>
+    )
+  }
+  return null
 }
 
 // ── Image detail modal ─────────────────────────────────────────
@@ -224,7 +198,7 @@ function ImageDetailModal({ imageId, onClose, onDelete, isDeleting }: ImageDetai
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in"
       onClick={onClose}
     >
       <div
@@ -248,14 +222,13 @@ function ImageDetailModal({ imageId, onClose, onDelete, isDeleting }: ImageDetai
         ) : image ? (
           <>
             {/* Image preview */}
-            <div className="aspect-video bg-muted/50 overflow-hidden rounded-t-2xl">
+            <div className="aspect-video bg-muted/50 overflow-hidden rounded-t-2xl flex items-center justify-center">
               <img src={image.imageUrl} alt="preview" className="size-full object-contain" />
             </div>
 
             {/* Metadata */}
             <div className="p-5 space-y-4">
               <div className="grid grid-cols-2 gap-3 text-sm">
-                <MetaItem label="ID" value={image.id} mono />
                 <MetaItem label="Định dạng" value={image.fileFormat.toUpperCase()} />
                 <MetaItem label="Kích thước" value={`${image.width}×${image.height}px`} />
                 <MetaItem label="Dung lượng" value={formatBytes(image.fileSize)} />
@@ -264,15 +237,7 @@ function ImageDetailModal({ imageId, onClose, onDelete, isDeleting }: ImageDetai
                   value={
                     image.imageIndex?.indexedAt
                       ? formatDate(image.imageIndex.indexedAt)
-                      : '—'
-                  }
-                />
-                <MetaItem
-                  label="Thời gian xử lý"
-                  value={
-                    image.imageIndex?.processDurationMs
-                      ? `${image.imageIndex.processDurationMs}ms`
-                      : '—'
+                      : formatDate(image.createdAt)
                   }
                 />
               </div>
@@ -285,7 +250,7 @@ function ImageDetailModal({ imageId, onClose, onDelete, isDeleting }: ImageDetai
                   </p>
                   <div className="bg-muted/40 rounded-lg p-3 space-y-1 max-h-32 overflow-y-auto">
                     {image.imageIndex.ocrLines.map((line, i) => (
-                      <p key={i} className="text-xs text-foreground">
+                      <p key={i} className="text-xs text-foreground font-mono">
                         {line.rawText}{' '}
                         <span className="text-muted-foreground">
                           ({Math.round(line.confidenceScore * 100)}%)
@@ -297,7 +262,7 @@ function ImageDetailModal({ imageId, onClose, onDelete, isDeleting }: ImageDetai
               )}
 
               {/* Actions */}
-              <div className="flex justify-end pt-2 border-t border-border/50">
+              <div className="flex justify-end items-center pt-3 border-t border-border/50">
                 <Button
                   variant="destructive"
                   size="sm"
@@ -353,7 +318,7 @@ function DeleteConfirmDialog({ image, onConfirm, onCancel, isDeleting }: DeleteC
   if (!image) return null
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
+      className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-fade-in"
       onClick={onCancel}
     >
       <div
@@ -398,52 +363,202 @@ function DeleteConfirmDialog({ image, onConfirm, onCancel, isDeleting }: DeleteC
 
 export function AdminImagesPage() {
   const navigate = useNavigate()
-  const { page, fileFormat, fromDate, toDate } = useSearch({ from: '/admin/images' })
+  const { fileFormat, fromDate, toDate } = useSearch({ from: '/admin/images' })
   const toast = useToast()
   const queryClient = useQueryClient()
 
+  // ── UI state
   const [viewingImageId, setViewingImageId] = React.useState<string | null>(null)
   const [pendingDelete, setPendingDelete] = React.useState<AdminImageItem | null>(null)
-  const [deletingId, setDeletingId] = React.useState<string | null>(null)
 
-  const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin', 'images', { page, fileFormat, fromDate, toDate }],
-    queryFn: () =>
-      getImages({
-        page,
+  // ── Infinite scroll state
+  const [images, setImages] = React.useState<AdminImageItem[]>([])
+  const [total, setTotal] = React.useState<number>(0)
+  const [currentPage, setCurrentPage] = React.useState<number>(1)
+  const [hasMore, setHasMore] = React.useState<boolean>(false)
+  const [status, setStatus] = React.useState<'loading' | 'success' | 'empty' | 'error'>('loading')
+  const [isLoadingMore, setIsLoadingMore] = React.useState<boolean>(false)
+
+  // Refs
+  const abortRef = React.useRef<AbortController | null>(null)
+  const loadMoreAbortRef = React.useRef<AbortController | null>(null)
+  const sentinelRef = React.useRef<HTMLDivElement>(null)
+
+  // Derive current filter params — stable object for effect deps
+  const filterKey = `${fileFormat ?? ''}|${fromDate ?? ''}|${toDate ?? ''}`
+
+  // ── fetchInitial: reset and load page 1 ───────────────────────
+  const fetchInitial = React.useCallback(async (
+    fmt?: string,
+    from?: string,
+    to?: string,
+  ) => {
+    abortRef.current?.abort()
+    loadMoreAbortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    setStatus('loading')
+    setImages([])
+    setCurrentPage(1)
+    setHasMore(false)
+    setIsLoadingMore(false)
+
+    try {
+      const res = await getImages({
+        page: 1,
+        limit: PAGE_SIZE,
+        fileFormat: (fmt as 'jpg' | 'png' | 'webp') || undefined,
+        fromDate: from || undefined,
+        toDate: to || undefined,
+      })
+
+      const items = res.data ?? []
+      setImages(items)
+      setTotal(res.meta.totalDocs)
+      setCurrentPage(1)
+      setHasMore(items.length < res.meta.totalDocs)
+      setStatus(items.length === 0 ? 'empty' : 'success')
+    } catch (err: unknown) {
+      if ((err as { name?: string }).name === 'CanceledError' || (err as { name?: string }).name === 'AbortError') return
+      console.error(err)
+      setStatus('error')
+      toast.error('Không thể tải danh sách ảnh')
+    }
+  }, [toast])
+
+  // ── fetchMore: append next page ───────────────────────────────
+  const fetchMore = React.useCallback(async () => {
+    if (isLoadingMore || !hasMore) return
+
+    loadMoreAbortRef.current?.abort()
+    const controller = new AbortController()
+    loadMoreAbortRef.current = controller
+
+    const nextPage = currentPage + 1
+    setIsLoadingMore(true)
+
+    try {
+      const res = await getImages({
+        page: nextPage,
         limit: PAGE_SIZE,
         fileFormat: (fileFormat as 'jpg' | 'png' | 'webp') || undefined,
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
-      }),
-    staleTime: 30_000,
-    placeholderData: (prev) => prev,
-  })
+      })
 
+      const items = res.data ?? []
+      setImages((prev) => [...prev, ...items])
+      setTotal(res.meta.totalDocs)
+      setCurrentPage(nextPage)
+      setHasMore(nextPage < res.meta.totalPages)
+    } catch (err: unknown) {
+      if ((err as { name?: string }).name === 'CanceledError' || (err as { name?: string }).name === 'AbortError') return
+      console.error(err)
+      toast.error('Không thể tải thêm ảnh')
+    } finally {
+      setIsLoadingMore(false)
+    }
+  }, [isLoadingMore, hasMore, currentPage, fileFormat, fromDate, toDate, toast])
+
+  // ── Effect: reload when filters change ───────────────────────
+  React.useEffect(() => {
+    fetchInitial(fileFormat ?? '', fromDate ?? '', toDate ?? '')
+    return () => {
+      abortRef.current?.abort()
+      loadMoreAbortRef.current?.abort()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filterKey]) // filterKey is stable and avoids fetchInitial reference churn
+
+  // ── Effect: IntersectionObserver ──────────────────────────────
+  React.useEffect(() => {
+    const sentinel = sentinelRef.current
+    if (!sentinel) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && hasMore && !isLoadingMore) {
+          fetchMore()
+        }
+      },
+      { threshold: 0.1, rootMargin: '300px 0px' },
+    )
+    observer.observe(sentinel)
+    return () => observer.disconnect()
+  }, [hasMore, isLoadingMore, fetchMore])
+
+  // ── Memoised grid results (stable reference while images don't change)
+  const searchResults = React.useMemo(
+    () => images.map(mapAdminImageToSearchResult),
+    [images],
+  )
+
+  // ── Delete mutation ───────────────────────────────────────────
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteImage(id),
-    onMutate: (id) => setDeletingId(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['admin', 'images'] })
+    onSuccess: (_, deletedId) => {
+      // Optimistically remove the deleted image from list — no full refetch needed
+      setImages((prev) => prev.filter((img) => img.id !== deletedId))
+      setTotal((prev) => Math.max(0, prev - 1))
+      // Invalidate detail query cache
+      queryClient.invalidateQueries({ queryKey: ['admin', 'images', deletedId] })
       toast.success('Đã xoá ảnh thành công')
       setPendingDelete(null)
       setViewingImageId(null)
-      setDeletingId(null)
     },
     onError: () => {
       toast.error('Xoá ảnh thất bại, vui lòng thử lại')
-      setDeletingId(null)
     },
   })
 
-  const images = data?.data ?? []
-  const totalPages = data?.meta?.totalPages ?? 1
-  const totalDocs = data?.meta?.totalDocs ?? 0
+  // ── Filter handlers ───────────────────────────────────────────
   const hasFilter = fileFormat || fromDate || toDate
+  const isFilterDisabled = status === 'loading' || isLoadingMore
+
+  const handleFilterChange = (patch: { fileFormat?: string; fromDate?: string; toDate?: string }) => {
+    const newFromDate = patch.fromDate !== undefined ? patch.fromDate : (fromDate ?? '')
+    const newToDate = patch.toDate !== undefined ? patch.toDate : (toDate ?? '')
+
+    if (newFromDate && newToDate && newFromDate >= newToDate) {
+      toast.error('Từ ngày phải nhỏ hơn Đến ngày')
+      return
+    }
+
+    navigate({
+      to: '/admin/images',
+      search: {
+        fileFormat: patch.fileFormat ?? fileFormat ?? '',
+        fromDate: newFromDate,
+        toDate: newToDate,
+      },
+    })
+  }
 
   const clearFilter = () =>
-    navigate({ to: '/admin/images', search: { page: 1, fileFormat: '', fromDate: '', toDate: '' } })
+    navigate({ to: '/admin/images', search: { fileFormat: '', fromDate: '', toDate: '' } })
 
+  // ── Card handlers ─────────────────────────────────────────────
+  const handleCardClick = (result: SearchResult) => setViewingImageId(result.id)
+
+  const handleDeleteCard = (result: SearchResult) => {
+    const found = images.find((i) => i.id === result.id)
+    if (found) setPendingDelete(found)
+  }
+
+  const handleSearchSimilar = async (result: SearchResult) => {
+    try {
+      const urlToFetch = result.fullUrl ?? result.thumbnailUrl
+      const file = await fetchImageAsFile(urlToFetch)
+      const newQueryId = `upload-${Date.now()}`
+      setPendingImageFile(file)
+      navigate({ to: '/results', search: { mode: 'image', q: '', query_id: newQueryId } })
+    } catch (err) {
+      console.error(err)
+      toast.error('Không thể tải ảnh để tìm kiếm')
+    }
+  }
+
+  // ── Render ────────────────────────────────────────────────────
   return (
     <div className="p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}
@@ -451,10 +566,12 @@ export function AdminImagesPage() {
         <div>
           <h1 className="text-2xl font-black text-foreground flex items-center gap-2">
             <Images className="size-6 text-primary" />
-            Kho ảnh
+            Kho ảnh hệ thống
           </h1>
           <p className="text-sm text-muted-foreground mt-0.5">
-            {isLoading ? 'Đang tải...' : `${totalDocs.toLocaleString('vi-VN')} ảnh đã index`}
+            {status === 'loading'
+              ? 'Đang tải...'
+              : `${total.toLocaleString('vi-VN')} ảnh đã index trong hệ thống`}
           </p>
         </div>
       </div>
@@ -464,40 +581,25 @@ export function AdminImagesPage() {
         fileFormat={fileFormat ?? ''}
         fromDate={fromDate ?? ''}
         toDate={toDate ?? ''}
-        onFileFormatChange={(v) =>
-          navigate({ to: '/admin/images', search: { page: 1, fileFormat: v, fromDate: fromDate ?? '', toDate: toDate ?? '' } })
-        }
-        onFromDateChange={(v) =>
-          navigate({ to: '/admin/images', search: { page: 1, fileFormat: fileFormat ?? '', fromDate: v, toDate: toDate ?? '' } })
-        }
-        onToDateChange={(v) =>
-          navigate({ to: '/admin/images', search: { page: 1, fileFormat: fileFormat ?? '', fromDate: fromDate ?? '', toDate: v } })
-        }
+        onFileFormatChange={(v) => handleFilterChange({ fileFormat: v })}
+        onFromDateChange={(v) => handleFilterChange({ fromDate: v })}
+        onToDateChange={(v) => handleFilterChange({ toDate: v })}
         onClear={clearFilter}
+        disabled={isFilterDisabled}
       />
 
       {/* Grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-          {Array.from({ length: 20 }).map((_, i) => (
-            <div key={i} className="rounded-xl overflow-hidden">
-              <Skeleton className="aspect-square w-full" />
-              <div className="p-2.5 space-y-1.5">
-                <Skeleton className="h-3 w-3/4" />
-                <Skeleton className="h-2.5 w-1/2" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : isError ? (
+      {status === 'loading' ? (
+        <SkeletonGrid count={20} />
+      ) : status === 'error' ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
           <AlertCircle className="size-10 text-destructive" />
           <p className="font-semibold">Không thể tải danh sách ảnh</p>
-          <Button variant="outline" onClick={() => refetch()}>
+          <Button variant="outline" onClick={() => fetchInitial(fileFormat ?? '', fromDate ?? '', toDate ?? '')}>
             Thử lại
           </Button>
         </div>
-      ) : images.length === 0 ? (
+      ) : status === 'empty' ? (
         <div className="flex flex-col items-center justify-center py-20 gap-4 text-center">
           <div className="flex items-center justify-center size-16 rounded-2xl bg-muted/50">
             <Images className="size-8 text-muted-foreground" />
@@ -517,57 +619,29 @@ export function AdminImagesPage() {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-          {images.map((image) => (
-            <ImageCard
-              key={image.id}
-              image={image}
-              onView={(img) => setViewingImageId(img.id)}
-              onDelete={(img) => setPendingDelete(img)}
-              isDeleting={deletingId === image.id}
-            />
-          ))}
-        </div>
+        <>
+          <MasonryGrid
+            results={searchResults}
+            onCardClick={handleCardClick}
+            onSearchSimilar={handleSearchSimilar}
+            onDelete={handleDeleteCard}
+            isLoadingMore={isLoadingMore}
+          />
+
+          {/* Infinite scroll sentinel */}
+          <div ref={sentinelRef} className="w-full h-4" aria-hidden="true" />
+
+          {/* Load more indicator / end of results */}
+          <LoadMoreIndicator
+            isLoading={isLoadingMore}
+            hasMore={hasMore}
+            total={total}
+            count={images.length}
+          />
+        </>
       )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Trang {page} / {totalPages}
-          </p>
-          <div className="flex gap-1.5">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={(page ?? 1) <= 1}
-              onClick={() =>
-                navigate({
-                  to: '/admin/images',
-                  search: { page: (page ?? 1) - 1, fileFormat: fileFormat ?? '', fromDate: fromDate ?? '', toDate: toDate ?? '' },
-                })
-              }
-            >
-              <ChevronLeft className="size-3.5" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={(page ?? 1) >= totalPages}
-              onClick={() =>
-                navigate({
-                  to: '/admin/images',
-                  search: { page: (page ?? 1) + 1, fileFormat: fileFormat ?? '', fromDate: fromDate ?? '', toDate: toDate ?? '' },
-                })
-              }
-            >
-              <ChevronRight className="size-3.5" />
-            </Button>
-          </div>
-        </div>
-      )}
-
-      {/* Detail Modal */}
+      {/* Detail Modal — uses useQuery (cached, lightweight) */}
       <ImageDetailModal
         imageId={viewingImageId}
         onClose={() => setViewingImageId(null)}
@@ -575,7 +649,7 @@ export function AdminImagesPage() {
           const img = images.find((i) => i.id === id)
           if (img) setPendingDelete(img)
         }}
-        isDeleting={deletingId === viewingImageId}
+        isDeleting={deleteMutation.isPending}
       />
 
       {/* Delete Confirm */}

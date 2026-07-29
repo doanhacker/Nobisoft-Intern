@@ -44,13 +44,13 @@ const imageRouter = Router();
  *         schema:
  *           type: string
  *           format: date
- *         description: Lọc từ ngày (yyyy-mm-dd)
+ *         description: Lọc từ ngày (yyyy-mm-dd), theo múi giờ Asia/Ho_Chi_Minh
  *       - in: query
  *         name: toDate
  *         schema:
  *           type: string
  *           format: date
- *         description: Lọc đến ngày (yyyy-mm-dd)
+ *         description: Lọc đến ngày (yyyy-mm-dd), tính hết ngày theo múi giờ Asia/Ho_Chi_Minh
  *     responses:
  *       200:
  *         description: Lấy danh sách thành công

@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { createRootRoute, Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/router-devtools'
-import { ScanSearch, LogIn, LogOut, Search, UserCircle2, Menu, X, LayoutDashboard, UploadCloud, Sparkles } from 'lucide-react'
+import { ScanSearch, LogIn, LogOut, Search, UserCircle2, Menu, X, LayoutDashboard, UploadCloud } from 'lucide-react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ThemeProvider } from '@/context/ThemeContext'
 import { AuthProvider } from '@/context/AuthContext'
@@ -126,226 +126,217 @@ function AppShell() {
     return () => window.removeEventListener('keydown', handler)
   }, [])
 
-  // Full-page routes get only providers + outlet (no header/footer)
-  if (isFullPageRoute) {
-    return (
-      <div className="relative min-h-screen bg-background text-foreground font-sans selection:bg-primary/30 selection:text-primary-foreground">
-        <NavigationProgress />
-        <main className="relative flex-1 z-[1]">
-          <Outlet />
-        </main>
-        <TanStackRouterDevtools position="bottom-right" />
-      </div>
-    )
-  }
-
+  // Unifying layout to keep `<Outlet />` mounted in the same DOM path.
+  // This prevents React from tearing down and remounting active components (e.g. ResultsPage) during transition.
   return (
     <div className="relative min-h-screen bg-background text-foreground flex flex-col font-sans selection:bg-primary/30 selection:text-primary-foreground">
       <NavigationProgress />
 
       {/* ── Glassmorphic Header ───────────────────────────── */}
-      <header className="sticky top-0 z-[var(--z-sticky)] backdrop-blur-xl bg-background/75 border-b border-border/50 px-4 sm:px-6 py-3">
-        {/* Gradient shimmer line at bottom of header */}
-        <div
-          className="absolute bottom-0 left-0 right-0 h-px"
-          style={{
-            background:
-              'linear-gradient(90deg, transparent 0%, oklch(0.52 0.22 268 / 0.4) 30%, oklch(0.72 0.15 200 / 0.4) 60%, transparent 100%)',
-          }}
-        />
+      {!isFullPageRoute && (
+        <header className="sticky top-0 z-[var(--z-sticky)] backdrop-blur-xl bg-background/75 border-b border-border/50 px-4 sm:px-6 py-3">
+          {/* Gradient shimmer line at bottom of header */}
+          <div
+            className="absolute bottom-0 left-0 right-0 h-px"
+            style={{
+              background:
+                'linear-gradient(90deg, transparent 0%, oklch(0.52 0.22 268 / 0.4) 30%, oklch(0.72 0.15 200 / 0.4) 60%, transparent 100%)',
+            }}
+          />
 
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          {/* ── Brand ── */}
-          <Link to="/" className="flex items-center gap-3 group">
-            {/* Logo mark */}
-            <div className="relative h-9 w-9 rounded-xl gradient-brand flex items-center justify-center shadow-brand transition-all duration-300 group-hover:scale-110 group-hover:shadow-[0_0_20px_oklch(0.52_0.22_268/0.5)]">
-              <ScanSearch className="size-5 text-white" strokeWidth={2.5} />
-            </div>
-            {/* Brand name */}
-            <div>
-              <span className="font-extrabold text-lg text-gradient-brand tracking-wide block leading-tight">
-                Nobisoft
-              </span>
-              <span className="text-[10px] block text-muted-foreground font-semibold tracking-widest uppercase leading-tight">
-                Visual Search
-              </span>
-            </div>
-          </Link>
-
-          {/* ── Desktop Navigation ── */}
-          <nav className="hidden sm:flex items-center gap-1.5">
-            {isAuthenticated && (
-              <>
-                <NavLink to="/search" icon={<Search className="size-3.5" />}>
-                  Tìm kiếm
-                </NavLink>
-                <NavLink to="/upload" icon={<UploadCloud className="size-3.5" />}>
-                  Tải ảnh lên
-                </NavLink>
-              </>
-            )}
-
-            {isAuthenticated ? (
-              <>
-                {isAdmin && (
-                  <NavLink to="/admin" icon={<LayoutDashboard className="size-3.5" />}>
-                    Admin Dashboard
-                  </NavLink>
-                )}
-                <NavLink to="/dashboard" icon={<UserCircle2 className="size-3.5" />}>
-                  {user?.name?.split(' ').at(-1) ?? 'Dashboard'}
-                </NavLink>
-                <Button
-                  id="header-logout"
-                  variant="ghost"
-                  size="sm"
-                  onClick={handleLogout}
-                  className="text-muted-foreground hover:text-foreground gap-1.5"
-                >
-                  <LogOut className="size-3.5" />
-                  Đăng xuất
-                </Button>
-              </>
-            ) : (
-              <>
-                <NavLink to="/login" icon={<LogIn className="size-3.5" />}>
-                  Đăng nhập
-                </NavLink>
-                <Button id="header-register" variant="brand" size="sm" asChild>
-                  <Link to="/register">Đăng ký</Link>
-                </Button>
-              </>
-            )}
-
-            {/* Divider */}
-            <div className="w-px h-5 bg-border/60 mx-1" />
-            <ThemeToggle />
-          </nav>
-
-          {/* ── Mobile: Theme + Hamburger ── */}
-          <div className="flex sm:hidden items-center gap-2" ref={menuRef}>
-            <ThemeToggle />
-
-            <button
-              id="header-mobile-menu"
-              aria-label={menuOpen ? 'Đóng menu' : 'Mở menu'}
-              aria-expanded={menuOpen}
-              onClick={() => setMenuOpen((o) => !o)}
-              className={cn(
-                'relative flex items-center justify-center size-9 rounded-xl border transition-all duration-200',
-                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                menuOpen
-                  ? 'bg-primary/10 border-primary/30 text-primary'
-                  : 'bg-muted/40 border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/80',
-              )}
-            >
-              {/* Animated hamburger → X */}
-              <span
-                className={cn(
-                  'absolute transition-all duration-200',
-                  menuOpen ? 'opacity-100 rotate-0' : 'opacity-0 rotate-90',
-                )}
-              >
-                <X className="size-4" />
-              </span>
-              <span
-                className={cn(
-                  'absolute transition-all duration-200',
-                  menuOpen ? 'opacity-0 -rotate-90' : 'opacity-100 rotate-0',
-                )}
-              >
-                <Menu className="size-4" />
-              </span>
-            </button>
-
-            {/* ── Dropdown Menu ── */}
-            {menuOpen && (
-              <div
-                className={cn(
-                  'absolute top-full right-0 left-0 mt-0',
-                  'bg-background/95 backdrop-blur-xl border-b border-border/50',
-                  'px-4 py-3 flex flex-col gap-1',
-                  'animate-fade-slide-down shadow-[0_8px_32px_oklch(0_0_0/0.12)]',
-                )}
-              >
-                {/* Nav items */}
-                {isAuthenticated && (
-                  <>
-                    <MobileNavLink
-                      to="/search"
-                      icon={<Search className="size-4 text-muted-foreground" />}
-                      onClick={() => setMenuOpen(false)}
-                    >
-                      Tìm kiếm
-                    </MobileNavLink>
-                    <MobileNavLink
-                      to="/upload"
-                      icon={<UploadCloud className="size-4 text-muted-foreground" />}
-                      onClick={() => setMenuOpen(false)}
-                    >
-                      Tải ảnh lên
-                    </MobileNavLink>
-                  </>
-                )}
-
-                {isAuthenticated ? (
-                  <>
-                    {isAdmin && (
-                      <MobileNavLink
-                        to="/admin"
-                        icon={<LayoutDashboard className="size-4 text-muted-foreground" />}
-                        onClick={() => setMenuOpen(false)}
-                      >
-                        Admin Dashboard
-                      </MobileNavLink>
-                    )}
-                    <MobileNavLink
-                      to="/dashboard"
-                      icon={<UserCircle2 className="size-4 text-muted-foreground" />}
-                      onClick={() => setMenuOpen(false)}
-                    >
-                      {user?.name ?? 'Dashboard'}
-                    </MobileNavLink>
-
-                    <div className="h-px bg-border/60 my-1" />
-
-                    <button
-                      onClick={handleLogout}
-                      className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-destructive hover:bg-destructive/10 transition-all duration-150 cursor-pointer w-full text-left"
-                    >
-                      <span className="flex items-center justify-center size-8 rounded-lg bg-destructive/10">
-                        <LogOut className="size-4 text-destructive" />
-                      </span>
-                      Đăng xuất
-                    </button>
-                  </>
-                ) : (
-                  <>
-                    <MobileNavLink
-                      to="/login"
-                      icon={<LogIn className="size-4 text-muted-foreground" />}
-                      onClick={() => setMenuOpen(false)}
-                    >
-                      Đăng nhập
-                    </MobileNavLink>
-
-                    <div className="px-4 py-2">
-                      <Button
-                        variant="brand"
-                        className="w-full"
-                        asChild
-                        onClick={() => setMenuOpen(false)}
-                      >
-                        <Link to="/register">Đăng ký ngay</Link>
-                      </Button>
-                    </div>
-                  </>
-                )}
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            {/* ── Brand ── */}
+            <Link to="/" className="flex items-center gap-3 group">
+              {/* Logo mark */}
+              <div className="relative h-9 w-9 rounded-xl gradient-brand flex items-center justify-center shadow-brand transition-all duration-300 group-hover:scale-110 group-hover:shadow-[0_0_20px_oklch(0.52_0.22_268/0.5)]">
+                <ScanSearch className="size-5 text-white" strokeWidth={2.5} />
               </div>
-            )}
+              {/* Brand name */}
+              <div>
+                <span className="font-extrabold text-lg text-gradient-brand tracking-wide block leading-tight">
+                  Nobisoft
+                </span>
+                <span className="text-[10px] block text-muted-foreground font-semibold tracking-widest uppercase leading-tight">
+                  Visual Search
+                </span>
+              </div>
+            </Link>
+
+            {/* ── Desktop Navigation ── */}
+            <nav className="hidden sm:flex items-center gap-1.5">
+              {isAuthenticated && (
+                <>
+                  <NavLink to="/search" icon={<Search className="size-3.5" />}>
+                    Tìm kiếm
+                  </NavLink>
+                  <NavLink to="/upload" icon={<UploadCloud className="size-3.5" />}>
+                    Tải ảnh lên
+                  </NavLink>
+                </>
+              )}
+
+              {isAuthenticated ? (
+                <>
+                  {isAdmin && (
+                    <NavLink to="/admin" icon={<LayoutDashboard className="size-3.5" />}>
+                      Admin Dashboard
+                    </NavLink>
+                  )}
+                  <NavLink to="/dashboard" icon={<UserCircle2 className="size-3.5" />}>
+                    {user?.name?.split(' ').at(-1) ?? 'Dashboard'}
+                  </NavLink>
+                  <Button
+                    id="header-logout"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleLogout}
+                    className="text-muted-foreground hover:text-foreground gap-1.5"
+                  >
+                    <LogOut className="size-3.5" />
+                    Đăng xuất
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <NavLink to="/login" icon={<LogIn className="size-3.5" />}>
+                    Đăng nhập
+                  </NavLink>
+                  <Button id="header-register" variant="brand" size="sm" asChild>
+                    <Link to="/register">Đăng ký</Link>
+                  </Button>
+                </>
+              )}
+
+              {/* Divider */}
+              <div className="w-px h-5 bg-border/60 mx-1" />
+              <ThemeToggle />
+            </nav>
+
+            {/* ── Mobile: Theme + Hamburger ── */}
+            <div className="flex sm:hidden items-center gap-2" ref={menuRef}>
+              <ThemeToggle />
+
+              <button
+                id="header-mobile-menu"
+                aria-label={menuOpen ? 'Đóng menu' : 'Mở menu'}
+                aria-expanded={menuOpen}
+                onClick={() => setMenuOpen((o) => !o)}
+                className={cn(
+                  'relative flex items-center justify-center size-9 rounded-xl border transition-all duration-200',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  menuOpen
+                    ? 'bg-primary/10 border-primary/30 text-primary'
+                    : 'bg-muted/40 border-border/60 text-muted-foreground hover:text-foreground hover:bg-muted/80',
+                )}
+              >
+                {/* Animated hamburger → X */}
+                <span
+                  className={cn(
+                    'absolute transition-all duration-200',
+                    menuOpen ? 'opacity-100 rotate-0' : 'opacity-0 rotate-90',
+                  )}
+                >
+                  <X className="size-4" />
+                </span>
+                <span
+                  className={cn(
+                    'absolute transition-all duration-200',
+                    menuOpen ? 'opacity-0 -rotate-90' : 'opacity-100 rotate-0',
+                  )}
+                >
+                  <Menu className="size-4" />
+                </span>
+              </button>
+
+              {/* ── Dropdown Menu ── */}
+              {menuOpen && (
+                <div
+                  className={cn(
+                    'absolute top-full right-0 left-0 mt-0',
+                    'bg-background/95 backdrop-blur-xl border-b border-border/50',
+                    'px-4 py-3 flex flex-col gap-1',
+                    'animate-fade-slide-down shadow-[0_8px_32px_oklch(0_0_0/0.12)]',
+                  )}
+                >
+                  {/* Nav items */}
+                  {isAuthenticated && (
+                    <>
+                      <MobileNavLink
+                        to="/search"
+                        icon={<Search className="size-4 text-muted-foreground" />}
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        Tìm kiếm
+                      </MobileNavLink>
+                      <MobileNavLink
+                        to="/upload"
+                        icon={<UploadCloud className="size-4 text-muted-foreground" />}
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        Tải ảnh lên
+                      </MobileNavLink>
+                    </>
+                  )}
+
+                  {isAuthenticated ? (
+                    <>
+                      {isAdmin && (
+                        <MobileNavLink
+                          to="/admin"
+                          icon={<LayoutDashboard className="size-4 text-muted-foreground" />}
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          Admin Dashboard
+                        </MobileNavLink>
+                      )}
+                      <MobileNavLink
+                        to="/dashboard"
+                        icon={<UserCircle2 className="size-4 text-muted-foreground" />}
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        {user?.name ?? 'Dashboard'}
+                      </MobileNavLink>
+
+                      <div className="h-px bg-border/60 my-1" />
+
+                      <button
+                        onClick={handleLogout}
+                        className="flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-semibold text-destructive hover:bg-destructive/10 transition-all duration-150 cursor-pointer w-full text-left"
+                      >
+                        <span className="flex items-center justify-center size-8 rounded-lg bg-destructive/10">
+                          <LogOut className="size-4 text-destructive" />
+                        </span>
+                        Đăng xuất
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <MobileNavLink
+                        to="/login"
+                        icon={<LogIn className="size-4 text-muted-foreground" />}
+                        onClick={() => setMenuOpen(false)}
+                      >
+                        Đăng nhập
+                      </MobileNavLink>
+
+                      <div className="px-4 py-2">
+                        <Button
+                          variant="brand"
+                          className="w-full"
+                          asChild
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          <Link to="/register">Đăng ký ngay</Link>
+                        </Button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      </header>
+        </header>
+      )}
 
       {/* ── Main Content ── */}
       <main className="relative flex-1 z-[1]">
@@ -353,18 +344,20 @@ function AppShell() {
       </main>
 
       {/* ── Footer ── */}
-      <footer className="relative z-[1] border-t border-border/50 bg-muted/20 py-5">
-        <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <div className="h-5 w-5 rounded-md gradient-brand flex items-center justify-center">
-              <ScanSearch className="size-3 text-white" />
+      {!isFullPageRoute && (
+        <footer className="relative z-[1] border-t border-border/50 bg-muted/20 py-5">
+          <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-muted-foreground">
+            <div className="flex items-center gap-2">
+              <div className="h-5 w-5 rounded-md gradient-brand flex items-center justify-center">
+                <ScanSearch className="size-3 text-white" />
+              </div>
+              <span className="font-semibold text-gradient-brand">Nobisoft</span>
+              <span>Visual Search Engine</span>
             </div>
-            <span className="font-semibold text-gradient-brand">Nobisoft</span>
-            <span>Visual Search Engine</span>
+            <p>© {new Date().getFullYear()} Nobisoft · Powered by CLIP AI + React</p>
           </div>
-          <p>© {new Date().getFullYear()} Nobisoft · Powered by CLIP AI + React</p>
-        </div>
-      </footer>
+        </footer>
+      )}
 
       {/* Devtools */}
       <TanStackRouterDevtools position="bottom-right" />

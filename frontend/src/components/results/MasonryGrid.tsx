@@ -19,36 +19,57 @@ export interface SearchResult {
     source?: string
 }
 
+const SKELETON_HEIGHTS = [180, 220, 260, 200, 300, 240, 160, 280]
+
 interface MasonryGridProps {
     results: SearchResult[]
     onCardClick: (result: SearchResult) => void
-    onSearchSimilar: (result: SearchResult) => void
+    onSearchSimilar?: (result: SearchResult) => void
+    onDelete?: (result: SearchResult) => void
     /** Compact mode: fewer columns for split-view (image search) layout */
     compact?: boolean
     /** Show similarity % badge on each card — only pass true for ADMIN role */
     showSimilarityBadge?: boolean
+    /** Optional custom breakpoint columns configuration */
+    breakpointCols?: Record<string, number> | number
+    /** Render skeleton cards at the bottom of the grid when loading more items */
+    isLoadingMore?: boolean
+    /** Number of skeleton cards to render when isLoadingMore is true (default: 6) */
+    skeletonCount?: number
 }
 
 const BREAKPOINTS_DEFAULT = {
-    default: 4,
-    1280: 4,
-    1024: 3,
-    768: 2,
+    default: 6,
+    1536: 6,
+    1280: 5,
+    1024: 4,
+    768: 3,
     640: 2,
     480: 1,
 }
 
 const BREAKPOINTS_COMPACT = {
-    default: 3,
-    1280: 3,
-    1024: 2,
+    default: 4,
+    1536: 4,
+    1280: 4,
+    1024: 3,
     768: 2,
     640: 1,
     480: 1,
 }
 
-export function MasonryGrid({ results, onCardClick, onSearchSimilar, compact = false, showSimilarityBadge = false }: MasonryGridProps) {
-    const breakpoints = compact ? BREAKPOINTS_COMPACT : BREAKPOINTS_DEFAULT
+export function MasonryGrid({
+    results,
+    onCardClick,
+    onSearchSimilar,
+    onDelete,
+    compact = false,
+    showSimilarityBadge = false,
+    breakpointCols,
+    isLoadingMore = false,
+    skeletonCount = 6,
+}: MasonryGridProps) {
+    const breakpoints = breakpointCols ?? (compact ? BREAKPOINTS_COMPACT : BREAKPOINTS_DEFAULT)
     return (
         <Masonry
             breakpointCols={breakpoints}
@@ -65,10 +86,24 @@ export function MasonryGrid({ results, onCardClick, onSearchSimilar, compact = f
                         result={result}
                         onClick={onCardClick}
                         onSearchSimilar={onSearchSimilar}
+                        onDelete={onDelete}
                         showSimilarityBadge={showSimilarityBadge}
                     />
                 </div>
             ))}
+
+            {isLoadingMore &&
+                Array.from({ length: skeletonCount }, (_, i) => (
+                    <div
+                        key={`skeleton-more-${i}`}
+                        className="rounded-xl overflow-hidden animate-shimmer"
+                        style={{ height: SKELETON_HEIGHTS[i % SKELETON_HEIGHTS.length] }}
+                    >
+                        <div className="w-full h-full bg-muted/80 relative">
+                            <div className="absolute top-2 right-2 h-5 w-10 rounded-full bg-muted-foreground/20 animate-shimmer" />
+                        </div>
+                    </div>
+                ))}
         </Masonry>
     )
 }
