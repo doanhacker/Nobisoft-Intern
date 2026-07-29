@@ -69,38 +69,60 @@ public class ImageProcessor
 
         foreach (var image in batch)
         {
-            var filePath = ResolveFilePath(image.Path);
-            if (!File.Exists(filePath))
-            {
-                _logger.LogError("File không tồn tại: {Path}", filePath);
-                await UpdateIndexStatus(image.Id, "FAILED");
-                await IncrementBatchProgressAsync(batchId, 0, 1);
-                failed++;
-                continue;
-            }
+            var isUrl = IsRemoteUrl(image.Path);
 
-            try
+            if (isUrl)
             {
-                var (resizedBytes, originalWidth, originalHeight) = await ResizeImageAsync(filePath, ct);
-                var ext = Path.GetExtension(filePath).TrimStart('.');
-                preparedImages.Add((image, resizedBytes, originalWidth, originalHeight, ext));
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Lỗi resize ảnh {Id}, gửi ảnh gốc cho AI", image.Id);
+                // ── Ảnh từ URL: download về memory ──
                 try
                 {
-                    var rawBytes = await File.ReadAllBytesAsync(filePath, ct);
-                    var ext = Path.GetExtension(filePath).TrimStart('.');
-                    // Width/Height = 0 → sẽ được AI hoặc bước sau cập nhật nếu cần
-                    preparedImages.Add((image, rawBytes, 0, 0, ext));
+                    var (downloadedBytes, origWidth, origHeight, ext) = await DownloadAndResizeImageAsync(image.Path, ct);
+                    preparedImages.Add((image, downloadedBytes, origWidth, origHeight, ext));
                 }
-                catch (Exception readEx)
+                catch (Exception ex)
                 {
-                    _logger.LogError(readEx, "Không thể đọc file gốc {Id}, bỏ qua", image.Id);
+                    _logger.LogError(ex, "Lỗi download/resize ảnh URL {Id}: {Url}", image.Id, image.Path);
                     await UpdateIndexStatus(image.Id, "FAILED");
                     await IncrementBatchProgressAsync(batchId, 0, 1);
                     failed++;
+                }
+            }
+            else
+            {
+                // ── Ảnh từ local file ──
+                var filePath = ResolveFilePath(image.Path);
+                if (!File.Exists(filePath))
+                {
+                    _logger.LogError("File không tồn tại: {Path}", filePath);
+                    await UpdateIndexStatus(image.Id, "FAILED");
+                    await IncrementBatchProgressAsync(batchId, 0, 1);
+                    failed++;
+                    continue;
+                }
+
+                try
+                {
+                    var (resizedBytes, originalWidth, originalHeight) = await ResizeImageAsync(filePath, ct);
+                    var ext = Path.GetExtension(filePath).TrimStart('.');
+                    preparedImages.Add((image, resizedBytes, originalWidth, originalHeight, ext));
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Lỗi resize ảnh {Id}, gửi ảnh gốc cho AI", image.Id);
+                    try
+                    {
+                        var rawBytes = await File.ReadAllBytesAsync(filePath, ct);
+                        var ext = Path.GetExtension(filePath).TrimStart('.');
+                        // Width/Height = 0 → sẽ được AI hoặc bước sau cập nhật nếu cần
+                        preparedImages.Add((image, rawBytes, 0, 0, ext));
+                    }
+                    catch (Exception readEx)
+                    {
+                        _logger.LogError(readEx, "Không thể đọc file gốc {Id}, bỏ qua", image.Id);
+                        await UpdateIndexStatus(image.Id, "FAILED");
+                        await IncrementBatchProgressAsync(batchId, 0, 1);
+                        failed++;
+                    }
                 }
             }
         }
@@ -494,6 +516,79 @@ public class ImageProcessor
     }
 
     // Helpers
+
+    /// <summary>
+    /// Kiểm tra xem path có phải URL remote không.
+    /// </summary>
+    private static bool IsRemoteUrl(string path)
+    {
+        return path.StartsWith("http://", StringComparison.OrdinalIgnoreCase)
+            || path.StartsWith("https://", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Download ảnh từ URL, resize, trả về bytes + metadata.
+    /// Thêm ?w=1024 cho Unsplash để tiết kiệm băng thông.
+    /// </summary>
+    private async Task<(byte[] Bytes, int Width, int Height, string Ext)> DownloadAndResizeImageAsync(string imageUrl, CancellationToken ct)
+    {
+        var client = _httpClientFactory.CreateClient();
+
+        // Thêm ?w=1024 cho Unsplash URLs để tiết kiệm băng thông
+        var downloadUrl = imageUrl;
+        if (imageUrl.Contains("images.unsplash.com") && !imageUrl.Contains("?w="))
+        {
+            downloadUrl = imageUrl.Contains('?')
+                ? $"{imageUrl}&w={MaxResizeDimension}"
+                : $"{imageUrl}?w={MaxResizeDimension}";
+        }
+
+        var response = await client.GetAsync(downloadUrl, ct);
+        response.EnsureSuccessStatusCode();
+
+        var rawBytes = await response.Content.ReadAsByteArrayAsync(ct);
+        if (rawBytes.Length == 0)
+            throw new InvalidOperationException($"Download trả về 0 bytes: {downloadUrl}");
+
+        // Detect format từ magic bytes
+        var detectedFormat = DetectImageFormat(rawBytes);
+        var ext = detectedFormat switch
+        {
+            MagickFormat.Jpeg => "jpg",
+            MagickFormat.Png => "png",
+            MagickFormat.WebP => "webp",
+            MagickFormat.Gif => "gif",
+            MagickFormat.Bmp => "bmp",
+            _ => "jpg" // fallback
+        };
+
+        // Resize nếu cần
+        MagickImage image;
+        if (detectedFormat != null)
+        {
+            var settings = new MagickReadSettings { Format = detectedFormat.Value };
+            image = new MagickImage(rawBytes, settings);
+        }
+        else
+        {
+            image = new MagickImage(rawBytes);
+        }
+
+        using (image)
+        {
+            int originalWidth = (int)image.Width;
+            int originalHeight = (int)image.Height;
+
+            // Luôn resize ảnh URL về max 1024px để tối ưu cho AI
+            var size = new MagickGeometry(MaxResizeDimension, MaxResizeDimension);
+            image.Resize(size);
+            _logger.LogInformation("Resize ảnh URL: {W}x{H} → {RW}x{RH}", originalWidth, originalHeight, image.Width, image.Height);
+
+            image.Format = MagickFormat.Jpeg;
+            image.Quality = 85; // Nén JPEG 85% — cân bằng chất lượng & kích thước
+            return (image.ToByteArray(), originalWidth, originalHeight, ext);
+        }
+    }
 
     private string ResolveFilePath(string messagePath)
     {
