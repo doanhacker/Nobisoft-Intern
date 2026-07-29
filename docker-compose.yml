@@ -67,7 +67,7 @@ services:
     environment:
       - VITE_API_URL=${VITE_API_URL}
     ports:
-      - "5173:5173"
+      - "80:5173"
     depends_on:
       - backend
 
@@ -93,7 +93,7 @@ services:
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
-      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      test: [ "CMD", "rabbitmq-diagnostics", "-q", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
