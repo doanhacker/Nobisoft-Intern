@@ -6,6 +6,60 @@ import type { ImageListQuery } from '../validators/admin/image.validate.js';
 import type { MyImageListQuery } from '../validators/client/my-image.validate.js';
 
 const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
+const IMAGE_CLEANUP_MAX_ATTEMPTS = 3;
+const IMAGE_CLEANUP_RETRY_DELAY_MS = 200;
+
+interface ImageResource {
+  id: string;
+  path: string;
+}
+
+function wait(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+async function cleanupWithRetry(
+  resourceName: string,
+  imageId: string,
+  operation: () => Promise<void>,
+): Promise<boolean> {
+  for (let attempt = 1; attempt <= IMAGE_CLEANUP_MAX_ATTEMPTS; attempt += 1) {
+    try {
+      await operation();
+      return true;
+    } catch (error) {
+      console.error(
+        `Failed to delete ${resourceName} for image ${imageId} `
+        + `(attempt ${attempt}/${IMAGE_CLEANUP_MAX_ATTEMPTS}):`,
+        error,
+      );
+
+      if (attempt < IMAGE_CLEANUP_MAX_ATTEMPTS) {
+        await wait(IMAGE_CLEANUP_RETRY_DELAY_MS * attempt);
+      }
+    }
+  }
+
+  return false;
+}
+
+async function cleanupImageResources(image: ImageResource): Promise<void> {
+  const [qdrantDeleted, fileDeleted] = await Promise.all([
+    cleanupWithRetry('Qdrant vector', image.id, () => deleteImageVector(image.id)),
+    cleanupWithRetry('stored file', image.id, () => deleteImageFromDisk(image.path)),
+  ]);
+
+  if (!qdrantDeleted || !fileDeleted) {
+    console.error(
+      `Image ${image.id} was deleted from PostgreSQL but external resource cleanup is incomplete`,
+    );
+  }
+}
+
+async function deleteImageRecordAndResources(image: ImageResource): Promise<void> {
+  await prisma.image.delete({ where: { id: image.id } });
+  await cleanupImageResources(image);
+}
 
 function resolveImageUrl(imagePath: string): string {
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
@@ -95,18 +149,7 @@ export async function deleteImage(id: string) {
     return null;
   }
 
-  // 1. Xoá khỏi PostgreSQL
-  await prisma.image.delete({ where: { id } });
-
-  // 2. Xoá vector khỏi Qdrant
-  try {
-    await deleteImageVector(id);
-  } catch {
-    console.warn(`Qdrant delete failed for image ${id}, may not exist`);
-  }
-
-  // 3. Xoá file khỏi disk
-  await deleteImageFromDisk(image.path);
+  await deleteImageRecordAndResources(image);
 
   return image;
 }
@@ -181,16 +224,7 @@ export async function deleteUserImage(userId: string, imageId: string) {
     return { found: true as const, owned: false as const };
   }
 
-  // Xoá ảnh (reuse logic từ deleteImage)
-  await prisma.image.delete({ where: { id: imageId } });
-
-  try {
-    await deleteImageVector(imageId);
-  } catch {
-    console.warn(`Qdrant delete failed for image ${imageId}, may not exist`);
-  }
-
-  await deleteImageFromDisk(image.path);
+  await deleteImageRecordAndResources(image);
 
   return { found: true as const, owned: true as const };
 }
