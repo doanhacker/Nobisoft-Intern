@@ -9,6 +9,7 @@ import type {
   RecommendationResult,
   RecommendationResultItem,
 } from '../../../types/recommendation.type.js';
+import { resolveImageUrl } from '../../../utils/image-url.util.js';
 
 const DEFAULT_CLICK_LIMIT = 30;
 const TIME_DECAY_LAMBDA = 0.05;
@@ -157,12 +158,3 @@ async function getRecommendationResults(
   });
 }
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
-
-function resolveImageUrl(imagePath: string): string {
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
-  }
-  const cleanPath = imagePath.replace(/\\/g, '/').replace(/^\//, '');
-  return `${BACKEND_URL}/${cleanPath}`;
-}

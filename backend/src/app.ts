@@ -8,9 +8,7 @@ import type { UUID } from 'node:crypto';
 import swaggerUi from 'swagger-ui-express';
 import { swaggerSpec } from './config/swagger.js';
 import { routesApiVer1 } from './api/v1/routes/index.route.js';
-
-
-import path from 'path';
+import imageServeRouter from './api/v1/routes/image-serve.route.js';
 
 const app: Express = express();
 
@@ -31,8 +29,8 @@ app.use(cors({
 
 app.use(express.json());
 
-// Serve ảnh local (storage/images/...) — browser load trực tiếp, không qua DB
-app.use('/storage', express.static(path.resolve(process.env.STORAGE_DIR || './storage')));
+// Serve ảnh với hỗ trợ resize
+app.use('/images', imageServeRouter);
 
 // ─── Swagger UI ───
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec, {

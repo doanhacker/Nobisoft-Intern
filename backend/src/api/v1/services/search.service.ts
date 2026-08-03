@@ -16,6 +16,7 @@ import type {
 } from '../../../types/search.type.js';
 import { tokenizeSearchQuery } from '../../../utils/normalize.util.js';
 import { readImageFromDisk } from '../../../utils/storage.util.js';
+import { resolveImageUrl } from '../../../utils/image-url.util.js';
 import {
   createImageSearchHistory,
   createSearchHistory,
@@ -336,12 +337,3 @@ function getImageMimeType(fileFormat: string): string {
   return mimeTypes[fileFormat.toLowerCase()] ?? 'application/octet-stream';
 }
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
-
-function resolveImageUrl(imagePath: string): string {
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
-  }
-  const cleanPath = imagePath.replace(/\\/g, '/').replace(/^\//, '');
-  return `${BACKEND_URL}/${cleanPath}`;
-}

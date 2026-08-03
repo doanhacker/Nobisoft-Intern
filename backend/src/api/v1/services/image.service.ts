@@ -2,10 +2,10 @@ import { prisma } from '../../../config/prisma.js';
 import { deleteImageVector } from '../../../services/qdrant.service.js';
 import { deleteImageFromDisk } from '../../../utils/storage.util.js';
 import { endOfHoChiMinhDay, startOfHoChiMinhDay } from '../../../utils/date.util.js';
+import { resolveImageUrl } from '../../../utils/image-url.util.js';
 import type { ImageListQuery } from '../validators/admin/image.validate.js';
 import type { MyImageListQuery } from '../validators/client/my-image.validate.js';
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
 const IMAGE_CLEANUP_MAX_ATTEMPTS = 3;
 const IMAGE_CLEANUP_RETRY_DELAY_MS = 200;
 
@@ -61,14 +61,7 @@ async function deleteImageRecordAndResources(image: ImageResource): Promise<void
   await cleanupImageResources(image);
 }
 
-function resolveImageUrl(imagePath: string): string {
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
-  }
-  // "storage/images/index/xxx.jpg" → "http://localhost:8000/storage/images/index/xxx.jpg"
-  const cleanPath = imagePath.replace(/\\/g, '/').replace(/^\//, '');
-  return `${BACKEND_URL}/${cleanPath}`;
-}
+
 
 function withImageUrl<T extends { path: string }>(image: T): Omit<T, 'path'> & { imageUrl: string } {
   const { path, ...rest } = image;
