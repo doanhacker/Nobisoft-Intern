@@ -22,7 +22,7 @@ const imageServeRouter = Router();
  *       GET /images/index/uuid.jpg?h=768
  *       ```
  *
- *       **Resize theo cả width và height (fit inside):**
+ *       **Resize theo cả width và height (crop/cover):**
  *       ```
  *       GET /images/index/uuid.jpg?w=1024&h=768
  *       ```
