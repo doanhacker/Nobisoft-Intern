@@ -5,6 +5,7 @@ import type {
   SearchHistoryListQuery,
   UserSearchHistoryServiceResult,
 } from '../../../types/history.type.js';
+import { resolveImageUrl } from '../../../utils/image-url.util.js';
 
 export class HistoryPageOutOfRangeError extends Error { }
 export class SearchHistoryUserNotFoundError extends Error { }
@@ -91,13 +92,3 @@ export async function getUserSearchHistory(
   };
 }
 
-const BACKEND_URL = process.env.BACKEND_URL || 'http://localhost:8000';
-
-function resolveImageUrl(imagePath: string): string {
-  if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-    return imagePath;
-  }
-
-  const cleanPath = imagePath.replace(/\\/g, '/').replace(/^\//, '');
-  return `${BACKEND_URL}/${cleanPath}`;
-}
