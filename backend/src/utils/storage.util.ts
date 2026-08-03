@@ -40,7 +40,7 @@ export async function saveImageToDisk(
   const ext = getExtension(mimetype);
   const filename = `${id}.${ext}`;
   const absolutePath = path.resolve(targetDir, filename);
-  const relativePath = path.join('storage', 'images', subfolder, filename);
+  const relativePath = `/images/${subfolder}/${filename}`;
 
   await fs.writeFile(absolutePath, buffer);
 
@@ -78,9 +78,17 @@ function resolveStoredImagePath(relativePath: string): string {
   }
 
   const normalizedPath = relativePath.replace(/\\/g, '/');
-  const pathInsideStorage = normalizedPath.startsWith('storage/')
-    ? normalizedPath.slice('storage/'.length)
-    : normalizedPath;
+
+  let pathInsideStorage: string;
+  if (normalizedPath.startsWith('storage/')) {
+    // Format cũ: "storage/images/index/xxx.jpg"
+    pathInsideStorage = normalizedPath.slice('storage/'.length);
+  } else if (normalizedPath.startsWith('/images/')) {
+    // Format mới: "/images/index/xxx.jpg"
+    pathInsideStorage = normalizedPath.slice(1); // → "images/index/xxx.jpg"
+  } else {
+    pathInsideStorage = normalizedPath;
+  }
 
   return path.resolve(STORAGE_DIR, pathInsideStorage);
 }

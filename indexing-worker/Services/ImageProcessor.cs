@@ -592,8 +592,17 @@ public class ImageProcessor
 
     private string ResolveFilePath(string messagePath)
     {
-        var fileName = Path.GetFileName(messagePath);
-        return Path.Combine(_storageDir, "images", "index", fileName);
+        var normalizedPath = messagePath.Replace('\\', '/');
+        if (normalizedPath.StartsWith("storage/"))
+        {
+            normalizedPath = normalizedPath.Substring("storage/".Length);
+        }
+        else if (normalizedPath.StartsWith("/"))
+        {
+            normalizedPath = normalizedPath.TrimStart('/');
+        }
+        
+        return Path.Combine(_storageDir, normalizedPath);
     }
 
     private static string ParseConnectionString(string databaseUrl)

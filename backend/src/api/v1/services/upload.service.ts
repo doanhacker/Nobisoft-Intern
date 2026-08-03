@@ -1,6 +1,5 @@
 import { prisma } from '../../../config/prisma.js';
 import { publishToIndexingQueue } from '../../../services/rabbitmq.service.js';
-import path from 'path';
 import fs from 'fs';
 
 /**
@@ -51,7 +50,7 @@ export async function processImageUploads(
 
     try {
       const id = file.filename.split('.')[0] as string;
-      const relativePath = path.normalize(file.path).replace(/\\/g, '/');
+      const relativePath = `/images/index/${file.filename}`;
 
       await prisma.$transaction(async (tx) => {
         await tx.image.create({
