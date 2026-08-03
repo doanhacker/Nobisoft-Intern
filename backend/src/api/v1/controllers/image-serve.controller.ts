@@ -72,7 +72,7 @@ export async function serveImage(req: Request, res: Response) {
         .resize({
           width: width || undefined,
           height: height || undefined,
-          fit: 'inside',
+          fit: 'cover',
           withoutEnlargement: true,
         })
         .toBuffer();
