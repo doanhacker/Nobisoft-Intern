@@ -17,6 +17,15 @@ export const imageListQuerySchema = z
 
 export type ImageListQuery = z.infer<typeof imageListQuerySchema>;
 
+export const bulkDeleteImagesSchema = z.object({
+  imageIds: z
+    .array(z.string().uuid('Image ID không hợp lệ'))
+    .min(1, 'Phải chọn ít nhất một ảnh')
+    .transform((imageIds) => [...new Set(imageIds)]),
+});
+
+export type BulkDeleteImagesInput = z.infer<typeof bulkDeleteImagesSchema>;
+
 export function validateImageListQuery(req: Request, res: Response, next: NextFunction) {
   const result = imageListQuerySchema.safeParse(req.query);
 
@@ -31,5 +40,22 @@ export function validateImageListQuery(req: Request, res: Response, next: NextFu
   }
 
   res.locals.query = result.data;
+  next();
+}
+
+export function validateBulkDeleteImages(req: Request, res: Response, next: NextFunction) {
+  const result = bulkDeleteImagesSchema.safeParse(req.body);
+
+  if (!result.success) {
+    const message = result.error.issues[0]?.message ?? 'Danh sách ảnh không hợp lệ';
+
+    res.status(400).json({
+      success: false,
+      message,
+    });
+    return;
+  }
+
+  res.locals.body = result.data;
   next();
 }

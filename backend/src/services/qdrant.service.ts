@@ -55,9 +55,22 @@ export async function upsertImageVector(
       {
         id: imageId,
         vector,
-        payload: { ...payload },
+        payload: { ...payload, deleted: false },
       },
     ],
+  });
+}
+
+export async function setImageVectorsDeleted(
+  imageIds: string[],
+  deleted: boolean,
+): Promise<void> {
+  if (imageIds.length === 0) return;
+
+  await qdrantClient.setPayload(QDRANT_COLLECTION_NAME, {
+    payload: { deleted },
+    points: imageIds,
+    wait: true,
   });
 }
 
@@ -107,15 +120,15 @@ export async function searchSimilarExcluding(
     with_vector: false,
   };
 
-  if (excludeIds.length > 0) {
-    queryParams.filter = {
-      must_not: [
-        {
-          has_id: excludeIds,
-        },
-      ],
-    };
-  }
+  queryParams.filter = {
+    must_not: [
+      {
+        key: 'deleted',
+        match: { value: true },
+      },
+      ...(excludeIds.length > 0 ? [{ has_id: excludeIds }] : []),
+    ],
+  };
 
   const queryResult = await qdrantClient.query(QDRANT_COLLECTION_NAME, queryParams);
 
@@ -144,6 +157,14 @@ export async function searchSimilarImageVectors(
     score_threshold: getSearchMinScore(mode),
     with_payload: false,
     with_vector: false,
+    filter: {
+      must_not: [
+        {
+          key: 'deleted',
+          match: { value: true },
+        },
+      ],
+    },
   });
 
   const matchedPoints = queryResult.points.map((point) => ({

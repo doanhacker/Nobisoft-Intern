@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import * as imageController from '../../controllers/admin/image.controller.js';
-import { validateImageListQuery } from '../../validators/admin/image.validate.js';
+import {
+  validateBulkDeleteImages,
+  validateImageListQuery,
+} from '../../validators/admin/image.validate.js';
 import { validateImageIdParam } from '../../validators/shared/image-id.validate.js';
 
 const imageRouter = Router();
@@ -194,26 +197,35 @@ imageRouter.get('/:id', validateImageIdParam, imageController.getImage);
 
 /**
  * @swagger
- * /admin/images/{id}:
- *   delete:
+ * /admin/images/bulk-delete:
+ *   patch:
  *     tags: [Admin - Images]
- *     summary: Xóa ảnh (chỉ Admin)
+ *     summary: Xóa mềm một hoặc nhiều ảnh
  *     description: |
- *       Xóa ảnh khỏi hệ thống. Chỉ Admin mới có quyền thực hiện.
- *       Cascade xóa: PostgreSQL (image + image_index + image_ocr), Qdrant (vector), và file trên disk.
+ *       Admin gửi toàn bộ ID ảnh đã chọn. Muốn xóa một ảnh thì gửi mảng có một ID.
+ *       Ảnh được chuyển vào thùng rác, không bị xóa khỏi Storage và Qdrant.
  *     security:
  *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: uuid
- *         description: Image ID (UUID)
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [imageIds]
+ *             properties:
+ *               imageIds:
+ *                 type: array
+ *                 minItems: 1
+ *                 items:
+ *                   type: string
+ *                   format: uuid
+ *                 example:
+ *                   - "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+ *                   - "550e8400-e29b-41d4-a716-446655440000"
  *     responses:
  *       200:
- *         description: Xóa ảnh thành công
+ *         description: Chuyển ảnh vào thùng rác thành công
  *         content:
  *           application/json:
  *             schema:
@@ -224,18 +236,25 @@ imageRouter.get('/:id', validateImageIdParam, imageController.getImage);
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: "Xóa ảnh thành công"
+ *                   example: "Đã chuyển 2 ảnh vào thùng rác"
  *                 data:
- *                   type: "null"
+ *                   type: object
+ *                   properties:
+ *                     requested:
+ *                       type: integer
+ *                       example: 2
+ *                     deleted:
+ *                       type: integer
+ *                       example: 2
  *       400:
- *         description: ID không đúng định dạng UUID
+ *         description: Danh sách ID rỗng hoặc có ID không đúng định dạng UUID
  *         content:
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  *             example:
  *               success: false
- *               message: "Image ID không hợp lệ"
+ *               message: "Danh sách ảnh không hợp lệ"
  *       401:
  *         description: Chưa đăng nhập hoặc token hết hạn
  *         content:
@@ -254,15 +273,6 @@ imageRouter.get('/:id', validateImageIdParam, imageController.getImage);
  *             example:
  *               success: false
  *               message: "Bạn không có quyền truy cập"
- *       404:
- *         description: Ảnh không tồn tại trong hệ thống
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/ErrorResponse'
- *             example:
- *               success: false
- *               message: "Ảnh không tồn tại"
  *       500:
  *         description: Lỗi server
  *         content:
@@ -271,8 +281,8 @@ imageRouter.get('/:id', validateImageIdParam, imageController.getImage);
  *               $ref: '#/components/schemas/ErrorResponse'
  *             example:
  *               success: false
- *               message: "Xóa ảnh thất bại"
+ *               message: "Xóa nhiều ảnh thất bại"
  */
-imageRouter.delete('/:id', validateImageIdParam, imageController.removeImage);
+imageRouter.patch('/bulk-delete', validateBulkDeleteImages, imageController.bulkDeleteImages);
 
 export default imageRouter;

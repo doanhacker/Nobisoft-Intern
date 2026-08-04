@@ -69,11 +69,13 @@ model Image {
   fileSize   Int?
   fileFormat String?  @db.VarChar(20)
   createdAt  DateTime @default(now()) @db.Timestamptz()
+  deletedAt  DateTime? @db.Timestamptz()
 
   imageIndex      ImageIndex?
   searchHistories SearchHistory[]
   searchClicks    SearchClick[]
 
+  @@index([deletedAt])
   @@map("images")
 }
 

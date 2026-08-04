@@ -1,67 +1,9 @@
 import { prisma } from '../../../config/prisma.js';
-import { deleteImageVector } from '../../../services/qdrant.service.js';
-import { deleteImageFromDisk } from '../../../utils/storage.util.js';
+import { setImageVectorsDeleted } from '../../../services/qdrant.service.js';
 import { endOfHoChiMinhDay, startOfHoChiMinhDay } from '../../../utils/date.util.js';
 import { resolveImageUrl } from '../../../utils/image-url.util.js';
 import type { ImageListQuery } from '../validators/admin/image.validate.js';
 import type { MyImageListQuery } from '../validators/client/my-image.validate.js';
-
-const IMAGE_CLEANUP_MAX_ATTEMPTS = 3;
-const IMAGE_CLEANUP_RETRY_DELAY_MS = 200;
-
-interface ImageResource {
-  id: string;
-  path: string;
-}
-
-function wait(milliseconds: number) {
-  return new Promise((resolve) => setTimeout(resolve, milliseconds));
-}
-
-async function cleanupWithRetry(
-  resourceName: string,
-  imageId: string,
-  operation: () => Promise<void>,
-): Promise<boolean> {
-  for (let attempt = 1; attempt <= IMAGE_CLEANUP_MAX_ATTEMPTS; attempt += 1) {
-    try {
-      await operation();
-      return true;
-    } catch (error) {
-      console.error(
-        `Failed to delete ${resourceName} for image ${imageId} `
-        + `(attempt ${attempt}/${IMAGE_CLEANUP_MAX_ATTEMPTS}):`,
-        error,
-      );
-
-      if (attempt < IMAGE_CLEANUP_MAX_ATTEMPTS) {
-        await wait(IMAGE_CLEANUP_RETRY_DELAY_MS * attempt);
-      }
-    }
-  }
-
-  return false;
-}
-
-async function cleanupImageResources(image: ImageResource): Promise<void> {
-  const [qdrantDeleted, fileDeleted] = await Promise.all([
-    cleanupWithRetry('Qdrant vector', image.id, () => deleteImageVector(image.id)),
-    cleanupWithRetry('stored file', image.id, () => deleteImageFromDisk(image.path)),
-  ]);
-
-  if (!qdrantDeleted || !fileDeleted) {
-    console.error(
-      `Image ${image.id} was deleted from PostgreSQL but external resource cleanup is incomplete`,
-    );
-  }
-}
-
-async function deleteImageRecordAndResources(image: ImageResource): Promise<void> {
-  await prisma.image.delete({ where: { id: image.id } });
-  await cleanupImageResources(image);
-}
-
-
 
 function withImageUrl<T extends { path: string }>(image: T): Omit<T, 'path'> & { imageUrl: string } {
   const { path, ...rest } = image;
@@ -73,6 +15,7 @@ export async function getIndexedImages(query: ImageListQuery) {
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {
+    deletedAt: null,
     imageIndex: {
       is: {
         status: 'SUCCESS',
@@ -118,8 +61,8 @@ export async function getIndexedImages(query: ImageListQuery) {
 }
 
 export async function getImageDetail(id: string) {
-  const image = await prisma.image.findUnique({
-    where: { id },
+  const image = await prisma.image.findFirst({
+    where: { id, deletedAt: null },
     include: {
       imageIndex: {
         include: {
@@ -132,19 +75,39 @@ export async function getImageDetail(id: string) {
   return image ? withImageUrl(image) : null;
 }
 
-export async function deleteImage(id: string) {
-  const image = await prisma.image.findUnique({
-    where: { id },
-    select: { id: true, path: true },
+export async function softDeleteImages(imageIds: string[]) {
+  const requested = imageIds.length;
+  const activeImages = await prisma.image.findMany({
+    where: {
+      id: { in: imageIds },
+      deletedAt: null,
+    },
+    select: { id: true },
   });
+  const activeImageIds = activeImages.map((image) => image.id);
 
-  if (!image) {
-    return null;
+  if (activeImageIds.length === 0) {
+    return { requested, deleted: 0 };
   }
 
-  await deleteImageRecordAndResources(image);
+  await setImageVectorsDeleted(activeImageIds, true);
 
-  return image;
+  try {
+    const result = await prisma.image.updateMany({
+      where: {
+        id: { in: activeImageIds },
+        deletedAt: null,
+      },
+      data: { deletedAt: new Date() },
+    });
+
+    return { requested, deleted: result.count };
+  } catch (error) {
+    await setImageVectorsDeleted(activeImageIds, false).catch((rollbackError) => {
+      console.error('Failed to rollback Qdrant soft-delete payload:', rollbackError);
+    });
+    throw error;
+  }
 }
 
 // ─── User's own images ───
@@ -154,8 +117,10 @@ export async function getUserImages(userId: string, query: MyImageListQuery) {
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {
+    deletedAt: null,
     imageIndex: {
       is: {
+        status: 'SUCCESS',
         batch: { uploadedBy: userId },
       },
     },
@@ -196,8 +161,8 @@ export async function getUserImages(userId: string, query: MyImageListQuery) {
 
 export async function deleteUserImage(userId: string, imageId: string) {
   // Kiểm tra ảnh có thuộc về user không (qua batch)
-  const image = await prisma.image.findUnique({
-    where: { id: imageId },
+  const image = await prisma.image.findFirst({
+    where: { id: imageId, deletedAt: null },
     include: {
       imageIndex: {
         include: {
@@ -217,7 +182,7 @@ export async function deleteUserImage(userId: string, imageId: string) {
     return { found: true as const, owned: false as const };
   }
 
-  await deleteImageRecordAndResources(image);
+  await softDeleteImages([image.id]);
 
   return { found: true as const, owned: true as const };
 }
