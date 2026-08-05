@@ -1,8 +1,9 @@
 import { Router } from 'express';
 import * as imageController from '../../controllers/admin/image.controller.js';
 import {
-  validateBulkDeleteImages,
+  validateImageIdsBody,
   validateImageListQuery,
+  validateTrashImageListQuery,
 } from '../../validators/admin/image.validate.js';
 import { validateImageIdParam } from '../../validators/shared/image-id.validate.js';
 
@@ -112,6 +113,83 @@ const imageRouter = Router();
  *               message: "Lấy danh sách ảnh thất bại"
  */
 imageRouter.get('/', validateImageListQuery, imageController.listImages);
+
+/**
+ * @swagger
+ * /admin/images/trash:
+ *   get:
+ *     tags: [Admin - Images]
+ *     summary: Lấy danh sách ảnh trong thùng rác
+ *     description: |
+ *       Trả về các ảnh đã xóa mềm, sắp xếp theo thời gian xóa mới nhất.
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           default: 1
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           minimum: 1
+ *           maximum: 100
+ *           default: 20
+ *     responses:
+ *       200:
+ *         description: Lấy danh sách thùng rác thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Lấy danh sách ảnh trong thùng rác thành công"
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     allOf:
+ *                       - $ref: '#/components/schemas/ImageListItem'
+ *                       - type: object
+ *                         properties:
+ *                           deletedAt:
+ *                             type: string
+ *                             format: date-time
+ *                 meta:
+ *                   $ref: '#/components/schemas/PaginationMeta'
+ *       400:
+ *         description: Query params không hợp lệ
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Chưa đăng nhập hoặc token hết hạn
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Không có quyền Admin
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Lỗi server
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+imageRouter.get('/trash', validateTrashImageListQuery, imageController.listTrashImages);
 
 /**
  * @swagger
@@ -283,6 +361,84 @@ imageRouter.get('/:id', validateImageIdParam, imageController.getImage);
  *               success: false
  *               message: "Xóa nhiều ảnh thất bại"
  */
-imageRouter.patch('/bulk-delete', validateBulkDeleteImages, imageController.bulkDeleteImages);
+imageRouter.patch('/bulk-delete', validateImageIdsBody, imageController.bulkDeleteImages);
+
+/**
+ * @swagger
+ * /admin/images/bulk-restore:
+ *   patch:
+ *     tags: [Admin - Images]
+ *     summary: Khôi phục một hoặc nhiều ảnh
+ *     description: |
+ *       Admin gửi toàn bộ ID ảnh cần khôi phục. Muốn khôi phục một ảnh thì gửi mảng có một ID.
+ *       Backend đặt `deletedAt` về null và bật lại vector trong Qdrant.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [imageIds]
+ *             properties:
+ *               imageIds:
+ *                 type: array
+ *                 minItems: 1
+ *                 items:
+ *                   type: string
+ *                   format: uuid
+ *                 example:
+ *                   - "3fa85f64-5717-4562-b3fc-2c963f66afa6"
+ *                   - "550e8400-e29b-41d4-a716-446655440000"
+ *     responses:
+ *       200:
+ *         description: Khôi phục ảnh thành công
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *                 message:
+ *                   type: string
+ *                   example: "Đã khôi phục 2 ảnh"
+ *                 data:
+ *                   type: object
+ *                   properties:
+ *                     requested:
+ *                       type: integer
+ *                       example: 2
+ *                     restored:
+ *                       type: integer
+ *                       example: 2
+ *       400:
+ *         description: Danh sách ID rỗng hoặc có ID không đúng định dạng UUID
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       401:
+ *         description: Chưa đăng nhập hoặc token hết hạn
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       403:
+ *         description: Không có quyền Admin
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       500:
+ *         description: Lỗi server
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ */
+imageRouter.patch('/bulk-restore', validateImageIdsBody, imageController.restoreImages);
 
 export default imageRouter;

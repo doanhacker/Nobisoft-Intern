@@ -4,11 +4,14 @@ import type {
   BulkDeleteImagesApiResponse,
   ImageDetailApiResponse,
   ImageListApiResponse,
+  RestoreImagesApiResponse,
+  TrashImageListApiResponse,
 } from '../../../../types/image.type.js';
 import { createPaginationMeta } from '../../../../utils/pagination.util.js';
 import type {
-  BulkDeleteImagesInput,
+  ImageIdsBody,
   ImageListQuery,
+  TrashImageListQuery,
 } from '../../validators/admin/image.validate.js';
 import * as imageService from '../../services/image.service.js';
 
@@ -67,9 +70,33 @@ export async function getImage(req: Request, res: Response) {
   }
 }
 
+export async function listTrashImages(_req: Request, res: Response) {
+  try {
+    const query = res.locals.query as TrashImageListQuery;
+    const { images, total } = await imageService.getDeletedImages(query);
+
+    const response: TrashImageListApiResponse = {
+      success: true,
+      message: 'Lấy danh sách ảnh trong thùng rác thành công',
+      data: images,
+      meta: createPaginationMeta(query.page, query.limit, total),
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('List trash images error:', error);
+
+    const response: ApiResponse = {
+      success: false,
+      message: 'Lấy danh sách ảnh trong thùng rác thất bại',
+    };
+    res.status(500).json(response);
+  }
+}
+
 export async function bulkDeleteImages(_req: Request, res: Response) {
   try {
-    const { imageIds } = res.locals.body as BulkDeleteImagesInput;
+    const { imageIds } = res.locals.body as ImageIdsBody;
     const result = await imageService.softDeleteImages(imageIds);
 
     const response: BulkDeleteImagesApiResponse = {
@@ -84,6 +111,28 @@ export async function bulkDeleteImages(_req: Request, res: Response) {
     const response: ApiResponse = {
       success: false,
       message: 'Xóa nhiều ảnh thất bại',
+    };
+    res.status(500).json(response);
+  }
+}
+
+export async function restoreImages(_req: Request, res: Response) {
+  try {
+    const { imageIds } = res.locals.body as ImageIdsBody;
+    const result = await imageService.restoreImages(imageIds);
+
+    const response: RestoreImagesApiResponse = {
+      success: true,
+      message: `Đã khôi phục ${result.restored} ảnh`,
+      data: result,
+    };
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('Restore images error:', error);
+
+    const response: ApiResponse = {
+      success: false,
+      message: 'Khôi phục ảnh thất bại',
     };
     res.status(500).json(response);
   }

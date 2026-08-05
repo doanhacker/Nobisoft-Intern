@@ -2,7 +2,10 @@ import { prisma } from '../../../config/prisma.js';
 import { setImageVectorsDeleted } from '../../../services/qdrant.service.js';
 import { endOfHoChiMinhDay, startOfHoChiMinhDay } from '../../../utils/date.util.js';
 import { resolveImageUrl } from '../../../utils/image-url.util.js';
-import type { ImageListQuery } from '../validators/admin/image.validate.js';
+import type {
+  ImageListQuery,
+  TrashImageListQuery,
+} from '../validators/admin/image.validate.js';
 import type { MyImageListQuery } from '../validators/client/my-image.validate.js';
 
 function withImageUrl<T extends { path: string }>(image: T): Omit<T, 'path'> & { imageUrl: string } {
@@ -10,8 +13,25 @@ function withImageUrl<T extends { path: string }>(image: T): Omit<T, 'path'> & {
   return { ...rest, imageUrl: resolveImageUrl(path) };
 }
 
+function applyImageListFilters(
+  where: Record<string, unknown>,
+  query: ImageListQuery | MyImageListQuery,
+  dateField: 'createdAt' | 'deletedAt',
+) {
+  if (query.fileFormat) {
+    where.fileFormat = query.fileFormat;
+  }
+
+  if (query.fromDate || query.toDate) {
+    const dateFilter: Record<string, Date> = {};
+    if (query.fromDate) dateFilter.gte = startOfHoChiMinhDay(query.fromDate);
+    if (query.toDate) dateFilter.lte = endOfHoChiMinhDay(query.toDate);
+    where[dateField] = dateFilter;
+  }
+}
+
 export async function getIndexedImages(query: ImageListQuery) {
-  const { page, limit, fileFormat, fromDate, toDate } = query;
+  const { page, limit } = query;
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {
@@ -23,16 +43,7 @@ export async function getIndexedImages(query: ImageListQuery) {
     },
   };
 
-  if (fileFormat) {
-    where.fileFormat = fileFormat;
-  }
-
-  if (fromDate || toDate) {
-    const dateFilter: Record<string, Date> = {};
-    if (fromDate) dateFilter.gte = startOfHoChiMinhDay(fromDate);
-    if (toDate) dateFilter.lte = endOfHoChiMinhDay(toDate);
-    where.createdAt = dateFilter;
-  }
+  applyImageListFilters(where, query, 'createdAt');
 
   const [images, total] = await Promise.all([
     prisma.image.findMany({
@@ -75,6 +86,50 @@ export async function getImageDetail(id: string) {
   return image ? withImageUrl(image) : null;
 }
 
+export async function getDeletedImages(query: TrashImageListQuery) {
+  const { page, limit } = query;
+  const skip = (page - 1) * limit;
+  const where: Record<string, unknown> = {
+    deletedAt: { not: null },
+    imageIndex: {
+      is: {
+        status: 'SUCCESS',
+      },
+    },
+  };
+
+  const [images, total] = await Promise.all([
+    prisma.image.findMany({
+      where,
+      skip,
+      take: limit,
+      orderBy: { deletedAt: 'desc' },
+      include: {
+        imageIndex: {
+          include: {
+            ocrLines: {
+              take: 3,
+              select: {
+                rawText: true,
+                confidenceScore: true,
+              },
+            },
+          },
+        },
+      },
+    }),
+    prisma.image.count({ where }),
+  ]);
+
+  return {
+    images: images.map((image) => ({
+      ...withImageUrl(image),
+      deletedAt: image.deletedAt!,
+    })),
+    total,
+  };
+}
+
 export async function softDeleteImages(imageIds: string[]) {
   const requested = imageIds.length;
   const activeImages = await prisma.image.findMany({
@@ -110,10 +165,45 @@ export async function softDeleteImages(imageIds: string[]) {
   }
 }
 
+export async function restoreImages(imageIds: string[]) {
+  const requested = imageIds.length;
+  const deletedImages = await prisma.image.findMany({
+    where: {
+      id: { in: imageIds },
+      deletedAt: { not: null },
+    },
+    select: { id: true },
+  });
+  const deletedImageIds = deletedImages.map((image) => image.id);
+
+  if (deletedImageIds.length === 0) {
+    return { requested, restored: 0 };
+  }
+
+  await setImageVectorsDeleted(deletedImageIds, false);
+
+  try {
+    const result = await prisma.image.updateMany({
+      where: {
+        id: { in: deletedImageIds },
+        deletedAt: { not: null },
+      },
+      data: { deletedAt: null },
+    });
+
+    return { requested, restored: result.count };
+  } catch (error) {
+    await setImageVectorsDeleted(deletedImageIds, true).catch((rollbackError) => {
+      console.error('Failed to rollback Qdrant restore payload:', rollbackError);
+    });
+    throw error;
+  }
+}
+
 // ─── User's own images ───
 
 export async function getUserImages(userId: string, query: MyImageListQuery) {
-  const { page, limit, fileFormat, fromDate, toDate } = query;
+  const { page, limit } = query;
   const skip = (page - 1) * limit;
 
   const where: Record<string, unknown> = {
@@ -126,16 +216,7 @@ export async function getUserImages(userId: string, query: MyImageListQuery) {
     },
   };
 
-  if (fileFormat) {
-    where.fileFormat = fileFormat;
-  }
-
-  if (fromDate || toDate) {
-    const dateFilter: Record<string, Date> = {};
-    if (fromDate) dateFilter.gte = startOfHoChiMinhDay(fromDate);
-    if (toDate) dateFilter.lte = endOfHoChiMinhDay(toDate);
-    where.createdAt = dateFilter;
-  }
+  applyImageListFilters(where, query, 'createdAt');
 
   const [images, total] = await Promise.all([
     prisma.image.findMany({
