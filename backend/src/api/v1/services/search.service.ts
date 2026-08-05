@@ -153,7 +153,9 @@ async function findImagesByAllTokens(tokens: string[]): Promise<string[]> {
     `SELECT ii."imageId" as "imageId"
      FROM image_ocr io
      JOIN image_index ii ON ii.id = io."imageIndexId"
+     JOIN images i ON i.id = ii."imageId"
      WHERE ii.status = 'SUCCESS'
+       AND i."deletedAt" IS NULL
        AND (${likeConditions.join(' OR ')})
      GROUP BY ii."imageId"
      HAVING ${havingConditions.join(' AND ')}
@@ -171,7 +173,10 @@ async function getOcrSearchResults(
   if (imageIds.length === 0) return [];
 
   const images = await prisma.image.findMany({
-    where: { id: { in: imageIds } },
+    where: {
+      id: { in: imageIds },
+      deletedAt: null,
+    },
     select: {
       id: true,
       path: true,
@@ -296,7 +301,10 @@ async function getSearchResults(points: SimilarImagePoint[]): Promise<SearchImag
   const imageIds = points.map((point) => point.imageId);
   const images = imageIds.length > 0
     ? await prisma.image.findMany({
-      where: { id: { in: imageIds } },
+      where: {
+        id: { in: imageIds },
+        deletedAt: null,
+      },
       select: {
         id: true,
         path: true,
@@ -336,4 +344,3 @@ function getImageMimeType(fileFormat: string): string {
 
   return mimeTypes[fileFormat.toLowerCase()] ?? 'application/octet-stream';
 }
-

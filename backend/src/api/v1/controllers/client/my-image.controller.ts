@@ -60,16 +60,16 @@ export async function removeMyImage(req: Request, res: Response) {
 
     const response: ApiResponse = {
       success: true,
-      message: 'Xoá ảnh thành công',
+      message: 'Đã chuyển ảnh vào thùng rác',
       data: null,
     };
     res.status(200).json(response);
   } catch (error) {
-    console.error('Delete my image error:', error);
+    console.error('Soft delete my image error:', error);
 
     const response: ApiResponse = {
       success: false,
-      message: 'Xoá ảnh thất bại',
+      message: 'Xóa ảnh thất bại',
     };
     res.status(500).json(response);
   }

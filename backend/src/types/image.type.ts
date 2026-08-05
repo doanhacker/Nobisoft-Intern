@@ -38,6 +38,23 @@ export interface MyImageListItem {
   createdAt: Date;
 }
 
+export interface BulkDeleteImagesResult {
+  requested: number;
+  deleted: number;
+}
+
+export interface TrashImageListItem extends ImageListItem {
+  deletedAt: Date;
+}
+
+export interface RestoreImagesResult {
+  requested: number;
+  restored: number;
+}
+
 export type ImageListApiResponse = ApiResponse<ImageListItem[]>;
 export type ImageDetailApiResponse = ApiResponse<ImageListItem>;
 export type MyImageListApiResponse = ApiResponse<MyImageListItem[]>;
+export type BulkDeleteImagesApiResponse = ApiResponse<BulkDeleteImagesResult>;
+export type TrashImageListApiResponse = ApiResponse<TrashImageListItem[]>;
+export type RestoreImagesApiResponse = ApiResponse<RestoreImagesResult>;

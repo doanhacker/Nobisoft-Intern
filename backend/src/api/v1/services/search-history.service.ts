@@ -149,8 +149,11 @@ export async function saveSearchClick(input: SearchClickInput): Promise<SaveSear
     };
   }
 
-  const clickedImage = await prisma.image.findUnique({
-    where: { id: input.clickedImageId },
+  const clickedImage = await prisma.image.findFirst({
+    where: {
+      id: input.clickedImageId,
+      deletedAt: null,
+    },
     select: { id: true },
   });
 

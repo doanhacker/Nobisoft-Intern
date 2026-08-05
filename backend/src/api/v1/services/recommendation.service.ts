@@ -62,6 +62,9 @@ export async function getRecommendations(
       searchHistory: {
         userId,
       },
+      clickedImage: {
+        deletedAt: null,
+      },
     },
     select: {
       clickedImageId: true,
@@ -132,7 +135,10 @@ async function getRecommendationResults(
   if (imageIds.length === 0) return [];
 
   const images = await prisma.image.findMany({
-    where: { id: { in: imageIds } },
+    where: {
+      id: { in: imageIds },
+      deletedAt: null,
+    },
     select: {
       id: true,
       path: true,
@@ -157,4 +163,3 @@ async function getRecommendationResults(
     }];
   });
 }
-

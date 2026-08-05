@@ -106,10 +106,10 @@ myImageRouter.get('/', validateMyImageListQuery, myImageController.listMyImages)
  * /images/me/{id}:
  *   delete:
  *     tags: [Client - My Images]
- *     summary: Xoá ảnh của user
+ *     summary: Xóa mềm ảnh của user
  *     description: |
- *       Xoá ảnh khỏi hệ thống. User chỉ có thể xoá ảnh do chính mình upload.
- *       Cascade xoá: PostgreSQL (image + image_index + image_ocr), Qdrant (vector), và file trên disk.
+ *       Chuyển ảnh vào thùng rác. User chỉ có thể xóa ảnh do chính mình upload.
+ *       File trên Storage và vector trong Qdrant được giữ lại để có thể khôi phục sau này.
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -122,7 +122,7 @@ myImageRouter.get('/', validateMyImageListQuery, myImageController.listMyImages)
  *         description: Image ID (UUID)
  *     responses:
  *       200:
- *         description: Xoá ảnh thành công
+ *         description: Chuyển ảnh vào thùng rác thành công
  *         content:
  *           application/json:
  *             schema:
@@ -133,7 +133,7 @@ myImageRouter.get('/', validateMyImageListQuery, myImageController.listMyImages)
  *                   example: true
  *                 message:
  *                   type: string
- *                   example: "Xoá ảnh thành công"
+ *                   example: "Đã chuyển ảnh vào thùng rác"
  *                 data:
  *                   type: "null"
  *       400:
