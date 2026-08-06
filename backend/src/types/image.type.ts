@@ -46,6 +46,8 @@ export interface BulkDeleteImagesResult {
 
 export interface TrashImageListItem extends ImageListItem {
   deletedAt: Date;
+  permanentDeleteAt: Date;
+  remainingDays: number;
 }
 
 export interface RestoreImagesResult {
@@ -54,9 +56,18 @@ export interface RestoreImagesResult {
   failedIds: string[];
 }
 
+export interface PermanentDeleteImagesResult {
+  requested: number;
+  deleted: number;
+  deletedIds: string[];
+  failedIds: string[];
+  skippedIds: string[];
+}
+
 export type ImageListApiResponse = ApiResponse<ImageListItem[]>;
 export type ImageDetailApiResponse = ApiResponse<ImageListItem>;
 export type MyImageListApiResponse = ApiResponse<MyImageListItem[]>;
 export type BulkDeleteImagesApiResponse = ApiResponse<BulkDeleteImagesResult>;
 export type TrashImageListApiResponse = ApiResponse<TrashImageListItem[]>;
 export type RestoreImagesApiResponse = ApiResponse<RestoreImagesResult>;
+export type PermanentDeleteImagesApiResponse = ApiResponse<PermanentDeleteImagesResult>;

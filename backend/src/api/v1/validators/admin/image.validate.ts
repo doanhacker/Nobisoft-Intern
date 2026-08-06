@@ -1,6 +1,9 @@
 import type { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
-import { MAX_BULK_IMAGE_IDS } from '../../../../config/image-operation.js';
+import {
+  MAX_BULK_IMAGE_IDS,
+  MAX_PERMANENT_DELETE_IMAGE_IDS,
+} from '../../../../config/image-operation.js';
 import { dateOnlySchema } from '../../../../utils/date.util.js';
 
 export const imageListQuerySchema = z
@@ -25,15 +28,23 @@ export const trashImageListQuerySchema = z.object({
 
 export type TrashImageListQuery = z.infer<typeof trashImageListQuerySchema>;
 
-export const imageIdsBodySchema = z.object({
-  imageIds: z
-    .array(z.string().uuid('Image ID không hợp lệ'))
-    .min(1, 'Phải chọn ít nhất một ảnh')
-    .max(MAX_BULK_IMAGE_IDS, `Chỉ được chọn tối đa ${MAX_BULK_IMAGE_IDS} ảnh`)
-    .transform((imageIds) => [...new Set(imageIds)]),
-});
+function createImageIdsBodySchema(maxImageIds: number) {
+  return z.object({
+    imageIds: z
+      .array(z.string().uuid('Image ID không hợp lệ'))
+      .min(1, 'Phải chọn ít nhất một ảnh')
+      .max(maxImageIds, `Chỉ được chọn tối đa ${maxImageIds} ảnh`)
+      .transform((imageIds) => [...new Set(imageIds)]),
+  });
+}
+
+export const imageIdsBodySchema = createImageIdsBodySchema(MAX_BULK_IMAGE_IDS);
+export const permanentDeleteImageIdsBodySchema = createImageIdsBodySchema(
+  MAX_PERMANENT_DELETE_IMAGE_IDS,
+);
 
 export type ImageIdsBody = z.infer<typeof imageIdsBodySchema>;
+export type PermanentDeleteImageIdsBody = z.infer<typeof permanentDeleteImageIdsBodySchema>;
 
 export function validateImageListQuery(req: Request, res: Response, next: NextFunction) {
   const result = imageListQuerySchema.safeParse(req.query);
@@ -71,6 +82,27 @@ export function validateTrashImageListQuery(req: Request, res: Response, next: N
 
 export function validateImageIdsBody(req: Request, res: Response, next: NextFunction) {
   const result = imageIdsBodySchema.safeParse(req.body);
+
+  if (!result.success) {
+    const message = result.error.issues[0]?.message ?? 'Danh sách ảnh không hợp lệ';
+
+    res.status(400).json({
+      success: false,
+      message,
+    });
+    return;
+  }
+
+  res.locals.body = result.data;
+  next();
+}
+
+export function validatePermanentDeleteImageIdsBody(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+) {
+  const result = permanentDeleteImageIdsBodySchema.safeParse(req.body);
 
   if (!result.success) {
     const message = result.error.issues[0]?.message ?? 'Danh sách ảnh không hợp lệ';

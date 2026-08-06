@@ -73,10 +73,6 @@ export function readImageFromDisk(relativePath: string): Promise<Buffer> {
 }
 
 function resolveStoredImagePath(relativePath: string): string {
-  if (path.isAbsolute(relativePath)) {
-    return relativePath;
-  }
-
   const normalizedPath = relativePath.replace(/\\/g, '/');
 
   let pathInsideStorage: string;
@@ -86,6 +82,8 @@ function resolveStoredImagePath(relativePath: string): string {
   } else if (normalizedPath.startsWith('/images/')) {
     // Format mới: "/images/index/xxx.jpg"
     pathInsideStorage = normalizedPath.slice(1); // → "images/index/xxx.jpg"
+  } else if (path.isAbsolute(relativePath)) {
+    return relativePath;
   } else {
     pathInsideStorage = normalizedPath;
   }

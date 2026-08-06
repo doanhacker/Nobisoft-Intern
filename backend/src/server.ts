@@ -4,6 +4,7 @@ import http from 'http';
 import { connectDatabase } from './config/prisma.js';
 import { ensureQdrantCollection } from './config/qdrant.js';
 import { connectRabbitMQ } from './services/rabbitmq.service.js';
+import { startTrashCleanupScheduler } from './services/trash-cleanup.service.js';
 
 
 const PORT = process.env.PORT || 8000;
@@ -18,6 +19,7 @@ async function startServer() {
     
     server.listen(PORT, () => {
       console.log(`Server running at http://localhost:${PORT}`);
+      startTrashCleanupScheduler();
     });
   } catch (error) {
     console.error('Failed to start server:', error);
