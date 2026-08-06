@@ -41,6 +41,7 @@ export interface MyImageListItem {
 export interface BulkDeleteImagesResult {
   requested: number;
   deleted: number;
+  failedIds: string[];
 }
 
 export interface TrashImageListItem extends ImageListItem {
@@ -50,6 +51,7 @@ export interface TrashImageListItem extends ImageListItem {
 export interface RestoreImagesResult {
   requested: number;
   restored: number;
+  failedIds: string[];
 }
 
 export type ImageListApiResponse = ApiResponse<ImageListItem[]>;

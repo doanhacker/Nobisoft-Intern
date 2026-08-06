@@ -1,4 +1,5 @@
 import { prisma } from '../../../config/prisma.js';
+import { IMAGE_OPERATION_BATCH_SIZE } from '../../../config/image-operation.js';
 import { setImageVectorsDeleted } from '../../../services/qdrant.service.js';
 import { endOfHoChiMinhDay, startOfHoChiMinhDay } from '../../../utils/date.util.js';
 import { resolveImageUrl } from '../../../utils/image-url.util.js';
@@ -130,74 +131,85 @@ export async function getDeletedImages(query: TrashImageListQuery) {
   };
 }
 
+interface UpdateImageDeletionStateResult {
+  changed: number;
+  failedIds: string[];
+}
+
+function createImageIdBatches(imageIds: string[]): string[][] {
+  const batches: string[][] = [];
+  for (let index = 0; index < imageIds.length; index += IMAGE_OPERATION_BATCH_SIZE) {
+    batches.push(imageIds.slice(index, index + IMAGE_OPERATION_BATCH_SIZE));
+  }
+  return batches;
+}
+
+async function updateImageDeletionState(
+  imageIds: string[],
+  deleted: boolean,
+): Promise<UpdateImageDeletionStateResult> {
+  let changed = 0;
+  const failedIds: string[] = [];
+
+  for (const batch of createImageIdBatches(imageIds)) {
+    let matchingIds: string[] = [];
+    let qdrantUpdated = false;
+
+    try {
+      const matchingImages = await prisma.image.findMany({
+        where: {
+          id: { in: batch },
+          deletedAt: deleted ? null : { not: null },
+        },
+        select: { id: true },
+      });
+      matchingIds = matchingImages.map((image) => image.id);
+
+      if (matchingIds.length === 0) continue;
+
+      await setImageVectorsDeleted(matchingIds, deleted);
+      qdrantUpdated = true;
+
+      const result = await prisma.image.updateMany({
+        where: {
+          id: { in: matchingIds },
+          deletedAt: deleted ? null : { not: null },
+        },
+        data: { deletedAt: deleted ? new Date() : null },
+      });
+      changed += result.count;
+    } catch (error) {
+      const affectedIds = matchingIds.length > 0 ? matchingIds : batch;
+      failedIds.push(...affectedIds);
+      console.error(`Failed to ${deleted ? 'soft-delete' : 'restore'} image batch:`, error);
+
+      if (qdrantUpdated) {
+        await setImageVectorsDeleted(matchingIds, !deleted).catch((rollbackError) => {
+          console.error('Failed to rollback Qdrant image batch payload:', rollbackError);
+        });
+      }
+    }
+  }
+
+  return { changed, failedIds };
+}
+
 export async function softDeleteImages(imageIds: string[]) {
-  const requested = imageIds.length;
-  const activeImages = await prisma.image.findMany({
-    where: {
-      id: { in: imageIds },
-      deletedAt: null,
-    },
-    select: { id: true },
-  });
-  const activeImageIds = activeImages.map((image) => image.id);
-
-  if (activeImageIds.length === 0) {
-    return { requested, deleted: 0 };
-  }
-
-  await setImageVectorsDeleted(activeImageIds, true);
-
-  try {
-    const result = await prisma.image.updateMany({
-      where: {
-        id: { in: activeImageIds },
-        deletedAt: null,
-      },
-      data: { deletedAt: new Date() },
-    });
-
-    return { requested, deleted: result.count };
-  } catch (error) {
-    await setImageVectorsDeleted(activeImageIds, false).catch((rollbackError) => {
-      console.error('Failed to rollback Qdrant soft-delete payload:', rollbackError);
-    });
-    throw error;
-  }
+  const result = await updateImageDeletionState(imageIds, true);
+  return {
+    requested: imageIds.length,
+    deleted: result.changed,
+    failedIds: result.failedIds,
+  };
 }
 
 export async function restoreImages(imageIds: string[]) {
-  const requested = imageIds.length;
-  const deletedImages = await prisma.image.findMany({
-    where: {
-      id: { in: imageIds },
-      deletedAt: { not: null },
-    },
-    select: { id: true },
-  });
-  const deletedImageIds = deletedImages.map((image) => image.id);
-
-  if (deletedImageIds.length === 0) {
-    return { requested, restored: 0 };
-  }
-
-  await setImageVectorsDeleted(deletedImageIds, false);
-
-  try {
-    const result = await prisma.image.updateMany({
-      where: {
-        id: { in: deletedImageIds },
-        deletedAt: { not: null },
-      },
-      data: { deletedAt: null },
-    });
-
-    return { requested, restored: result.count };
-  } catch (error) {
-    await setImageVectorsDeleted(deletedImageIds, true).catch((rollbackError) => {
-      console.error('Failed to rollback Qdrant restore payload:', rollbackError);
-    });
-    throw error;
-  }
+  const result = await updateImageDeletionState(imageIds, false);
+  return {
+    requested: imageIds.length,
+    restored: result.changed,
+    failedIds: result.failedIds,
+  };
 }
 
 // ─── User's own images ───

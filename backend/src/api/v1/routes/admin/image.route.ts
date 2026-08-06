@@ -281,6 +281,7 @@ imageRouter.get('/:id', validateImageIdParam, imageController.getImage);
  *     summary: Xóa mềm một hoặc nhiều ảnh
  *     description: |
  *       Admin gửi toàn bộ ID ảnh đã chọn. Muốn xóa một ảnh thì gửi mảng có một ID.
+ *       Tối đa 10.000 ID mỗi request; Backend tự chia batch để xử lý.
  *       Ảnh được chuyển vào thùng rác, không bị xóa khỏi Storage và Qdrant.
  *     security:
  *       - bearerAuth: []
@@ -295,6 +296,7 @@ imageRouter.get('/:id', validateImageIdParam, imageController.getImage);
  *               imageIds:
  *                 type: array
  *                 minItems: 1
+ *                 maxItems: 10000
  *                 items:
  *                   type: string
  *                   format: uuid
@@ -324,8 +326,14 @@ imageRouter.get('/:id', validateImageIdParam, imageController.getImage);
  *                     deleted:
  *                       type: integer
  *                       example: 2
+ *                     failedIds:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                         format: uuid
+ *                       example: []
  *       400:
- *         description: Danh sách ID rỗng hoặc có ID không đúng định dạng UUID
+ *         description: Danh sách ID rỗng, vượt quá 10.000 phần tử hoặc có ID không đúng định dạng UUID
  *         content:
  *           application/json:
  *             schema:
@@ -371,6 +379,7 @@ imageRouter.patch('/bulk-delete', validateImageIdsBody, imageController.bulkDele
  *     summary: Khôi phục một hoặc nhiều ảnh
  *     description: |
  *       Admin gửi toàn bộ ID ảnh cần khôi phục. Muốn khôi phục một ảnh thì gửi mảng có một ID.
+ *       Tối đa 10.000 ID mỗi request; Backend tự chia batch để xử lý.
  *       Backend đặt `deletedAt` về null và bật lại vector trong Qdrant.
  *     security:
  *       - bearerAuth: []
@@ -385,6 +394,7 @@ imageRouter.patch('/bulk-delete', validateImageIdsBody, imageController.bulkDele
  *               imageIds:
  *                 type: array
  *                 minItems: 1
+ *                 maxItems: 10000
  *                 items:
  *                   type: string
  *                   format: uuid
@@ -414,8 +424,14 @@ imageRouter.patch('/bulk-delete', validateImageIdsBody, imageController.bulkDele
  *                     restored:
  *                       type: integer
  *                       example: 2
+ *                     failedIds:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                         format: uuid
+ *                       example: []
  *       400:
- *         description: Danh sách ID rỗng hoặc có ID không đúng định dạng UUID
+ *         description: Danh sách ID rỗng, vượt quá 10.000 phần tử hoặc có ID không đúng định dạng UUID
  *         content:
  *           application/json:
  *             schema:

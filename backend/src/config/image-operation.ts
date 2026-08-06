@@ -1,0 +1,2 @@
+export const MAX_BULK_IMAGE_IDS = 10_000;
+export const IMAGE_OPERATION_BATCH_SIZE = 250;
