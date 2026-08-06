@@ -1,13 +1,23 @@
 import { prisma } from '../../../config/prisma.js';
-import { IMAGE_OPERATION_BATCH_SIZE } from '../../../config/image-operation.js';
-import { setImageVectorsDeleted } from '../../../services/qdrant.service.js';
+import {
+  getTrashRetentionDays,
+  IMAGE_OPERATION_BATCH_SIZE,
+  PERMANENT_DELETE_CONCURRENCY,
+} from '../../../config/image-operation.js';
+import {
+  deleteImageVector,
+  setImageVectorsDeleted,
+} from '../../../services/qdrant.service.js';
 import { endOfHoChiMinhDay, startOfHoChiMinhDay } from '../../../utils/date.util.js';
 import { resolveImageUrl } from '../../../utils/image-url.util.js';
+import { deleteImageFromDisk } from '../../../utils/storage.util.js';
 import type {
   ImageListQuery,
   TrashImageListQuery,
 } from '../validators/admin/image.validate.js';
 import type { MyImageListQuery } from '../validators/client/my-image.validate.js';
+
+const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
 function withImageUrl<T extends { path: string }>(image: T): Omit<T, 'path'> & { imageUrl: string } {
   const { path, ...rest } = image;
@@ -122,11 +132,27 @@ export async function getDeletedImages(query: TrashImageListQuery) {
     prisma.image.count({ where }),
   ]);
 
+  const retentionDays = getTrashRetentionDays();
+  const now = Date.now();
+
   return {
-    images: images.map((image) => ({
-      ...withImageUrl(image),
-      deletedAt: image.deletedAt!,
-    })),
+    images: images.map((image) => {
+      const deletedAt = image.deletedAt!;
+      const permanentDeleteAt = new Date(
+        deletedAt.getTime() + retentionDays * MILLISECONDS_PER_DAY,
+      );
+      const remainingDays = Math.max(
+        1,
+        Math.ceil((permanentDeleteAt.getTime() - now) / MILLISECONDS_PER_DAY),
+      );
+
+      return {
+        ...withImageUrl(image),
+        deletedAt,
+        permanentDeleteAt,
+        remainingDays,
+      };
+    }),
     total,
   };
 }
@@ -136,10 +162,10 @@ interface UpdateImageDeletionStateResult {
   failedIds: string[];
 }
 
-function createImageIdBatches(imageIds: string[]): string[][] {
-  const batches: string[][] = [];
-  for (let index = 0; index < imageIds.length; index += IMAGE_OPERATION_BATCH_SIZE) {
-    batches.push(imageIds.slice(index, index + IMAGE_OPERATION_BATCH_SIZE));
+function createBatches<T>(items: T[], batchSize: number): T[][] {
+  const batches: T[][] = [];
+  for (let index = 0; index < items.length; index += batchSize) {
+    batches.push(items.slice(index, index + batchSize));
   }
   return batches;
 }
@@ -151,7 +177,7 @@ async function updateImageDeletionState(
   let changed = 0;
   const failedIds: string[] = [];
 
-  for (const batch of createImageIdBatches(imageIds)) {
+  for (const batch of createBatches(imageIds, IMAGE_OPERATION_BATCH_SIZE)) {
     let matchingIds: string[] = [];
     let qdrantUpdated = false;
 
@@ -209,6 +235,71 @@ export async function restoreImages(imageIds: string[]) {
     requested: imageIds.length,
     restored: result.changed,
     failedIds: result.failedIds,
+  };
+}
+
+interface PermanentDeleteCandidate {
+  id: string;
+  path: string;
+}
+
+async function permanentlyDeleteImage(image: PermanentDeleteCandidate): Promise<string> {
+  await deleteImageFromDisk(image.path);
+  await deleteImageVector(image.id);
+
+  const result = await prisma.image.deleteMany({
+    where: {
+      id: image.id,
+      deletedAt: { not: null },
+    },
+  });
+
+  if (result.count === 0) {
+    throw new Error(`Image ${image.id} is no longer in trash`);
+  }
+
+  return image.id;
+}
+
+export async function permanentlyDeleteImages(imageIds: string[]) {
+  const images = await prisma.image.findMany({
+    where: {
+      id: { in: imageIds },
+      deletedAt: { not: null },
+    },
+    select: {
+      id: true,
+      path: true,
+    },
+  });
+
+  const candidateIds = new Set(images.map((image) => image.id));
+  const skippedIds = imageIds.filter((imageId) => !candidateIds.has(imageId));
+  const deletedIds: string[] = [];
+  const failedIds: string[] = [];
+
+  for (const batch of createBatches(images, PERMANENT_DELETE_CONCURRENCY)) {
+    const results = await Promise.allSettled(batch.map(permanentlyDeleteImage));
+
+    results.forEach((result, index) => {
+      const image = batch[index];
+      if (!image) return;
+
+      if (result.status === 'fulfilled') {
+        deletedIds.push(result.value);
+      } else {
+        failedIds.push(image.id);
+        console.error(`Failed to permanently delete image ${image.id}:`, result.reason);
+      }
+    });
+  }
+
+  return {
+    requested: imageIds.length,
+    deleted: deletedIds.length,
+    deletedIds,
+    failedIds,
+    skippedIds,
   };
 }
 

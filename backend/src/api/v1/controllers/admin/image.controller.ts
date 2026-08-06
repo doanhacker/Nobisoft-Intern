@@ -4,6 +4,7 @@ import type {
   BulkDeleteImagesApiResponse,
   ImageDetailApiResponse,
   ImageListApiResponse,
+  PermanentDeleteImagesApiResponse,
   RestoreImagesApiResponse,
   TrashImageListApiResponse,
 } from '../../../../types/image.type.js';
@@ -11,6 +12,7 @@ import { createPaginationMeta } from '../../../../utils/pagination.util.js';
 import type {
   ImageIdsBody,
   ImageListQuery,
+  PermanentDeleteImageIdsBody,
   TrashImageListQuery,
 } from '../../validators/admin/image.validate.js';
 import * as imageService from '../../services/image.service.js';
@@ -133,6 +135,28 @@ export async function restoreImages(_req: Request, res: Response) {
     const response: ApiResponse = {
       success: false,
       message: 'Khôi phục ảnh thất bại',
+    };
+    res.status(500).json(response);
+  }
+}
+
+export async function permanentlyDeleteImages(_req: Request, res: Response) {
+  try {
+    const { imageIds } = res.locals.body as PermanentDeleteImageIdsBody;
+    const result = await imageService.permanentlyDeleteImages(imageIds);
+
+    const response: PermanentDeleteImagesApiResponse = {
+      success: true,
+      message: `Đã xóa vĩnh viễn ${result.deleted} ảnh`,
+      data: result,
+    };
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('Permanent delete images error:', error);
+
+    const response: ApiResponse = {
+      success: false,
+      message: 'Xóa vĩnh viễn ảnh thất bại',
     };
     res.status(500).json(response);
   }
