@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { z } from 'zod';
+import { MAX_BULK_IMAGE_IDS } from '../../../../config/image-operation.js';
 import { dateOnlySchema } from '../../../../utils/date.util.js';
 
 export const imageListQuerySchema = z
@@ -28,6 +29,7 @@ export const imageIdsBodySchema = z.object({
   imageIds: z
     .array(z.string().uuid('Image ID không hợp lệ'))
     .min(1, 'Phải chọn ít nhất một ảnh')
+    .max(MAX_BULK_IMAGE_IDS, `Chỉ được chọn tối đa ${MAX_BULK_IMAGE_IDS} ảnh`)
     .transform((imageIds) => [...new Set(imageIds)]),
 });
 

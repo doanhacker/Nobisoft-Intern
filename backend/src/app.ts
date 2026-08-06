@@ -11,6 +11,7 @@ import { routesApiVer1 } from './api/v1/routes/index.route.js';
 import imageServeRouter from './api/v1/routes/image-serve.route.js';
 
 const app: Express = express();
+const JSON_BODY_LIMIT = '1mb';
 
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
@@ -27,7 +28,7 @@ app.use(cors({
   credentials: true,
 }));
 
-app.use(express.json());
+app.use(express.json({ limit: JSON_BODY_LIMIT }));
 
 // Serve ảnh với hỗ trợ resize
 app.use('/images', imageServeRouter);
