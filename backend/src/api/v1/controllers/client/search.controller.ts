@@ -11,16 +11,20 @@ import { saveSearchClick } from '../../services/search-history.service.js';
 import {
   ImageSearchHistoryNotFoundError,
   OcrSearchHistoryNotFoundError,
+  PromptSearchHistoryNotFoundError,
   SearchPageOutOfRangeError,
   searchImagesByImage,
+  searchImagesByPrompt,
   searchImagesByTextOcr,
   searchImagesByTextSemantic,
   TextSearchHistoryNotFoundError,
 } from '../../services/search.service.js';
+import { OllamaServiceError } from '../../../../services/ollama.service.js';
 import type {
   SearchClickBody,
   SearchImageQuery,
   SearchTextOcrQuery,
+  SearchTextPromptQuery,
   SearchTextSemanticQuery,
 } from '../../validators/client/search.validate.js';
 import { formatSearchResultsForRole } from '../../../../utils/search-response.util.js';
@@ -168,6 +172,69 @@ function handleSemanticSearchError(error: unknown, res: Response) {
   const response: ApiResponse = {
     success: false,
     message: 'Tìm kiếm semantic thất bại',
+  };
+  res.status(500).json(response);
+}
+
+// Prompt Search
+
+export async function searchByPrompt(req: Request, res: Response) {
+  try {
+    const { q, searchHistoryId, page, limit } = res.locals
+      .searchTextPromptQuery as SearchTextPromptQuery;
+    const result = q
+      ? await searchImagesByPrompt({
+        userId: req.user!.id,
+        queryText: q,
+        page,
+        limit,
+      })
+      : await searchImagesByPrompt({
+        userId: req.user!.id,
+        searchHistoryId: searchHistoryId!,
+        page,
+        limit,
+      });
+
+    sendSemanticSearchResponse(res, result, req.user!.role);
+  } catch (error) {
+    handlePromptSearchError(error, res);
+  }
+}
+
+function handlePromptSearchError(error: unknown, res: Response) {
+  console.error('Prompt search error:', error);
+
+  if (error instanceof OllamaServiceError) {
+    const response: ApiResponse = {
+      success: false,
+      message: 'Dịch vụ xử lý prompt tạm thời không khả dụng',
+    };
+    res.status(503).json(response);
+    return;
+  }
+
+  if (error instanceof PromptSearchHistoryNotFoundError) {
+    const response: ApiResponse = {
+      success: false,
+      message: error.message,
+    };
+    res.status(404).json(response);
+    return;
+  }
+
+  if (error instanceof SearchPageOutOfRangeError) {
+    const response: ApiResponse = {
+      success: false,
+      message: error.message,
+    };
+    res.status(400).json(response);
+    return;
+  }
+
+  const response: ApiResponse = {
+    success: false,
+    message: 'Tìm kiếm prompt thất bại',
   };
   res.status(500).json(response);
 }

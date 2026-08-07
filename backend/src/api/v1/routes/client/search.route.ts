@@ -4,6 +4,7 @@ import type { ApiResponse } from '../../../../types/apiResponse.js';
 import {
   recordSearchClick,
   searchByImage,
+  searchByPrompt,
   searchByTextOcr,
   searchByTextSemantic,
 } from '../../controllers/client/search.controller.js';
@@ -12,6 +13,7 @@ import {
   validateSearchClick,
   validateSearchImage,
   validateSearchTextOcr,
+  validateSearchTextPrompt,
   validateSearchTextSemantic,
 } from '../../validators/client/search.validate.js';
 
@@ -51,17 +53,18 @@ const searchRouter = Router();
  *         schema:
  *           type: string
  *           format: uuid
- *         description: ID lịch sử tìm kiếm (dùng khi chuyển trang ở cả mode semantic và ocr).
+ *         description: ID lịch sử tìm kiếm (dùng khi chuyển trang ở các mode).
  *       - in: query
  *         name: mode
  *         required: true
  *         schema:
  *           type: string
- *           enum: [semantic, ocr]
+ *           enum: [semantic, ocr, prompt]
  *         description: |
  *           Chế độ tìm kiếm:
  *           - `semantic` — AI hiểu ngữ nghĩa; `similarityScore` chỉ trả về cho ADMIN
  *           - `ocr` — Matching text trong ảnh, trả `ocrMatches[]` với toạ độ
+ *           - `prompt` — Hỗ trợ tiếng Việt, tự động dịch sang tiếng Anh rồi tìm semantic
  *         example: ocr
  *       - in: query
  *         name: page
@@ -165,10 +168,12 @@ searchRouter.get('/text', (req: Request, res: Response) => {
     validateSearchTextOcr(req, res, () => searchByTextOcr(req, res));
   } else if (mode === 'semantic') {
     validateSearchTextSemantic(req, res, () => searchByTextSemantic(req, res));
+  } else if (mode === 'prompt') {
+    validateSearchTextPrompt(req, res, () => searchByPrompt(req, res));
   } else {
     const response: ApiResponse = {
       success: false,
-      message: 'mode chỉ được phép là semantic hoặc ocr',
+      message: 'mode chỉ được phép là semantic, ocr hoặc prompt',
     };
     res.status(400).json(response);
   }
