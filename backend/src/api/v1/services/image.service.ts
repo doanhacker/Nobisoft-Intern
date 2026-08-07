@@ -100,8 +100,11 @@ export async function getImageDetail(id: string) {
 export async function getDeletedImages(query: TrashImageListQuery) {
   const { page, limit } = query;
   const skip = (page - 1) * limit;
+  const retentionDays = getTrashRetentionDays();
+  const now = Date.now();
+  const activeTrashCutoff = new Date(now - retentionDays * MILLISECONDS_PER_DAY);
   const where: Record<string, unknown> = {
-    deletedAt: { not: null },
+    deletedAt: { gt: activeTrashCutoff },
     imageIndex: {
       is: {
         status: 'SUCCESS',
@@ -131,9 +134,6 @@ export async function getDeletedImages(query: TrashImageListQuery) {
     }),
     prisma.image.count({ where }),
   ]);
-
-  const retentionDays = getTrashRetentionDays();
-  const now = Date.now();
 
   return {
     images: images.map((image) => {
