@@ -122,7 +122,8 @@ imageRouter.get('/', validateImageListQuery, imageController.listImages);
  *     tags: [Admin - Images]
  *     summary: Lấy danh sách ảnh trong thùng rác
  *     description: |
- *       Trả về các ảnh đã xóa mềm, sắp xếp theo thời gian xóa mới nhất.
+ *       Trả về các ảnh đã xóa mềm nhưng chưa quá thời hạn lưu trong thùng rác, sắp xếp theo thời gian xóa mới nhất.
+ *       Ảnh đã quá `TRASH_RETENTION_DAYS` không còn hiển thị và sẽ được scheduler xóa vĩnh viễn.
  *     security:
  *       - bearerAuth: []
  *     parameters:
