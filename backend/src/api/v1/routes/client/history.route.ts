@@ -38,7 +38,7 @@ const historyRouter = Router();
  *         name: searchType
  *         schema:
  *           $ref: '#/components/schemas/SearchType'
- *         description: Lọc theo IMAGE_ONLY, TEXT_SEMANTIC hoặc TEXT_OCR
+ *         description: Lọc theo IMAGE_ONLY, TEXT_SEMANTIC, TEXT_OCR hoặc TEXT_PROMPT
  *       - in: query
  *         name: fromDate
  *         schema:

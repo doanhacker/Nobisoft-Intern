@@ -131,6 +131,55 @@ export function validateSearchTextSemantic(req: Request, res: Response, next: Ne
   next();
 }
 
+const searchTextPromptSchema = z
+  .object({
+    q: z.preprocess(
+      (value) => value === '' ? undefined : value,
+      z
+        .string()
+        .trim()
+        .min(1, 'Nội dung tìm kiếm không được để trống')
+        .max(1000, 'Nội dung tìm kiếm không được vượt quá 1000 ký tự')
+        .optional(),
+    ),
+    searchHistoryId: z.preprocess(
+      (value) => value === '' ? undefined : value,
+      z.string().uuid('searchHistoryId không hợp lệ').optional(),
+    ),
+    mode: z.literal('prompt', 'mode chỉ được phép là prompt'),
+    page: z.coerce.number().int().min(1, 'Trang phải lớn hơn hoặc bằng 1').default(1),
+    limit: z.coerce
+      .number()
+      .int()
+      .pipe(z.literal(20, 'Số lượng kết quả mỗi trang chỉ được là 20'))
+      .default(20),
+  })
+  .refine((data) => Boolean(data.q) !== Boolean(data.searchHistoryId), {
+    message: 'Chỉ gửi q khi tìm kiếm mới hoặc searchHistoryId khi chuyển trang',
+  })
+  .refine((data) => !data.q || data.page === 1, {
+    message: 'Tìm kiếm mới phải bắt đầu từ trang 1',
+    path: ['page'],
+  });
+
+export type SearchTextPromptQuery = z.infer<typeof searchTextPromptSchema>;
+
+export function validateSearchTextPrompt(req: Request, res: Response, next: NextFunction) {
+  const result = searchTextPromptSchema.safeParse(req.query);
+
+  if (!result.success) {
+    const response: ApiResponse = {
+      success: false,
+      message: result.error.issues[0]?.message ?? 'Tham số tìm kiếm không hợp lệ',
+    };
+    res.status(400).json(response);
+    return;
+  }
+
+  res.locals.searchTextPromptQuery = result.data;
+  next();
+}
+
 const searchTextOcrSchema = z.object({
   q: z.preprocess(
     (value) => value === '' ? undefined : value,

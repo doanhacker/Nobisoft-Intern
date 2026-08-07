@@ -282,7 +282,7 @@ const options: swaggerJsdoc.Options = {
 
         SearchType: {
           type: 'string',
-          enum: ['IMAGE_ONLY', 'TEXT_SEMANTIC', 'TEXT_OCR'],
+          enum: ['IMAGE_ONLY', 'TEXT_SEMANTIC', 'TEXT_OCR', 'TEXT_PROMPT'],
         },
 
         HistoryQueryImage: {

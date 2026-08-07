@@ -108,7 +108,7 @@ export async function getImageSearchHistory(
 export async function getTextSearchHistory(
   userId: string,
   searchHistoryId: string,
-  searchType: 'TEXT_SEMANTIC' | 'TEXT_OCR',
+  searchType: 'TEXT_SEMANTIC' | 'TEXT_OCR' | 'TEXT_PROMPT',
 ): Promise<TextSearchHistoryQuery | null> {
   const history = await prisma.searchHistory.findFirst({
     where: {
