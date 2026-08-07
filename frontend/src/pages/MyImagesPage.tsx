@@ -15,19 +15,25 @@ import {
   AlertTriangle,
   Search,
   CheckCircle2,
+  CheckSquare,
+  Square,
 } from 'lucide-react'
 import {
   getMyImages,
   deleteMyImage,
+  bulkDeleteImages,
   formatFileSize,
   type UserImage,
+  type GetMyImagesParams,
 } from '@/services/myImagesService'
+import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal'
 import { fetchImageAsFile, setPendingImageFile } from '@/services/searchService'
 import { SkeletonGrid } from '@/components/results/SkeletonGrid'
 import { MasonryGrid, type SearchResult } from '@/components/results/MasonryGrid'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
+import { getThumbnailUrl } from '@/lib/imageUtils'
 
 // ============================================================
 // Constants
@@ -42,7 +48,7 @@ const PAGE_SIZE = 20
 function mapUserImageToSearchResult(img: UserImage): SearchResult {
   return {
     id: img.id,
-    thumbnailUrl: img.imageUrl,
+    thumbnailUrl: getThumbnailUrl(img.imageUrl),
     fullUrl: img.imageUrl,
     title: img.filename,
     width: img.width ?? undefined,
@@ -168,19 +174,28 @@ interface DayGroupProps {
   onImageClick: (image: UserImage, groupImages: UserImage[]) => void
   onSearchSimilar: (result: SearchResult) => void
   onDelete: (id: string) => Promise<void>
+  isSelectMode: boolean
+  selectedIds: Set<string>
+  onToggleSelect: (image: UserImage) => void
 }
 
-function DayGroup({ group, onImageClick, onSearchSimilar, onDelete }: DayGroupProps) {
+function DayGroup({ group, onImageClick, onSearchSimilar, onDelete, isSelectMode, selectedIds, onToggleSelect }: DayGroupProps) {
   const searchResults = React.useMemo(
     () => group.images.map(mapUserImageToSearchResult),
     [group.images],
   )
 
   const handleCardClick = (result: SearchResult) => {
+    if (isSelectMode) return // handled by onToggleSelect
     const found = group.images.find((img) => img.id === result.id)
     if (found) {
       onImageClick(found, group.images)
     }
+  }
+
+  const handleToggleSelect = (result: SearchResult) => {
+    const found = group.images.find((img) => img.id === result.id)
+    if (found) onToggleSelect(found)
   }
 
   const handleDeleteCard = async (result: SearchResult) => {
@@ -204,6 +219,9 @@ function DayGroup({ group, onImageClick, onSearchSimilar, onDelete }: DayGroupPr
         onCardClick={handleCardClick}
         onSearchSimilar={onSearchSimilar}
         onDelete={handleDeleteCard}
+        isSelectMode={isSelectMode}
+        selectedIds={selectedIds}
+        onToggleSelect={handleToggleSelect}
       />
     </div>
   )
@@ -266,7 +284,9 @@ function Lightbox({ image, allImages, onClose, onDelete, onSearchSimilar, onNavi
     }
   }, [])
 
-  return ReactDOM.createPortal(
+  return (
+    <>
+    {ReactDOM.createPortal(
     <div
       className="fixed inset-0 z-[9500] flex items-center justify-center"
       role="dialog"
@@ -309,37 +329,16 @@ function Lightbox({ image, allImages, onClose, onDelete, onSearchSimilar, onNavi
               <span className="hidden sm:inline">Tìm tương tự</span>
             </button>
 
-            {/* Delete button */}
-            {!showDeleteConfirm ? (
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                disabled={isDeleting}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-destructive/80 text-white/80 hover:text-white text-xs font-semibold transition-all duration-150 border border-white/10 hover:border-destructive"
-                title="Xoá ảnh (phím Delete)"
-              >
-                <Trash2 className="size-3.5" />
-                Xoá
-              </button>
-            ) : (
-              <div className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-destructive/20 border border-destructive/40">
-                <AlertTriangle className="size-3.5 text-amber-400 shrink-0" />
-                <span className="text-xs text-white font-semibold">Xoá ảnh này?</span>
-                <button
-                  onClick={() => setShowDeleteConfirm(false)}
-                  className="px-2 py-0.5 rounded text-[11px] font-semibold bg-white/10 hover:bg-white/20 text-white transition-colors"
-                >
-                  Huỷ
-                </button>
-                <button
-                  onClick={handleDelete}
-                  disabled={isDeleting}
-                  className="px-2 py-0.5 rounded text-[11px] font-semibold bg-destructive hover:bg-destructive/80 text-white transition-colors flex items-center gap-1 disabled:opacity-50"
-                >
-                  {isDeleting ? <Loader2 className="size-3 animate-spin" /> : null}
-                  {isDeleting ? 'Đang xoá...' : 'Xác nhận'}
-                </button>
-              </div>
-            )}
+            {/* Delete button — triggers centered modal */}
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={isDeleting}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-destructive/80 text-white/80 hover:text-white text-xs font-semibold transition-all duration-150 border border-white/10 hover:border-destructive"
+              title="Xoá ảnh (phím Delete)"
+            >
+              <Trash2 className="size-3.5" />
+              Xoá
+            </button>
 
             {/* Close button */}
             <button
@@ -408,6 +407,16 @@ function Lightbox({ image, allImages, onClose, onDelete, onSearchSimilar, onNavi
       </div>
     </div>,
     document.body,
+  )}
+  {showDeleteConfirm && (
+    <DeleteConfirmModal
+      imageTitle={image.filename}
+      isDeleting={isDeleting}
+      onConfirm={handleDelete}
+      onCancel={() => setShowDeleteConfirm(false)}
+    />
+  )}
+  </>
   )
 }
 
@@ -437,6 +446,12 @@ export function MyImagesPage() {
 
   // ── Lightbox ───────────────────────────────────────────────
   const [lightbox, setLightbox] = React.useState<LightboxState | null>(null)
+
+  // ── Bulk select ────────────────────────────────────────────
+  const [isSelectMode, setIsSelectMode] = React.useState(false)
+  const [selectedIds, setSelectedIds] = React.useState<Set<string>>(new Set())
+  const [isBulkDeleting, setIsBulkDeleting] = React.useState(false)
+  const [showBulkConfirm, setShowBulkConfirm] = React.useState(false)
 
   // ── Initial fetch ──────────────────────────────────────────
   React.useEffect(() => {
@@ -504,7 +519,7 @@ export function MyImagesPage() {
     return () => observer.disconnect()
   }, [hasMore, isLoadingMore, handleLoadMore])
 
-  // ── Delete ────────────────────────────────────────────────
+  // ── Delete (single) ────────────────────────────────────────
   const handleDelete = async (id: string) => {
     try {
       await deleteMyImage(id)
@@ -519,6 +534,59 @@ export function MyImagesPage() {
     } catch {
       toast.error('Không thể xoá ảnh. Vui lòng thử lại.')
       throw new Error('Delete failed') // re-throw so card UI can reset
+    }
+  }
+
+  // ── Bulk select handlers ────────────────────────────────────
+  const toggleSelectMode = React.useCallback(() => {
+    setIsSelectMode((prev) => {
+      if (prev) {
+        // Exiting: clear selection
+        setSelectedIds(new Set())
+        setShowBulkConfirm(false)
+      }
+      return !prev
+    })
+  }, [])
+
+  const toggleSelectImage = React.useCallback((image: UserImage) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(image.id)) {
+        next.delete(image.id)
+      } else {
+        next.add(image.id)
+      }
+      return next
+    })
+  }, [])
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return
+    setIsBulkDeleting(true)
+    try {
+      const ids = Array.from(selectedIds)
+      const result = await bulkDeleteImages(ids)
+      // Remove successfully-deleted images from local state
+      const deletedSet = new Set(
+        result.failedIds.length > 0
+          ? ids.filter((id) => !result.failedIds.includes(id))
+          : ids,
+      )
+      setImages((prev) => prev.filter((img) => !deletedSet.has(img.id)))
+      setTotalDocs((prev) => Math.max(0, prev - deletedSet.size))
+      if (result.failedIds.length > 0) {
+        toast.error(`Xoá ${result.deleted}/${result.requested} ảnh. ${result.failedIds.length} ảnh thất bại.`)
+      } else {
+        toast.success(`Đã xoá ${result.deleted} ảnh vào thùng rác.`)
+      }
+      setSelectedIds(new Set())
+      setIsSelectMode(false)
+      setShowBulkConfirm(false)
+    } catch {
+      toast.error('Không thể xoá ảnh. Vui lòng thử lại.')
+    } finally {
+      setIsBulkDeleting(false)
     }
   }
 
@@ -539,8 +607,9 @@ export function MyImagesPage() {
     }
   }
 
-  // ── Lightbox handlers ──────────────────────────────────────
+  // ── Lightbox handlers — disabled in select mode ──────────────
   const handleImageClick = (image: UserImage, groupImages: UserImage[]) => {
+    if (isSelectMode) return
     setLightbox({ image, allImages: groupImages })
   }
 
@@ -590,19 +659,66 @@ export function MyImagesPage() {
               </div>
             </div>
 
-            <Button
-              id="my-images-upload-btn"
-              variant="brand"
-              size="sm"
-              asChild
-              className="shrink-0"
-            >
-              <Link to="/upload">
-                <UploadCloud className="size-4" />
-                Tải thêm ảnh
-              </Link>
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Nút chọn để xoá */}
+              {!isInitialLoading && images.length > 0 && (
+                <button
+                  id="my-images-select-mode-btn"
+                  onClick={toggleSelectMode}
+                  className={cn(
+                    'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-semibold border transition-all duration-200',
+                    isSelectMode
+                      ? 'bg-destructive/10 border-destructive/40 text-destructive hover:bg-destructive/20'
+                      : 'bg-muted/60 border-border/60 text-muted-foreground hover:bg-muted hover:text-foreground',
+                  )}
+                >
+                  {isSelectMode ? (
+                    <>
+                      <X className="size-3.5" />
+                      Huỷ chọn
+                      {selectedIds.size > 0 && (
+                        <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
+                          {selectedIds.size}
+                        </span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <CheckSquare className="size-3.5" />
+                      Chọn để xoá
+                    </>
+                  )}
+                </button>
+              )}
+
+              <Button
+                id="my-images-trash-btn"
+                variant="ghost"
+                size="sm"
+                asChild
+                className="shrink-0 text-muted-foreground hover:text-foreground"
+              >
+                <Link to="/my-images/trash">
+                  <Trash2 className="size-4" />
+                  Thùng rác
+                </Link>
+              </Button>
+
+              <Button
+                id="my-images-upload-btn"
+                variant="brand"
+                size="sm"
+                asChild
+                className="shrink-0"
+              >
+                <Link to="/upload">
+                  <UploadCloud className="size-4" />
+                  Tải thêm ảnh
+                </Link>
+              </Button>
+            </div>
           </div>
+
 
           {/* ── Loading state ── */}
           {isInitialLoading && <SkeletonGrid count={12} />}
@@ -620,6 +736,9 @@ export function MyImagesPage() {
                   onImageClick={handleImageClick}
                   onSearchSimilar={handleSearchSimilar}
                   onDelete={handleDelete}
+                  isSelectMode={isSelectMode}
+                  selectedIds={selectedIds}
+                  onToggleSelect={toggleSelectImage}
                 />
               ))}
             </div>
@@ -650,7 +769,7 @@ export function MyImagesPage() {
       </div>
 
       {/* ── Lightbox ── */}
-      {lightbox && (
+      {lightbox && !isSelectMode && (
         <Lightbox
           image={lightbox.image}
           allImages={lightbox.allImages}
@@ -660,6 +779,78 @@ export function MyImagesPage() {
           onNavigate={handleLightboxNavigate}
         />
       )}
+
+      {/* ── Bulk Delete Floating Toolbar ── */}
+      {isSelectMode && ReactDOM.createPortal(
+        <div
+          className={cn(
+            'fixed bottom-0 left-0 right-0 z-[9000] flex justify-center px-4 pb-6 pt-3',
+            'animate-slide-up',
+          )}
+          style={{
+            animation: 'slideUpFade 0.25s cubic-bezier(0.34,1.56,0.64,1) both',
+          }}
+        >
+          <div className="w-full max-w-lg bg-card/95 backdrop-blur-xl border border-border/60 rounded-2xl shadow-2xl px-4 py-3 flex items-center justify-between gap-4">
+            {/* Left: selection info */}
+            <div className="flex items-center gap-2">
+              <div className="flex items-center justify-center size-8 rounded-xl bg-primary/10 shrink-0">
+                {selectedIds.size > 0
+                  ? <CheckSquare className="size-4 text-primary" />
+                  : <Square className="size-4 text-muted-foreground" />
+                }
+              </div>
+              <div>
+                <p className="text-sm font-bold text-foreground">
+                  {selectedIds.size > 0
+                    ? `Đã chọn ${selectedIds.size} ảnh`
+                    : 'Chưa chọn ảnh nào'
+                  }
+                </p>
+                <p className="text-[11px] text-muted-foreground">Click vào ảnh để chọn</p>
+              </div>
+            </div>
+
+            {/* Right: action buttons */}
+            <div className="flex items-center gap-2 shrink-0">
+              {/* Cancel */}
+              <button
+                id="bulk-delete-cancel-btn"
+                onClick={toggleSelectMode}
+                disabled={isBulkDeleting}
+                className="px-3 py-1.5 rounded-xl text-sm font-semibold bg-muted/80 hover:bg-muted text-muted-foreground hover:text-foreground border border-border/60 transition-all duration-150 disabled:opacity-50"
+              >
+                Huỷ
+              </button>
+
+              {/* Delete trigger */}
+              <button
+                id="bulk-delete-trigger-btn"
+                onClick={() => setShowBulkConfirm(true)}
+                disabled={selectedIds.size === 0 || isBulkDeleting}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-sm font-semibold bg-destructive hover:bg-destructive/90 text-destructive-foreground border border-destructive/60 transition-all duration-150 disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+              >
+                <Trash2 className="size-3.5" />
+                Xoá {selectedIds.size > 0 ? `${selectedIds.size} ảnh` : 'ảnh'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body,
+      )}
+
+      {/* Bulk Delete Confirm Modal */}
+      {showBulkConfirm && (
+        <DeleteConfirmModal
+          imageTitle={`Xoá ${selectedIds.size} ảnh đã chọn`}
+          description="Các ảnh này sẽ được chuyển vào Thùng rác và có thể khôi phục trong vòng 30 ngày."
+          isDeleting={isBulkDeleting}
+          onConfirm={handleBulkDelete}
+          onCancel={() => setShowBulkConfirm(false)}
+          confirmLabel={`Xoá ${selectedIds.size} ảnh`}
+        />
+      )}
+
     </>
   )
 }

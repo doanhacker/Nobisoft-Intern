@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
+import { getThumbnailUrl } from '@/lib/imageUtils'
 
 // ============================================================
 // AdminImagesPage — Kho ảnh với infinite scroll
@@ -44,7 +45,7 @@ function formatDate(dateStr: string) {
 function mapAdminImageToSearchResult(img: AdminImageItem): SearchResult {
   return {
     id: img.id,
-    thumbnailUrl: img.imageUrl,
+    thumbnailUrl: getThumbnailUrl(img.imageUrl),
     fullUrl: img.imageUrl,
     title: img.imageUrl.split('/').pop() ?? img.id,
     width: img.width ?? undefined,

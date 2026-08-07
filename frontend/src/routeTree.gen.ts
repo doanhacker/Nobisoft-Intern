@@ -21,7 +21,9 @@ import { Route as HistoryRouteImport } from './routes/history'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as MyImagesIndexRouteImport } from './routes/my-images/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as MyImagesTrashRouteImport } from './routes/my-images/trash'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as AdminImagesRouteImport } from './routes/admin/images'
 import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
@@ -87,10 +89,20 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MyImagesIndexRoute = MyImagesIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => MyImagesRoute,
+} as any)
 const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AdminRoute,
+} as any)
+const MyImagesTrashRoute = MyImagesTrashRouteImport.update({
+  id: '/trash',
+  path: '/trash',
+  getParentRoute: () => MyImagesRoute,
 } as any)
 const AdminUsersRoute = AdminUsersRouteImport.update({
   id: '/users',
@@ -119,7 +131,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
-  '/my-images': typeof MyImagesRoute
+  '/my-images': typeof MyImagesRouteWithChildren
   '/recommendations': typeof RecommendationsRoute
   '/register': typeof RegisterRoute
   '/results': typeof ResultsRoute
@@ -129,7 +141,9 @@ export interface FileRoutesByFullPath {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/images': typeof AdminImagesRoute
   '/admin/users': typeof AdminUsersRouteWithChildren
+  '/my-images/trash': typeof MyImagesTrashRoute
   '/admin/': typeof AdminIndexRoute
+  '/my-images/': typeof MyImagesIndexRoute
   '/admin/users/$userId': typeof AdminUsersUserIdRoute
 }
 export interface FileRoutesByTo {
@@ -137,7 +151,6 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
-  '/my-images': typeof MyImagesRoute
   '/recommendations': typeof RecommendationsRoute
   '/register': typeof RegisterRoute
   '/results': typeof ResultsRoute
@@ -147,7 +160,9 @@ export interface FileRoutesByTo {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/images': typeof AdminImagesRoute
   '/admin/users': typeof AdminUsersRouteWithChildren
+  '/my-images/trash': typeof MyImagesTrashRoute
   '/admin': typeof AdminIndexRoute
+  '/my-images': typeof MyImagesIndexRoute
   '/admin/users/$userId': typeof AdminUsersUserIdRoute
 }
 export interface FileRoutesById {
@@ -157,7 +172,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/history': typeof HistoryRoute
   '/login': typeof LoginRoute
-  '/my-images': typeof MyImagesRoute
+  '/my-images': typeof MyImagesRouteWithChildren
   '/recommendations': typeof RecommendationsRoute
   '/register': typeof RegisterRoute
   '/results': typeof ResultsRoute
@@ -167,7 +182,9 @@ export interface FileRoutesById {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/images': typeof AdminImagesRoute
   '/admin/users': typeof AdminUsersRouteWithChildren
+  '/my-images/trash': typeof MyImagesTrashRoute
   '/admin/': typeof AdminIndexRoute
+  '/my-images/': typeof MyImagesIndexRoute
   '/admin/users/$userId': typeof AdminUsersUserIdRoute
 }
 export interface FileRouteTypes {
@@ -188,7 +205,9 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/images'
     | '/admin/users'
+    | '/my-images/trash'
     | '/admin/'
+    | '/my-images/'
     | '/admin/users/$userId'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -196,7 +215,6 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/history'
     | '/login'
-    | '/my-images'
     | '/recommendations'
     | '/register'
     | '/results'
@@ -206,7 +224,9 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/images'
     | '/admin/users'
+    | '/my-images/trash'
     | '/admin'
+    | '/my-images'
     | '/admin/users/$userId'
   id:
     | '__root__'
@@ -225,7 +245,9 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/images'
     | '/admin/users'
+    | '/my-images/trash'
     | '/admin/'
+    | '/my-images/'
     | '/admin/users/$userId'
   fileRoutesById: FileRoutesById
 }
@@ -235,7 +257,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   HistoryRoute: typeof HistoryRoute
   LoginRoute: typeof LoginRoute
-  MyImagesRoute: typeof MyImagesRoute
+  MyImagesRoute: typeof MyImagesRouteWithChildren
   RecommendationsRoute: typeof RecommendationsRoute
   RegisterRoute: typeof RegisterRoute
   ResultsRoute: typeof ResultsRoute
@@ -330,12 +352,26 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/my-images/': {
+      id: '/my-images/'
+      path: '/'
+      fullPath: '/my-images/'
+      preLoaderRoute: typeof MyImagesIndexRouteImport
+      parentRoute: typeof MyImagesRoute
+    }
     '/admin/': {
       id: '/admin/'
       path: '/'
       fullPath: '/admin/'
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
+    }
+    '/my-images/trash': {
+      id: '/my-images/trash'
+      path: '/trash'
+      fullPath: '/my-images/trash'
+      preLoaderRoute: typeof MyImagesTrashRouteImport
+      parentRoute: typeof MyImagesRoute
     }
     '/admin/users': {
       id: '/admin/users'
@@ -396,13 +432,27 @@ const AdminRouteChildren: AdminRouteChildren = {
 
 const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
+interface MyImagesRouteChildren {
+  MyImagesTrashRoute: typeof MyImagesTrashRoute
+  MyImagesIndexRoute: typeof MyImagesIndexRoute
+}
+
+const MyImagesRouteChildren: MyImagesRouteChildren = {
+  MyImagesTrashRoute: MyImagesTrashRoute,
+  MyImagesIndexRoute: MyImagesIndexRoute,
+}
+
+const MyImagesRouteWithChildren = MyImagesRoute._addFileChildren(
+  MyImagesRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   DashboardRoute: DashboardRoute,
   HistoryRoute: HistoryRoute,
   LoginRoute: LoginRoute,
-  MyImagesRoute: MyImagesRoute,
+  MyImagesRoute: MyImagesRouteWithChildren,
   RecommendationsRoute: RecommendationsRoute,
   RegisterRoute: RegisterRoute,
   ResultsRoute: ResultsRoute,

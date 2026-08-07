@@ -1,5 +1,6 @@
 import axiosClient from './axiosClient'
 import type { SearchResult } from '@/components/results/MasonryGrid'
+import { getThumbnailUrl } from '@/lib/imageUtils'
 
 // ============================================================
 // recommendationService.ts — GET /recommendations
@@ -54,7 +55,7 @@ export interface RecommendationResult {
 function mapToSearchResult(item: RecommendationResultItem): SearchResult {
   return {
     id: item.id,
-    thumbnailUrl: item.imageUrl,
+    thumbnailUrl: getThumbnailUrl(item.imageUrl),
     fullUrl: item.imageUrl,
     title: undefined,
     similarityScore: item.similarityScore,
