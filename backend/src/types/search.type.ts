@@ -6,15 +6,15 @@ interface SearchImageBaseInput {
 
 export type SearchImageInput =
   | (SearchImageBaseInput & {
-      image: {
-        buffer: Buffer;
-        originalname: string;
-        mimetype: string;
-      };
-    })
+    image: {
+      buffer: Buffer;
+      originalname: string;
+      mimetype: string;
+    };
+  })
   | (SearchImageBaseInput & {
-      searchHistoryId: string;
-    });
+    searchHistoryId: string;
+  });
 
 export interface SearchImageResultItem {
   id: string;
@@ -55,11 +55,11 @@ interface SearchTextBaseInput {
 
 export type SearchTextSemanticInput =
   | (SearchTextBaseInput & {
-      queryText: string;
-    })
+    queryText: string;
+  })
   | (SearchTextBaseInput & {
-      searchHistoryId: string;
-    });
+    searchHistoryId: string;
+  });
 
 export interface SearchTextSemanticResult {
   searchHistoryId: string;
@@ -77,10 +77,13 @@ export interface SearchTextSemanticData {
 
 export type SearchTextSemanticResponse = ApiResponse<SearchTextSemanticData>;
 
-// ============================
-// OCR Search
-// ============================
+// PromptSearch
 
+export type SearchTextPromptInput =
+  | (SearchTextBaseInput & { queryText: string })
+  | (SearchTextBaseInput & { searchHistoryId: string });
+
+// OcrSearch
 export type SearchTextOcrInput =
   | (SearchTextBaseInput & { queryText: string })
   | (SearchTextBaseInput & { searchHistoryId: string });
@@ -123,15 +126,15 @@ export type SearchTextOcrResponse = ApiResponse<SearchTextOcrData>;
 
 export type CreateSearchHistoryInput =
   | {
-      userId: string;
-      searchType: 'IMAGE_ONLY';
-      queryImageId: string;
-    }
+    userId: string;
+    searchType: 'IMAGE_ONLY';
+    queryImageId: string;
+  }
   | {
-      userId: string;
-      searchType: 'TEXT_SEMANTIC' | 'TEXT_OCR';
-      queryText: string;
-    };
+    userId: string;
+    searchType: 'TEXT_SEMANTIC' | 'TEXT_OCR' | 'TEXT_PROMPT';
+    queryText: string;
+  };
 
 export interface CreateImageSearchHistoryInput {
   userId: string;
@@ -167,12 +170,12 @@ export interface SearchClickData {
 
 export type SaveSearchClickResult =
   | {
-      success: true;
-      data: SearchClickData;
-    }
+    success: true;
+    data: SearchClickData;
+  }
   | {
-      success: false;
-      statusCode: 404;
-      message: string;
-    };
+    success: false;
+    statusCode: 404;
+    message: string;
+  };
 import type { ApiResponse } from './apiResponse.js';
