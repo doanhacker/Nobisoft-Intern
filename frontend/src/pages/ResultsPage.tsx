@@ -439,11 +439,16 @@ export function ResultsPage() {
       }
 
       console.log(`[ResultsPage] fetchMore succeeded. Received ${data.length} results, total: ${fetchedTotal}`);
-      setResults((prev) => [...prev, ...data])
+      // Use functional update so `next.length` is the committed array length
+      // (avoids stale-closure bug where results.length was captured at
+      // fetchMore creation time and may not reflect the latest state).
+      setResults((prev) => {
+        const next = [...prev, ...data]
+        setHasMore(next.length < fetchedTotal && data.length > 0)
+        return next
+      })
       setTotal(fetchedTotal)
       setCurrentPage(nextPage)
-      const allLoaded = results.length + data.length >= fetchedTotal
-      setHasMore(!allLoaded && data.length > 0)
     } catch (err) {
       if ((err as Error).name === 'AbortError' || (err as { code?: string }).code === 'ERR_CANCELED') {
         console.log(`[ResultsPage] fetchMore: Request was aborted/canceled`);
@@ -461,7 +466,7 @@ export function ResultsPage() {
     } finally {
       setIsLoadingMore(false)
     }
-  }, [searchHistoryId, isLoadingMore, hasMore, currentPage, mode, results.length, toastError])
+  }, [searchHistoryId, isLoadingMore, hasMore, currentPage, mode, toastError])
 
   // ── Effect: fire fetchInitial when URL search params change ──
   React.useEffect(() => {

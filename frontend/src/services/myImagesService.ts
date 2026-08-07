@@ -143,6 +143,33 @@ export async function deleteMyImage(id: string): Promise<void> {
   await axiosClient.delete(`/images/me/${id}`)
 }
 
+// ─── Bulk delete ──────────────────────────────────────────────
+
+export interface BulkDeleteResult {
+  requested: number
+  deleted: number
+  failedIds: string[]
+}
+
+interface BulkDeleteApiResponse {
+  success: boolean
+  message: string
+  data: BulkDeleteResult
+}
+
+/**
+ * PATCH /admin/images/bulk-delete
+ * Xoá mềm nhiều ảnh cùng lúc (chuyển vào thùng rác).
+ * Nhận danh sách imageIds, trả về kết quả gồm số lượng đã xoá và failedIds.
+ * Tối đa 10.000 ID/request; với danh sách lớn nên chia nhỏ <= 1.000 ID.
+ */
+export async function bulkDeleteImages(imageIds: string[]): Promise<BulkDeleteResult> {
+  const { data } = await axiosClient.patch<BulkDeleteApiResponse>('/admin/images/bulk-delete', {
+    imageIds,
+  })
+  return data.data
+}
+
 // ─── Utility: format file size ───────────────────────────────
 
 export function formatFileSize(bytes: number | null): string {
@@ -150,4 +177,147 @@ export function formatFileSize(bytes: number | null): string {
   if (bytes < 1024) return `${bytes} B`
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
+
+// ─── Trash (soft-deleted images) ─────────────────────────────
+
+/** Ảnh đã xoá mềm, nằm trong thùng rác */
+export interface TrashImage extends UserImage {
+  /** ISO 8601 — thời điểm bị xoá mềm */
+  deletedAt: string
+  /** ISO 8601 — thời điểm sẽ bị xoá vĩnh viễn tự động */
+  permanentDeleteAt: string
+  /** Số ngày còn lại trước khi bị xoá vĩnh viễn (tối thiểu 1) */
+  remainingDays: number
+}
+
+export interface GetTrashImagesResult {
+  images: TrashImage[]
+  totalDocs: number
+  totalPages: number
+  hasMore: boolean
+  page: number
+  limit: number
+}
+
+// Internal API item shape for trash
+interface TrashImageListItem extends MyImageListItem {
+  deletedAt: string
+  permanentDeleteAt: string
+  remainingDays: number
+}
+
+interface TrashImagesApiResponse {
+  success: boolean
+  message: string
+  data: TrashImageListItem[]
+  meta: PaginationMeta
+}
+
+function mapToTrashImage(item: TrashImageListItem): TrashImage {
+  return {
+    ...mapToUserImage(item),
+    uploadedAt: item.createdAt,
+    deletedAt: item.deletedAt,
+    permanentDeleteAt: item.permanentDeleteAt,
+    remainingDays: item.remainingDays,
+  }
+}
+
+export interface GetTrashImagesParams {
+  page: number
+  limit?: number
+}
+
+/**
+ * GET /admin/images/trash
+ * Lấy danh sách ảnh đã xoá mềm (đang trong thùng rác), hỗ trợ phân trang.
+ */
+export async function getTrashImages(params: GetTrashImagesParams): Promise<GetTrashImagesResult> {
+  const { page, limit = 20 } = params
+  const { data } = await axiosClient.get<TrashImagesApiResponse>('/admin/images/trash', {
+    params: { page, limit },
+  })
+  const { data: items, meta } = data
+  return {
+    images: items.map(mapToTrashImage),
+    totalDocs: meta.totalDocs,
+    totalPages: meta.totalPages,
+    hasMore: meta.page < meta.totalPages,
+    page: meta.page,
+    limit: meta.limit,
+  }
+}
+
+// ─── Restore ────────────────────────────────────────────────
+
+export interface RestoreResult {
+  requested: number
+  restored: number
+  failedIds: string[]
+}
+
+interface RestoreApiResponse {
+  success: boolean
+  message: string
+  data: RestoreResult
+}
+
+/**
+ * PATCH /admin/images/bulk-restore
+ * Khôi phục nhiều ảnh từ thùng rác (đặt deletedAt = null, bật lại vector Qdrant).
+ * Tối đa 10.000 ID/request.
+ */
+export async function bulkRestoreImages(imageIds: string[]): Promise<RestoreResult> {
+  const { data } = await axiosClient.patch<RestoreApiResponse>('/admin/images/bulk-restore', {
+    imageIds,
+  })
+  return data.data
+}
+
+// ─── Permanent delete ────────────────────────────────────────
+
+export interface PermanentDeleteResult {
+  requested: number
+  deleted: number
+  deletedIds: string[]
+  failedIds: string[]
+  skippedIds: string[]
+}
+
+interface PermanentDeleteApiResponse {
+  success: boolean
+  message: string
+  data: PermanentDeleteResult
+}
+
+/**
+ * DELETE /admin/images/permanent
+ * Xoá vĩnh viễn nhiều ảnh khỏi thùng rác (Storage + Qdrant + PostgreSQL).
+ * Tối đa 500 ID/request — hàm này tự chia batch nếu > 500 IDs.
+ */
+export async function permanentDeleteImages(imageIds: string[]): Promise<PermanentDeleteResult> {
+  const BATCH_SIZE = 500
+  const aggregate: PermanentDeleteResult = {
+    requested: imageIds.length,
+    deleted: 0,
+    deletedIds: [],
+    failedIds: [],
+    skippedIds: [],
+  }
+
+  for (let i = 0; i < imageIds.length; i += BATCH_SIZE) {
+    const batch = imageIds.slice(i, i + BATCH_SIZE)
+    const { data } = await axiosClient.delete<PermanentDeleteApiResponse>(
+      '/admin/images/permanent',
+      { data: { imageIds: batch } },
+    )
+    const result = data.data
+    aggregate.deleted += result.deleted
+    aggregate.deletedIds.push(...result.deletedIds)
+    aggregate.failedIds.push(...result.failedIds)
+    aggregate.skippedIds.push(...result.skippedIds)
+  }
+
+  return aggregate
 }

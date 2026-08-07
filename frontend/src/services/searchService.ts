@@ -1,5 +1,6 @@
 import axiosClient from './axiosClient'
 import type { SearchResult } from '@/components/results/MasonryGrid'
+import { getThumbnailUrl } from '@/lib/imageUtils'
 
 // ============================================================
 // searchService.ts — Visual Search API integration
@@ -84,7 +85,7 @@ export interface SearchByImageResult {
 function mapToSearchResult(item: SearchImageResultItem): SearchResult {
   return {
     id: item.id,
-    thumbnailUrl: item.imageUrl,
+    thumbnailUrl: getThumbnailUrl(item.imageUrl),
     fullUrl: item.imageUrl,
     title: undefined,
     // similarityScore is undefined for USER role (backend omits it)
@@ -299,7 +300,7 @@ export interface SearchByTextResult {
 function mapSemanticItem(item: TextSemanticResultItem): SearchResult {
   return {
     id: item.id,
-    thumbnailUrl: item.imageUrl,
+    thumbnailUrl: getThumbnailUrl(item.imageUrl),
     fullUrl: item.imageUrl,
     title: undefined,
     // similarityScore is undefined for USER role (backend omits it)
@@ -318,7 +319,7 @@ function mapOcrItem(item: TextOcrResultItem): SearchResult {
 
   return {
     id: item.id,
-    thumbnailUrl: item.imageUrl,
+    thumbnailUrl: getThumbnailUrl(item.imageUrl),
     fullUrl: item.imageUrl,
     title: undefined,
     // OCR results never carry a similarity score — leave it undefined
