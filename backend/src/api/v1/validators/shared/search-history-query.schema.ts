@@ -10,7 +10,7 @@ export const searchHistoryQuerySchema = z.object({
     .default(20),
   searchType: z.preprocess(
     (value) => value === '' ? undefined : value,
-    z.enum(['IMAGE_ONLY', 'TEXT_SEMANTIC', 'TEXT_OCR']).optional(),
+    z.enum(['IMAGE_ONLY', 'TEXT_SEMANTIC', 'TEXT_OCR', 'TEXT_PROMPT']).optional(),
   ),
   fromDate: dateOnlySchema.optional(),
   toDate: dateOnlySchema.optional(),

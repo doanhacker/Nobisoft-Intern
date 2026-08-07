@@ -18,5 +18,10 @@ echo "Pulling model: $MODEL ..."
 ollama pull "$MODEL"
 echo "Model $MODEL is ready."
 
+# Warmup: preload model into RAM
+echo "Warming up model $MODEL ..."
+curl -sf http://localhost:11434/api/generate -d "{\"model\": \"$MODEL\", \"prompt\": \"hi\", \"stream\": false, \"keep_alive\": -1, \"options\": {\"num_predict\": 1}}" > /dev/null 2>&1
+echo "Model $MODEL is loaded into RAM."
+
 # Keep the server running
 wait

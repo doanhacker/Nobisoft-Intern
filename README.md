@@ -26,6 +26,7 @@ Services:
 - Backend docs: http://localhost:8000/docs
 - AI service: http://localhost:9000
 - AI service docs: http://localhost:9000/docs
+- Ollama (Prompt Translation): http://localhost:11434
 - Database: localhost:5432
 
 ## Project Structure

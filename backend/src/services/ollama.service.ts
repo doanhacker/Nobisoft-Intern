@@ -8,15 +8,25 @@ if (!OLLAMA_URL) {
   throw new Error('OLLAMA_URL is required');
 }
 
-const TRANSLATE_SYSTEM_PROMPT = `You are an image search query translator. Your ONLY job is to convert the user's input into a short English image description for CLIP-based visual search.
+const TRANSLATE_SYSTEM_PROMPT = `You are an image search query translator for a CLIP-based visual search engine.
+
+Task: Convert user input (any language) into a short, accurate English image description.
 
 Rules:
-- Output ONLY the English description, nothing else
-- Remove filler words, opinions, and meta-instructions (e.g. "I want to find", "please search for")
-- Extract the core visual subject and its key attributes (color, count, action, setting)
-- Keep it under 15 words
-- Use simple, concrete nouns and adjectives
-- If input is already in English, just clean and simplify it`;
+1. Output ONLY the English description — no explanation, no quotes, no prefix
+2. Remove filler words and meta-instructions ("tôi muốn tìm", "hãy tìm cho tôi", "I want to find")
+3. Keep proper nouns EXACTLY as given — do NOT substitute or reinterpret names
+   - "Ronaldo de Lima" → "Ronaldo de Lima", NOT "Cristiano Ronaldo"
+   - "Son Tung MTP" → "Son Tung MTP"
+4. Use the most visually recognizable and specific English term:
+   - "giấy tờ tuỳ thân" → "ID card" (NOT "personal document")
+   - "xe máy" → "motorcycle" (NOT "motorbike vehicle")
+   - "bằng lái xe" → "driver license card"
+   - "hoa sen" → "lotus flower"
+5. Keep output under 15 words, use simple concrete nouns and adjectives
+6. Include visual attributes when mentioned: color, count, action, setting, size
+7. If input is already in English, clean and simplify it
+8. Do NOT append "photo", "picture", "image", or "portrait" — describe only the subject`;
 
 interface OllamaGenerateResponse {
   model: string;
@@ -48,6 +58,7 @@ export async function translatePrompt(userInput: string): Promise<string> {
         prompt: userInput,
         system: TRANSLATE_SYSTEM_PROMPT,
         stream: false,
+        keep_alive: -1,
         options: {
           temperature: 0.1,
           top_p: 0.9,

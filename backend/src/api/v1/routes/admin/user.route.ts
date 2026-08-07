@@ -134,7 +134,7 @@ userRouter.get('/', validateUserListQuery, userController.getUsers);
  *         name: searchType
  *         schema:
  *           $ref: '#/components/schemas/SearchType'
- *         description: Lọc theo loại tìm kiếm (IMAGE_ONLY, TEXT_SEMANTIC, TEXT_OCR)
+ *         description: Lọc theo loại tìm kiếm (IMAGE_ONLY, TEXT_SEMANTIC, TEXT_OCR, TEXT_PROMPT)
  *       - in: query
  *         name: fromDate
  *         schema:
