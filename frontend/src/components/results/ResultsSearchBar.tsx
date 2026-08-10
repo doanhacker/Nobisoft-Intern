@@ -113,8 +113,8 @@ export function ResultsSearchBar({
     <>
       <div
         className={cn(
-          'flex items-center gap-2 px-4 py-2.5',
-          'bg-background/80 backdrop-blur-xl border-b border-border/40',
+          'flex items-center gap-2 px-4 py-2.5 rounded-2xl',
+          'bg-background/80 backdrop-blur-xl',
           className,
         )}
       >
