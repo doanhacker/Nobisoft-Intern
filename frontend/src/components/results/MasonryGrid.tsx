@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useMasonryColumns, type BreakpointCols } from '@/hooks/useMasonryColumns'
+import { useMasonryColumns, type BreakpointCols, type MasonryItem } from '@/hooks/useMasonryColumns'
 import { ImageResultCard } from './ImageResultCard'
 
 // ============================================================
@@ -16,7 +16,7 @@ import { ImageResultCard } from './ImageResultCard'
 //  - ImageResultCard is memoized to prevent unnecessary re-renders
 // ============================================================
 
-export interface SearchResult {
+export interface SearchResult extends MasonryItem {
     id: string
     thumbnailUrl: string
     fullUrl?: string
@@ -155,7 +155,7 @@ export function MasonryGrid({
     const containerRef = React.useRef<HTMLDivElement>(null)
     const activeBreakpoints = breakpointCols ?? (compact ? BREAKPOINTS_COMPACT : BREAKPOINTS_DEFAULT)
 
-    const { columns, numCols } = useMasonryColumns({
+    const { columns, numCols } = useMasonryColumns<SearchResult>({
         items: results,
         containerRef,
         breakpointCols: activeBreakpoints,

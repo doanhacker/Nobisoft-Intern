@@ -17,6 +17,7 @@ import {
   BarChart2,
   ScanText,
   CalendarRange,
+  Sparkles,
 } from 'lucide-react'
 import { getUserSearchHistory } from '@/services/adminUserService'
 import type { SearchHistoryItem } from '@/types/admin'
@@ -72,6 +73,16 @@ const SEARCH_TYPE_CONFIG = {
     dot: 'bg-amber-500',
     accent: 'border-l-amber-400',
     glow: 'shadow-amber-100 dark:shadow-amber-950/30',
+  },
+  TEXT_PROMPT: {
+    label: 'Prompt',
+    icon: Sparkles,
+    gradient: 'from-emerald-500 to-teal-600',
+    badge:
+      'bg-emerald-50 text-emerald-700 border-emerald-200/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-700/40',
+    dot: 'bg-emerald-500',
+    accent: 'border-l-emerald-400',
+    glow: 'shadow-emerald-100 dark:shadow-emerald-950/30',
   },
 } as const
 
@@ -344,6 +355,7 @@ const TABS: { value: SearchTypeKey; label: string }[] = [
   { value: 'IMAGE_ONLY', label: 'Tìm bằng ảnh' },
   { value: 'TEXT_SEMANTIC', label: 'Semantic' },
   { value: 'TEXT_OCR', label: 'OCR' },
+  { value: 'TEXT_PROMPT', label: 'Prompt' },
 ]
 
 // ── Stats badge ───────────────────────────────────────────────

@@ -32,7 +32,7 @@ const TRENDING = [
 const STATS = [
   { icon: <Images className="size-4" />, label: '50K+ ảnh', sub: 'đã index' },
   { icon: <Zap className="size-4" />, label: '< 3s', sub: 'thời gian tìm' },
-  { icon: <TrendingUp className="size-4" />, label: '3 chế độ', sub: 'tìm kiếm' },
+  { icon: <TrendingUp className="size-4" />, label: '4 chế độ', sub: 'tìm kiếm' },
   { icon: <Clock className="size-4" />, label: 'Real-time', sub: 'kết quả' },
 ]
 

@@ -67,14 +67,14 @@ export function SearchBar({ onSearch, isLoading = false, className, compact = fa
 
   const handleSearch = () => {
     if (mode === 'image' && !imageFile) return
-    if ((mode === 'semantic' || mode === 'ocr') && !textQuery.trim()) return
+    if (mode !== 'image' && !textQuery.trim()) return
 
     onSearch({ mode, textQuery, imageFile, imagePreviewUrl })
   }
 
   const canSearch =
     (mode === 'image' && !!imageFile) ||
-    ((mode === 'semantic' || mode === 'ocr') && textQuery.trim().length > 0)
+    (mode !== 'image' && textQuery.trim().length > 0)
 
   return (
     <div

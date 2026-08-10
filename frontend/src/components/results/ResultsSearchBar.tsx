@@ -10,7 +10,7 @@ import { ImageSearchModal } from './ImageSearchModal'
 // - Image thumbnail + "Open modal" button for image mode
 // ============================================================
 
-export type SearchMode = 'image' | 'semantic' | 'ocr'
+export type SearchMode = 'image' | 'semantic' | 'ocr' | 'prompt'
 
 export interface ResultsSearchState {
   mode: SearchMode
@@ -32,6 +32,7 @@ const MODE_OPTIONS: { id: SearchMode; label: string; shortLabel: string }[] = [
   { id: 'image', label: 'Tìm bằng Ảnh', shortLabel: 'Ảnh' },
   { id: 'semantic', label: 'Tìm bằng Mô tả', shortLabel: 'Mô tả' },
   { id: 'ocr', label: 'Tìm bằng Chữ', shortLabel: 'Chữ' },
+  { id: 'prompt', label: 'Tìm bằng Prompt', shortLabel: 'Prompt' },
 ]
 
 export function ResultsSearchBar({
@@ -88,7 +89,7 @@ export function ResultsSearchBar({
       setShowImageModal(true)
       return
     }
-    if ((mode === 'semantic' || mode === 'ocr') && !textQuery.trim()) return
+    if (mode !== 'image' && !textQuery.trim()) return
     onSearch({ mode, textQuery, imageFile, imagePreviewUrl })
   }
 
@@ -106,7 +107,7 @@ export function ResultsSearchBar({
   const currentModeLabel = MODE_OPTIONS.find((m) => m.id === mode)?.label ?? 'Chọn chế độ'
   const canSearch =
     (mode === 'image' && !!imageFile) ||
-    ((mode === 'semantic' || mode === 'ocr') && textQuery.trim().length > 0)
+    (mode !== 'image' && textQuery.trim().length > 0)
 
   return (
     <>
@@ -184,7 +185,9 @@ export function ResultsSearchBar({
                 placeholder={
                   mode === 'semantic'
                     ? 'Mô tả nội dung ảnh bạn muốn tìm...'
-                    : 'Nhập chữ xuất hiện trong ảnh...'
+                    : mode === 'ocr'
+                    ? 'Nhập chữ xuất hiện trong ảnh...'
+                    : 'Nhập prompt mô tả bằng tiếng Việt...'
                 }
                 disabled={isLoading}
                 className={cn(

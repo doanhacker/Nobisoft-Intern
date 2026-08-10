@@ -150,9 +150,9 @@ export function ResultsSidebar({ className }: ResultsSidebarProps) {
 
         {isAuthenticated && (
           <Link
-            to="/dashboard"
+            to="/search"
             className="size-9 rounded-full gradient-brand flex items-center justify-center text-white text-xs font-bold shadow-sm hover:scale-110 transition-transform duration-200"
-            title={`Dashboard (${user?.name ?? 'User'})`}
+            title={user?.name ?? 'User'}
           >
             {user?.name?.charAt(0).toUpperCase() ?? <UserCircle2 className="size-4" />}
           </Link>
