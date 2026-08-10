@@ -8,6 +8,7 @@ import {
   FileText,
   Eye,
   CheckCircle2,
+  Sparkles,
 } from 'lucide-react'
 import { MasonryGrid, type SearchResult } from '@/components/results/MasonryGrid'
 import { SkeletonGrid } from '@/components/results/SkeletonGrid'
@@ -25,7 +26,7 @@ import { AuthContext } from '@/context/AuthContext'
 // - Vertical sidebar left (68px)
 // - Sticky search bar at top
 // - Split view for image mode (query image left, results right)
-// - Full width for text modes (semantic/ocr)
+// - Full width for text modes (semantic/ocr/prompt)
 // - Infinite scroll: IntersectionObserver on sentinel div
 // ============================================================
 
@@ -41,6 +42,7 @@ const MODE_LABELS: Record<SearchMode, { label: string; icon: React.ElementType }
   image: { label: 'Tìm bằng hình ảnh', icon: ImageIcon },
   semantic: { label: 'Tìm bằng mô tả', icon: Search },
   ocr: { label: 'Tìm bằng chữ trong ảnh', icon: FileText },
+  prompt: { label: 'Tìm bằng prompt AI', icon: Sparkles },
 }
 
 // ── Empty state ───────────────────────────────────────────────
@@ -62,6 +64,12 @@ function EmptyState({ mode, query }: { mode: SearchMode; query: string }) {
           <p className="text-sm text-muted-foreground leading-relaxed">
             Không tìm thấy ảnh chứa chữ{' '}
             <span className="text-foreground font-semibold">"{query}"</span>.
+          </p>
+        )}
+        {mode === 'prompt' && (
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Không có ảnh phù hợp với prompt{' '}
+            <span className="text-foreground font-semibold">"{query}"</span>. Thử thay đổi prompt.
           </p>
         )}
         {mode === 'image' && (
@@ -102,8 +110,8 @@ function ResultsInfoBar({
   mode,
   query,
   queryId,
-  count,
-  total,
+  count: _count,
+  total: _total,
   isLoading,
 }: {
   mode: SearchMode
@@ -129,11 +137,6 @@ function ResultsInfoBar({
             </>
           )}
           {queryId && !query && <>Kết quả tìm ảnh tương tự</>}
-          {!isLoading && count > 0 && (
-            <span className="text-muted-foreground/70">
-              {' '}— {total} ảnh
-            </span>
-          )}
         </p>
       )}
     </div>
@@ -271,8 +274,8 @@ export function ResultsPage() {
   }, []) // intentionally run only on mount
 
   const { mode, q, query_id, imageId } = search
-  // Show similarity badge only to ADMIN users, and only for image/semantic modes (not OCR)
-  const showSimilarityBadge = Boolean(auth?.isAdmin) && (mode === 'image' || mode === 'semantic')
+  // Show similarity badge only to ADMIN users, and only for image/semantic/prompt modes (not OCR)
+  const showSimilarityBadge = Boolean(auth?.isAdmin) && (mode === 'image' || mode === 'semantic' || mode === 'prompt')
 
   // ── fetchInitial: page 1 — always a NEW search session ───────
   // Called when mode/query changes. Resets all state and creates a new SearchHistory.
@@ -348,7 +351,7 @@ export function ResultsPage() {
         } else {
           console.log(`[ResultsPage] fetchInitial [Text]: Calling searchByTextNew for mode: ${fetchMode}, query: "${fetchQuery}"`);
           const response = await searchByTextNew(
-            fetchMode as 'semantic' | 'ocr',
+            fetchMode as 'semantic' | 'ocr' | 'prompt',
             fetchQuery,
             20,
             controller.signal,
@@ -428,7 +431,7 @@ export function ResultsPage() {
       } else {
         console.log(`[ResultsPage] fetchMore [Text]: Calling searchByTextPage for mode: ${mode}, page: ${nextPage}`);
         const response = await searchByTextPage(
-          mode as 'semantic' | 'ocr',
+          mode as 'semantic' | 'ocr' | 'prompt',
           searchHistoryId,
           nextPage,
           _limitRef.current,

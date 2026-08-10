@@ -41,7 +41,7 @@ export type UserListParams = {
 
 // ─── Search History ───────────────────────────────────────────
 
-export type SearchTypeValue = 'IMAGE_ONLY' | 'TEXT_SEMANTIC' | 'TEXT_OCR'
+export type SearchTypeValue = 'IMAGE_ONLY' | 'TEXT_SEMANTIC' | 'TEXT_OCR' | 'TEXT_PROMPT'
 
 /** Ảnh dùng để tìm kiếm (query image) — khớp với backend history.type.ts */
 export interface HistoryQueryImage {

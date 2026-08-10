@@ -6,6 +6,7 @@ import {
   Images,
   ScanSearch,
   ChevronRight,
+  History,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -28,6 +29,11 @@ const NAV_ITEMS = [
     to: '/admin/images',
     label: 'Kho ảnh',
     icon: Images,
+  },
+  {
+    to: '/admin/history',
+    label: 'Lịch sử',
+    icon: History,
   },
 ] as const
 

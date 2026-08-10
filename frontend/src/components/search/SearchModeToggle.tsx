@@ -1,8 +1,8 @@
 import * as React from "react"
-import { Image, Type, FileText } from "lucide-react"
+import { Image, Type, FileText, Sparkles } from "lucide-react"
 import { cn } from "@/lib/utils"
 
-export type SearchMode = "image" | "semantic" | "ocr"
+export type SearchMode = "image" | "semantic" | "ocr" | "prompt"
 
 interface SearchModeOption {
   id: SearchMode
@@ -33,6 +33,13 @@ const SEARCH_MODES: SearchModeOption[] = [
     shortLabel: "Chữ",
     icon: FileText,
     description: "Tìm ảnh chứa dòng chữ cụ thể",
+  },
+  {
+    id: "prompt",
+    label: "Tìm bằng Prompt",
+    shortLabel: "Prompt",
+    icon: Sparkles,
+    description: "Tìm kiếm thông minh bằng prompt AI (tự động dịch & tối ưu)",
   },
 ]
 

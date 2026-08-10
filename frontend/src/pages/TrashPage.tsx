@@ -5,6 +5,7 @@ import {
   Trash2,
   X,
   ChevronLeft,
+  ChevronRight,
   CalendarDays,
   Loader2,
   AlertTriangle,
@@ -13,6 +14,7 @@ import {
   Square,
   RotateCcw,
   PackageOpen,
+  Info,
 } from 'lucide-react'
 import {
   getTrashImages,
@@ -27,6 +29,7 @@ import { useToast } from '@/components/ui/Toast'
 import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal'
 import { cn } from '@/lib/utils'
 import { getThumbnailUrl } from '@/lib/imageUtils'
+import { formatFileSize } from '@/services/myImagesService'
 
 // ============================================================
 // Constants
@@ -134,10 +137,223 @@ function RemainingDaysBadge({ days }: { days: number }) {
 }
 
 // ============================================================
+// Helper: format date-time
+// ============================================================
+
+function formatFullDateTime(isoString: string): string {
+  const d = new Date(isoString)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()} lúc ${pad(d.getHours())}:${pad(d.getMinutes())}`
+}
+
+// ============================================================
+// Trash Lightbox
+// ============================================================
+
+interface TrashLightboxProps {
+  image: TrashImage
+  allImages: TrashImage[]
+  onClose: () => void
+  onRestore: (id: string) => Promise<void>
+  onPermanentDelete: (id: string) => Promise<void>
+  onNavigate: (image: TrashImage) => void
+}
+
+function TrashLightbox({ image, allImages, onClose, onRestore, onPermanentDelete, onNavigate }: TrashLightboxProps) {
+  const [isRestoring, setIsRestoring] = React.useState(false)
+  const [isDeleting, setIsDeleting] = React.useState(false)
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false)
+
+  const currentIndex = allImages.findIndex((img) => img.id === image.id)
+  const hasPrev = currentIndex > 0
+  const hasNext = currentIndex < allImages.length - 1
+
+  const handlePrev = React.useCallback(() => {
+    if (hasPrev) onNavigate(allImages[currentIndex - 1])
+  }, [hasPrev, allImages, currentIndex, onNavigate])
+
+  const handleNext = React.useCallback(() => {
+    if (hasNext) onNavigate(allImages[currentIndex + 1])
+  }, [hasNext, allImages, currentIndex, onNavigate])
+
+  const handleRestore = async () => {
+    setIsRestoring(true)
+    await onRestore(image.id)
+    setIsRestoring(false)
+    onClose()
+  }
+
+  const handlePermanentDelete = async () => {
+    setIsDeleting(true)
+    await onPermanentDelete(image.id)
+    setIsDeleting(false)
+    setShowDeleteConfirm(false)
+    onClose()
+  }
+
+  // Keyboard navigation
+  React.useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+      if (e.key === 'ArrowLeft') handlePrev()
+      if (e.key === 'ArrowRight') handleNext()
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose, handlePrev, handleNext])
+
+  // Prevent body scroll
+  React.useEffect(() => {
+    document.body.style.overflow = 'hidden'
+    return () => { document.body.style.overflow = '' }
+  }, [])
+
+  const isBusy = isRestoring || isDeleting
+
+  return (
+    <>
+    {ReactDOM.createPortal(
+    <div
+      className="fixed inset-0 z-[9500] flex items-center justify-center"
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Xem ảnh: ${image.filename}`}
+    >
+      {/* Backdrop */}
+      <div className="absolute inset-0 bg-black/92 backdrop-blur-md" onClick={onClose} />
+
+      {/* Content */}
+      <div className="relative z-10 flex flex-col items-center w-full max-w-5xl px-4 py-6 max-h-screen">
+        {/* Top bar */}
+        <div className="w-full flex items-center justify-between mb-4 gap-3">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="flex items-center justify-center size-7 rounded-lg bg-white/10 shrink-0">
+              <Info className="size-3.5 text-white/70" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-white truncate">{image.filename}</p>
+              <p className="text-xs text-white/60">
+                Xoá {formatFullDateTime(image.deletedAt)}
+                {image.size ? ` · ${formatFileSize(image.size)}` : ''}
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Remaining days badge */}
+            <div
+              className={cn(
+                'px-2.5 py-1 rounded-full text-xs font-bold border',
+                image.remainingDays <= 3
+                  ? 'bg-destructive/80 border-destructive/60 text-white'
+                  : image.remainingDays <= 7
+                    ? 'bg-amber-500/80 border-amber-400/60 text-white'
+                    : 'bg-white/10 border-white/20 text-white/80',
+              )}
+            >
+              Còn {image.remainingDays <= 1 ? '< 1 ngày' : `${image.remainingDays} ngày`}
+            </div>
+
+            {/* Restore button */}
+            <button
+              onClick={handleRestore}
+              disabled={isBusy}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600/80 hover:bg-emerald-500 text-white text-xs font-semibold transition-all duration-150 border border-emerald-400/40 disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Khôi phục ảnh"
+            >
+              {isRestoring ? <Loader2 className="size-3.5 animate-spin" /> : <RotateCcw className="size-3.5" />}
+              <span className="hidden sm:inline">Khôi phục</span>
+            </button>
+
+            {/* Permanent delete button */}
+            <button
+              onClick={() => setShowDeleteConfirm(true)}
+              disabled={isBusy}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-destructive/80 text-white/80 hover:text-white text-xs font-semibold transition-all duration-150 border border-white/10 hover:border-destructive disabled:opacity-50 disabled:cursor-not-allowed"
+              title="Xoá vĩnh viễn"
+            >
+              <Trash2 className="size-3.5" />
+              <span className="hidden sm:inline">Xoá vĩnh viễn</span>
+            </button>
+
+            {/* Close button */}
+            <button
+              onClick={onClose}
+              className="flex items-center justify-center size-8 rounded-lg bg-white/10 hover:bg-white/20 text-white transition-colors border border-white/10"
+              aria-label="Đóng (Esc)"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+        </div>
+
+        {/* Image + nav */}
+        <div className="relative flex items-center gap-3 w-full justify-center">
+          <button
+            onClick={handlePrev}
+            disabled={!hasPrev}
+            className={cn(
+              'flex items-center justify-center size-10 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all duration-150 border border-white/10 shrink-0',
+              !hasPrev && 'opacity-30 cursor-not-allowed hover:bg-white/10',
+            )}
+            aria-label="Ảnh trước (←)"
+          >
+            <ChevronLeft className="size-5" />
+          </button>
+
+          <div className="flex-1 flex items-center justify-center min-w-0">
+            <img
+              src={image.imageUrl}
+              alt={image.filename}
+              className="max-h-[75vh] max-w-full object-contain rounded-xl shadow-2xl"
+              style={{ display: 'block' }}
+            />
+          </div>
+
+          <button
+            onClick={handleNext}
+            disabled={!hasNext}
+            className={cn(
+              'flex items-center justify-center size-10 rounded-xl bg-white/10 hover:bg-white/20 text-white transition-all duration-150 border border-white/10 shrink-0',
+              !hasNext && 'opacity-30 cursor-not-allowed hover:bg-white/10',
+            )}
+            aria-label="Ảnh tiếp (→)"
+          >
+            <ChevronRight className="size-5" />
+          </button>
+        </div>
+
+        {/* Counter + hints */}
+        <p className="mt-3 text-xs text-white/50 font-medium">
+          {currentIndex + 1} / {allImages.length}
+        </p>
+        <div className="flex items-center gap-4 mt-2 text-[10px] text-white/30 font-medium">
+          <span>← → điều hướng</span>
+          <span>Esc đóng</span>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  )}
+  {showDeleteConfirm && (
+    <DeleteConfirmModal
+      imageTitle={image.filename}
+      description="Ảnh sẽ bị XOÁ VĨNH VIỄN và KHÔNG THỂ KHÔI PHỤC."
+      isDeleting={isDeleting}
+      onConfirm={handlePermanentDelete}
+      onCancel={() => setShowDeleteConfirm(false)}
+      confirmLabel="Xoá vĩnh viễn"
+    />
+  )}
+  </>
+  )
+}
+
+// ============================================================
 // Empty state
 // ============================================================
 
-function EmptyState() {
+function EmptyState({ backTo, backLabel }: { backTo: string; backLabel: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-24 px-6 text-center space-y-5">
       <div className="relative">
@@ -155,9 +371,9 @@ function EmptyState() {
         </p>
       </div>
       <Button id="trash-back-btn" variant="brand" size="lg" asChild>
-        <Link to="/my-images">
+        <Link to={backTo}>
           <ChevronLeft className="size-4" />
-          Quay lại Ảnh của tôi
+          {backLabel}
         </Link>
       </Button>
     </div>
@@ -173,10 +389,11 @@ interface TrashGroupProps {
   isSelectMode: boolean
   selectedIds: Set<string>
   onToggleSelect: (image: TrashImage) => void
+  onImageClick: (image: TrashImage, groupImages: TrashImage[]) => void
   remainingDaysMap: Map<string, number>
 }
 
-function TrashDayGroup({ group, isSelectMode, selectedIds, onToggleSelect, remainingDaysMap }: TrashGroupProps) {
+function TrashDayGroup({ group, isSelectMode, selectedIds, onToggleSelect, onImageClick, remainingDaysMap }: TrashGroupProps) {
   const searchResults = React.useMemo(
     () => group.images.map(mapTrashImageToSearchResult),
     [group.images],
@@ -185,6 +402,12 @@ function TrashDayGroup({ group, isSelectMode, selectedIds, onToggleSelect, remai
   const handleToggleSelect = (result: SearchResult) => {
     const found = group.images.find((img) => img.id === result.id)
     if (found) onToggleSelect(found)
+  }
+
+  const handleCardClick = (result: SearchResult) => {
+    if (isSelectMode) return
+    const found = group.images.find((img) => img.id === result.id)
+    if (found) onImageClick(found, group.images)
   }
 
   return (
@@ -212,10 +435,10 @@ function TrashDayGroup({ group, isSelectMode, selectedIds, onToggleSelect, remai
         })()}
       </div>
 
-      {/* Masonry Grid — no single-delete, no search-similar in trash */}
+      {/* Masonry Grid */}
       <MasonryGrid
         results={searchResults}
-        onCardClick={() => { /* no lightbox for trash */ }}
+        onCardClick={handleCardClick}
         isSelectMode={isSelectMode}
         selectedIds={selectedIds}
         onToggleSelect={handleToggleSelect}
@@ -230,6 +453,8 @@ function TrashDayGroup({ group, isSelectMode, selectedIds, onToggleSelect, remai
 
 export function TrashPage() {
   const toast = useToast()
+  const backTo = '/admin/images'
+  const backLabel = 'Kho ảnh'
 
   // ── Data state ────────────────────────────────────────────
   const [images, setImages] = React.useState<TrashImage[]>([])
@@ -240,6 +465,9 @@ export function TrashPage() {
   // ── Loading state ──────────────────────────────────────────
   const [isInitialLoading, setIsInitialLoading] = React.useState(true)
   const [isLoadingMore, setIsLoadingMore] = React.useState(false)
+
+  // ── Lightbox state ──────────────────────────────────────────
+  const [lightbox, setLightbox] = React.useState<{ image: TrashImage; allImages: TrashImage[] } | null>(null)
 
   // ── Bulk select ────────────────────────────────────────────
   const [isSelectMode, setIsSelectMode] = React.useState(false)
@@ -385,6 +613,42 @@ export function TrashPage() {
     }
   }
 
+  // ── Single image handlers (from Lightbox) ───────────────────
+  const handleImageClick = (image: TrashImage, groupImages: TrashImage[]) => {
+    if (isSelectMode) return
+    setLightbox({ image, allImages: groupImages })
+  }
+
+  const handleLightboxNavigate = (image: TrashImage) => {
+    setLightbox((prev) => (prev ? { ...prev, image } : null))
+  }
+
+  const handleSingleRestore = async (id: string) => {
+    try {
+      await bulkRestoreImages([id])
+      setImages((prev) => prev.filter((img) => img.id !== id))
+      setTotalDocs((prev) => Math.max(0, prev - 1))
+      toast.success('Đã khôi phục ảnh thành công.')
+    } catch {
+      toast.error('Không thể khôi phục ảnh. Vui lòng thử lại.')
+    }
+  }
+
+  const handleSinglePermanentDelete = async (id: string) => {
+    try {
+      const result = await permanentDeleteImages([id])
+      if (result.deleted > 0) {
+        setImages((prev) => prev.filter((img) => !result.deletedIds.includes(img.id)))
+        setTotalDocs((prev) => Math.max(0, prev - result.deleted))
+        toast.success('Đã xoá vĩnh viễn ảnh.')
+      } else {
+        toast.error('Không thể xoá vĩnh viễn ảnh. Vui lòng thử lại.')
+      }
+    } catch {
+      toast.error('Không thể xoá vĩnh viễn ảnh. Vui lòng thử lại.')
+    }
+  }
+
   // ── Derived ────────────────────────────────────────────────
   const groups = React.useMemo(() => groupByDeletionDay(images), [images])
   const isBusy = isBulkRestoring || isBulkPermanentDeleting
@@ -463,9 +727,9 @@ export function TrashPage() {
                 asChild
                 className="shrink-0 text-muted-foreground"
               >
-                <Link to="/my-images">
+                <Link to={backTo}>
                   <ChevronLeft className="size-4" />
-                  Ảnh của tôi
+                  {backLabel}
                 </Link>
               </Button>
             </div>
@@ -486,7 +750,7 @@ export function TrashPage() {
           {isInitialLoading && <SkeletonGrid count={12} />}
 
           {/* ── Empty state ── */}
-          {!isInitialLoading && images.length === 0 && <EmptyState />}
+          {!isInitialLoading && images.length === 0 && <EmptyState backTo={backTo} backLabel={backLabel} />}
 
           {/* ── Image groups ── */}
           {!isInitialLoading && groups.length > 0 && (
@@ -498,6 +762,7 @@ export function TrashPage() {
                   isSelectMode={isSelectMode}
                   selectedIds={selectedIds}
                   onToggleSelect={toggleSelectImage}
+                  onImageClick={handleImageClick}
                   remainingDaysMap={remainingDaysMap}
                 />
               ))}
@@ -605,6 +870,18 @@ export function TrashPage() {
           onConfirm={handlePermanentDelete}
           onCancel={() => setShowPermanentConfirm(false)}
           confirmLabel="Xoá vĩnh viễn"
+        />
+      )}
+
+      {/* Lightbox for viewing single trash image detail */}
+      {lightbox && !isSelectMode && (
+        <TrashLightbox
+          image={lightbox.image}
+          allImages={lightbox.allImages}
+          onClose={() => setLightbox(null)}
+          onRestore={handleSingleRestore}
+          onPermanentDelete={handleSinglePermanentDelete}
+          onNavigate={handleLightboxNavigate}
         />
       )}
     </>

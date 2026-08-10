@@ -33,6 +33,6 @@ export function requireAuth() {
  */
 export function requireGuest() {
   if (isAuthenticated()) {
-    throw redirect({ to: '/dashboard' })
+    throw redirect({ to: '/search' })
   }
 }

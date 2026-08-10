@@ -1,7 +1,7 @@
 import * as React from 'react'
 import { createRootRoute, Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { TanStackRouterDevtools } from '@tanstack/router-devtools'
-import { ScanSearch, LogIn, LogOut, Search, UserCircle2, Menu, X, LayoutDashboard, UploadCloud } from 'lucide-react'
+import { ScanSearch, LogIn, LogOut, Search, Menu, X, LayoutDashboard, UploadCloud } from 'lucide-react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ThemeProvider } from '@/context/ThemeContext'
 import { AuthProvider } from '@/context/AuthContext'
@@ -90,7 +90,7 @@ function MobileNavLink({ to, children, icon, onClick }: NavLinkProps) {
 
 // ── App shell ─────────────────────────────────────────────────
 function AppShell() {
-  const { isAuthenticated, user, logout, isAdmin } = useAuth()
+  const { isAuthenticated, logout, isAdmin } = useAuth()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = React.useState(false)
   const menuRef = React.useRef<HTMLDivElement>(null)
@@ -182,9 +182,6 @@ function AppShell() {
                       Admin Dashboard
                     </NavLink>
                   )}
-                  <NavLink to="/dashboard" icon={<UserCircle2 className="size-3.5" />}>
-                    {user?.name?.split(' ').at(-1) ?? 'Dashboard'}
-                  </NavLink>
                   <Button
                     id="header-logout"
                     variant="ghost"
@@ -289,13 +286,6 @@ function AppShell() {
                           Admin Dashboard
                         </MobileNavLink>
                       )}
-                      <MobileNavLink
-                        to="/dashboard"
-                        icon={<UserCircle2 className="size-4 text-muted-foreground" />}
-                        onClick={() => setMenuOpen(false)}
-                      >
-                        {user?.name ?? 'Dashboard'}
-                      </MobileNavLink>
 
                       <div className="h-px bg-border/60 my-1" />
 

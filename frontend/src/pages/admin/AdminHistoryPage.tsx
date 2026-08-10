@@ -24,7 +24,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
 // ============================================================
-// SearchHistoryPage — User's own search history
+// AdminHistoryPage — Lịch sử tìm kiếm trong admin layout
+// Route: /admin/history
 // ============================================================
 
 const PAGE_SIZE = 20
@@ -453,10 +454,10 @@ function Pagination({ page, totalPages, totalDocs, onPrev, onNext }: PaginationP
 
 // ── Main Page ─────────────────────────────────────────────────
 
-export function SearchHistoryPage() {
+export function AdminHistoryPage() {
   const navigate = useNavigate()
   const { page, searchType, fromDate: fromDateParam, toDate: toDateParam } = useSearch({
-    from: '/history',
+    from: '/admin/history',
   })
 
   const activeType = (searchType as SearchTypeKey) ?? ''
@@ -469,7 +470,7 @@ export function SearchHistoryPage() {
   const [lightbox, setLightbox] = React.useState<{ src: string; alt: string } | null>(null)
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['history', 'me', { page, searchType: activeType, fromDate, toDate }],
+    queryKey: ['admin-history', 'me', { page, searchType: activeType, fromDate, toDate }],
     queryFn: () =>
       getMySearchHistory({
         page,
@@ -490,7 +491,7 @@ export function SearchHistoryPage() {
 
   function goToPage(p: number) {
     navigate({
-      to: '/history',
+      to: '/admin/history',
       search: {
         page: p,
         searchType: activeType,
@@ -502,7 +503,7 @@ export function SearchHistoryPage() {
 
   function changeType(type: SearchTypeKey) {
     navigate({
-      to: '/history',
+      to: '/admin/history',
       search: {
         page: 1,
         searchType: type,
@@ -515,7 +516,7 @@ export function SearchHistoryPage() {
   function handleFromDateChange(v: string) {
     setFromDate(v)
     navigate({
-      to: '/history',
+      to: '/admin/history',
       search: {
         page: 1,
         searchType: activeType,
@@ -528,7 +529,7 @@ export function SearchHistoryPage() {
   function handleToDateChange(v: string) {
     setToDate(v)
     navigate({
-      to: '/history',
+      to: '/admin/history',
       search: {
         page: 1,
         searchType: activeType,
@@ -542,7 +543,7 @@ export function SearchHistoryPage() {
     setFromDate('')
     setToDate('')
     navigate({
-      to: '/history',
+      to: '/admin/history',
       search: { page: 1, searchType: activeType },
     })
   }
@@ -572,7 +573,7 @@ export function SearchHistoryPage() {
 
             {/* Info */}
             <div className="flex-1 min-w-0">
-              <h1 className="text-xl font-black text-foreground">Lịch sử tìm kiếm của tôi</h1>
+              <h1 className="text-xl font-black text-foreground">Lịch sử tìm kiếm</h1>
               <p className="text-sm text-muted-foreground mt-1">
                 Xem lại các lượt tìm kiếm bằng ảnh, văn bản Semantic và OCR của bạn.
               </p>
@@ -612,7 +613,7 @@ export function SearchHistoryPage() {
                 <button
                   key={tab.value}
                   role="tab"
-                  id={`tab-${tab.value || 'all'}`}
+                  id={`admin-tab-${tab.value || 'all'}`}
                   aria-selected={isActive}
                   onClick={() => changeType(tab.value)}
                   className={cn(
@@ -649,7 +650,7 @@ export function SearchHistoryPage() {
               <p className="font-semibold text-foreground">Không thể tải lịch sử</p>
               <p className="text-sm text-muted-foreground mt-0.5">Đã xảy ra lỗi khi gọi API</p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => refetch()} id="retry-btn">
+            <Button variant="outline" size="sm" onClick={() => refetch()} id="admin-retry-btn">
               Thử lại
             </Button>
           </div>
