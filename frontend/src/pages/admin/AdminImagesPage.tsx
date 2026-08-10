@@ -18,6 +18,7 @@ import {
   ImageOff,
   Info,
   Search,
+  SearchX,
 } from 'lucide-react'
 import { getImages } from '@/services/adminImageService'
 import { bulkDeleteImages } from '@/services/myImagesService'
@@ -863,6 +864,19 @@ export function AdminImagesPage() {
                   )}
                 </button>
               )}
+
+              <Button
+                id="admin-images-search-delete-btn"
+                variant="outline"
+                size="sm"
+                asChild
+                className="shrink-0 text-destructive border-destructive/30 hover:bg-destructive/8 hover:border-destructive/50 hover:text-destructive"
+              >
+                <Link to="/admin/search-delete">
+                  <SearchX className="size-4" />
+                  Tìm &amp; Xoá
+                </Link>
+              </Button>
 
               <Button
                 id="admin-images-trash-btn"

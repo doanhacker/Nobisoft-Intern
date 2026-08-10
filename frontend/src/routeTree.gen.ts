@@ -22,6 +22,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as AdminTrashRouteImport } from './routes/admin/trash'
+import { Route as AdminSearchDeleteRouteImport } from './routes/admin/search-delete'
 import { Route as AdminImagesRouteImport } from './routes/admin/images'
 import { Route as AdminHistoryRouteImport } from './routes/admin/history'
 import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
@@ -92,6 +93,11 @@ const AdminTrashRoute = AdminTrashRouteImport.update({
   path: '/trash',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminSearchDeleteRoute = AdminSearchDeleteRouteImport.update({
+  id: '/search-delete',
+  path: '/search-delete',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminImagesRoute = AdminImagesRouteImport.update({
   id: '/images',
   path: '/images',
@@ -127,6 +133,7 @@ export interface FileRoutesByFullPath {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/history': typeof AdminHistoryRoute
   '/admin/images': typeof AdminImagesRoute
+  '/admin/search-delete': typeof AdminSearchDeleteRoute
   '/admin/trash': typeof AdminTrashRoute
   '/admin/users': typeof AdminUsersRouteWithChildren
   '/admin/': typeof AdminIndexRoute
@@ -145,6 +152,7 @@ export interface FileRoutesByTo {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/history': typeof AdminHistoryRoute
   '/admin/images': typeof AdminImagesRoute
+  '/admin/search-delete': typeof AdminSearchDeleteRoute
   '/admin/trash': typeof AdminTrashRoute
   '/admin/users': typeof AdminUsersRouteWithChildren
   '/admin': typeof AdminIndexRoute
@@ -165,6 +173,7 @@ export interface FileRoutesById {
   '/admin/dashboard': typeof AdminDashboardRoute
   '/admin/history': typeof AdminHistoryRoute
   '/admin/images': typeof AdminImagesRoute
+  '/admin/search-delete': typeof AdminSearchDeleteRoute
   '/admin/trash': typeof AdminTrashRoute
   '/admin/users': typeof AdminUsersRouteWithChildren
   '/admin/': typeof AdminIndexRoute
@@ -186,6 +195,7 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/history'
     | '/admin/images'
+    | '/admin/search-delete'
     | '/admin/trash'
     | '/admin/users'
     | '/admin/'
@@ -204,6 +214,7 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/history'
     | '/admin/images'
+    | '/admin/search-delete'
     | '/admin/trash'
     | '/admin/users'
     | '/admin'
@@ -223,6 +234,7 @@ export interface FileRouteTypes {
     | '/admin/dashboard'
     | '/admin/history'
     | '/admin/images'
+    | '/admin/search-delete'
     | '/admin/trash'
     | '/admin/users'
     | '/admin/'
@@ -335,6 +347,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminTrashRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/search-delete': {
+      id: '/admin/search-delete'
+      path: '/search-delete'
+      fullPath: '/admin/search-delete'
+      preLoaderRoute: typeof AdminSearchDeleteRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/images': {
       id: '/admin/images'
       path: '/images'
@@ -382,6 +401,7 @@ interface AdminRouteChildren {
   AdminDashboardRoute: typeof AdminDashboardRoute
   AdminHistoryRoute: typeof AdminHistoryRoute
   AdminImagesRoute: typeof AdminImagesRoute
+  AdminSearchDeleteRoute: typeof AdminSearchDeleteRoute
   AdminTrashRoute: typeof AdminTrashRoute
   AdminUsersRoute: typeof AdminUsersRouteWithChildren
   AdminIndexRoute: typeof AdminIndexRoute
@@ -391,6 +411,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminDashboardRoute: AdminDashboardRoute,
   AdminHistoryRoute: AdminHistoryRoute,
   AdminImagesRoute: AdminImagesRoute,
+  AdminSearchDeleteRoute: AdminSearchDeleteRoute,
   AdminTrashRoute: AdminTrashRoute,
   AdminUsersRoute: AdminUsersRouteWithChildren,
   AdminIndexRoute: AdminIndexRoute,
