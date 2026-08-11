@@ -34,7 +34,7 @@ const imageServeRouter = Router();
  *       ```
  *
  *       Giới hạn resize: min 16px, max 4096px. Ảnh không bị phóng to nếu nhỏ hơn target.
- *       Response có `Cache-Control: public, max-age=86400` (cache 1 ngày).
+ *       Response có `Cache-Control: public, max-age=3600` (cache 1 giờ).
  *     parameters:
  *       - in: path
  *         name: subfolder
@@ -83,7 +83,7 @@ const imageServeRouter = Router();
  *               type: string
  *               format: binary
  *       400:
- *         description: Subfolder hoặc filename không hợp lệ
+ *         description: Subfolder, filename hoặc kích thước resize không hợp lệ
  *         content:
  *           application/json:
  *             schema:

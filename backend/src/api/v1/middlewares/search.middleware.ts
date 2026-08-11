@@ -1,11 +1,12 @@
 import multer from 'multer';
 import type { Request } from 'express';
-
-const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+import {
+  ALLOWED_SEARCH_IMAGE_MIME_TYPES,
+  MAX_IMAGE_FILE_SIZE_BYTES,
+} from '../../../config/image.js';
 
 function fileFilter(_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) {
-  if (ALLOWED_MIME_TYPES.includes(file.mimetype)) {
+  if ((ALLOWED_SEARCH_IMAGE_MIME_TYPES as readonly string[]).includes(file.mimetype)) {
     cb(null, true);
   } else {
     cb(new Error(`File "${file.originalname}" không hợp lệ. Chỉ chấp nhận: jpg, png, webp`));
@@ -16,7 +17,7 @@ const searchUpload = multer({
   storage: multer.memoryStorage(),
   fileFilter,
   limits: {
-    fileSize: MAX_FILE_SIZE,
+    fileSize: MAX_IMAGE_FILE_SIZE_BYTES,
   },
 });
 

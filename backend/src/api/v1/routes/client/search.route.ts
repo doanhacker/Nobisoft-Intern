@@ -205,7 +205,7 @@ searchRouter.get('/text', (req: Request, res: Response) => {
  *               image:
  *                 type: string
  *                 format: binary
- *                 description: Ảnh cần tìm (jpg, png, webp, tối đa 10MB)
+ *                 description: Ảnh cần tìm (jpg, png, webp, tối đa 10MB và 40 triệu pixel)
  *               page:
  *                 type: integer
  *                 enum: [1]

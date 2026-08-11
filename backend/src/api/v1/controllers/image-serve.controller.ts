@@ -1,7 +1,13 @@
 import type { Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
+import { pipeline } from 'stream/promises';
 import sharp from 'sharp';
+import {
+  MAX_IMAGE_PIXELS,
+  MAX_RESIZE_DIMENSION,
+  MIN_RESIZE_DIMENSION,
+} from '../../../config/image.js';
 
 const STORAGE_DIR = process.env.STORAGE_DIR || './storage';
 const ALLOWED_SUBFOLDERS = ['index', 'search'];
@@ -15,14 +21,15 @@ const MIME_TYPES: Record<string, string> = {
   '.gif': 'image/gif',
 };
 
-// Giới hạn resize để tránh abuse
-const MAX_DIMENSION = 4096;
-const MIN_DIMENSION = 16;
-
 function parseResizeDimension(value: unknown): number | undefined {
-  if (value === undefined || value === null || value === '') return undefined;
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || !/^\d+$/.test(value)) return undefined;
   const num = Number(value);
-  if (!Number.isInteger(num) || num < MIN_DIMENSION || num > MAX_DIMENSION) return undefined;
+  if (
+    !Number.isInteger(num) ||
+    num < MIN_RESIZE_DIMENSION ||
+    num > MAX_RESIZE_DIMENSION
+  ) return undefined;
   return num;
 }
 
@@ -63,31 +70,44 @@ export async function serveImage(req: Request, res: Response) {
     // Parse resize params
     const width = parseResizeDimension(req.query.w);
     const height = parseResizeDimension(req.query.h);
+    const hasInvalidWidth = req.query.w !== undefined && width === undefined;
+    const hasInvalidHeight = req.query.h !== undefined && height === undefined;
+
+    if (hasInvalidWidth || hasInvalidHeight) {
+      res.status(400).json({
+        success: false,
+        message: `Kích thước resize phải là số nguyên từ ${MIN_RESIZE_DIMENSION} đến ${MAX_RESIZE_DIMENSION}`,
+      });
+      return;
+    }
 
     // Set cache headers
-    res.setHeader('Cache-Control', 'public, max-age=86400');
+    res.setHeader('Cache-Control', 'public, max-age=3600');
 
     if (width || height) {
-      const resizedBuffer = await sharp(filePath)
+      const resizedImage = sharp(filePath, { limitInputPixels: MAX_IMAGE_PIXELS })
+        .autoOrient()
         .resize({
           width: width || undefined,
           height: height || undefined,
           fit: 'cover',
           withoutEnlargement: true,
-        })
-        .toBuffer();
+        });
 
       res.setHeader('Content-Type', contentType);
-      res.setHeader('Content-Length', resizedBuffer.length);
-      res.send(resizedBuffer);
+      await pipeline(resizedImage, res);
     } else {
       // Trả ảnh gốc — stream trực tiếp, không load vào memory
       res.setHeader('Content-Type', contentType);
       const stream = fs.createReadStream(filePath);
-      stream.pipe(res);
+      await pipeline(stream, res);
     }
   } catch (error) {
     console.error('Error serving image:', error);
-    res.status(500).json({ success: false, message: 'Lỗi xử lý ảnh' });
+    if (!res.headersSent) {
+      res.status(500).json({ success: false, message: 'Lỗi xử lý ảnh' });
+    } else {
+      res.destroy();
+    }
   }
 }
