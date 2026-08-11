@@ -8,7 +8,7 @@ const options: swaggerJsdoc.Options = {
       version: '1.0.0',
     },
     servers: [
-      { url: '/' },
+      { url: '/api' },
     ],
     components: {
       securitySchemes: {
