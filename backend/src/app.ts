@@ -13,6 +13,8 @@ import imageServeRouter from './api/v1/routes/image-serve.route.js';
 const app: Express = express();
 const JSON_BODY_LIMIT = '1mb';
 
+app.set('trust proxy', 1);
+
 const allowedOrigins = process.env.ALLOWED_ORIGINS
   ? process.env.ALLOWED_ORIGINS.split(',')
   : [];

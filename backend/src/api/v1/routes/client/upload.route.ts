@@ -82,6 +82,12 @@ const uploadRouter = Router();
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       429:
+ *         description: Vượt quá giới hạn số lần upload
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  */
 uploadRouter.post('/', uploadMultiple, uploadImages);
 

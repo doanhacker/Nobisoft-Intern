@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { imageResizeRateLimiter } from '../middlewares/rate-limit.middleware.js';
 import { serveImage } from '../controllers/image-serve.controller.js';
 
 const imageServeRouter = Router();
@@ -93,6 +94,12 @@ const imageServeRouter = Router();
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       429:
+ *         description: Vượt quá giới hạn số lần resize ảnh
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Lỗi server khi xử lý ảnh
  *         content:
@@ -100,6 +107,6 @@ const imageServeRouter = Router();
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
  */
-imageServeRouter.get('/:subfolder/:filename', serveImage);
+imageServeRouter.get('/:subfolder/:filename', imageResizeRateLimiter, serveImage);
 
 export default imageServeRouter;

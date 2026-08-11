@@ -6,6 +6,11 @@ upstream backend_upstream {
     server backend:8000;
 }
 
+# Shared request counters are stored in Nginx memory.
+limit_req_zone $binary_remote_addr zone=api_rate_limit:10m rate=20r/s;
+limit_req_zone $binary_remote_addr zone=image_rate_limit:10m rate=20r/s;
+limit_conn_zone $binary_remote_addr zone=connection_limit:10m;
+
 # ─── HTTP → HTTPS redirect + ACME challenge ───
 server {
     listen 80;
@@ -48,9 +53,21 @@ server {
 
     # Max upload size (for image uploads)
     client_max_body_size 100M;
+    limit_req_status 429;
+    limit_conn_status 429;
+
+    error_page 429 = @rate_limited;
+
+    location @rate_limited {
+        default_type application/json;
+        return 429 '{"success":false,"message":"Quá nhiều yêu cầu, vui lòng thử lại sau"}';
+    }
 
     # ─── Backend API ───
     location /api/ {
+        limit_req zone=api_rate_limit burst=40 nodelay;
+        limit_conn connection_limit 30;
+
         proxy_pass http://backend_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
@@ -66,6 +83,9 @@ server {
 
     # ─── Backend: Image serving ───
     location /images/ {
+        limit_req zone=image_rate_limit burst=60 nodelay;
+        limit_conn connection_limit 20;
+
         proxy_pass http://backend_upstream;
         proxy_http_version 1.1;
         proxy_set_header Host $host;
