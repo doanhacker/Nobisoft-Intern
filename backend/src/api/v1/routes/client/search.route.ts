@@ -155,6 +155,12 @@ const searchRouter = Router();
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       429:
+ *         description: Vượt quá giới hạn số lần tìm kiếm
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Lỗi AI Service, Qdrant hoặc Backend
  *         content:
@@ -279,6 +285,12 @@ searchRouter.get('/text', (req: Request, res: Response) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/ErrorResponse'
+ *       429:
+ *         description: Vượt quá giới hạn số lần tìm kiếm
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Lỗi AI Service, Qdrant hoặc Backend
  *         content:
@@ -356,6 +368,12 @@ searchRouter.post('/image', uploadSearchImage, validateSearchImage, searchByImag
  *               $ref: '#/components/schemas/ErrorResponse'
  *       404:
  *         description: Không tìm thấy lịch sử hoặc ảnh
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       429:
+ *         description: Vượt quá giới hạn request tìm kiếm
  *         content:
  *           application/json:
  *             schema:
