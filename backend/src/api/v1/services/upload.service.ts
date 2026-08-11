@@ -41,7 +41,7 @@ export async function processImageUploads(
 
   // 2. Xử lý từng file
   for (const file of files) {
-    const ext = file.originalname.split('.').pop()?.toLowerCase() || '';
+    const ext = file.filename.split('.').pop()?.toLowerCase() || '';
     if (!['jpg', 'jpeg', 'png', 'webp', 'avif'].includes(ext)) {
       if (fs.existsSync(file.path)) fs.unlinkSync(file.path);
       results.push({ filename: file.originalname, success: false, error: 'Định dạng không hợp lệ' });

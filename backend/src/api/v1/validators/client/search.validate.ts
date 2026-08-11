@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
 import type { ApiResponse } from '../../../../types/apiResponse.js';
+import { InvalidImageContentError, validateImageContent } from '../../../../utils/image-file.util.js';
 import { uploadSearchImageMemory } from '../../middlewares/search.middleware.js';
 
 const searchImageSchema = z.object({
@@ -61,20 +62,26 @@ export type SearchClickBody = z.infer<typeof searchClickSchema>;
 
 export function uploadSearchImage(req: Request, res: Response, next: NextFunction) {
   uploadSearchImageMemory(req, res, (error: unknown) => {
-    if (!error) {
-      next();
-      return;
-    }
+    void (async () => {
+      try {
+        if (error) throw error;
+        if (req.file) await validateImageContent(req.file.buffer, req.file.mimetype);
+        next();
+        return;
+      } catch (uploadError) {
+        const message =
+          uploadError instanceof multer.MulterError && uploadError.code === 'LIMIT_FILE_SIZE'
+            ? 'Ảnh không được vượt quá 10MB'
+            : uploadError instanceof InvalidImageContentError
+              ? uploadError.message
+              : uploadError instanceof Error
+                ? uploadError.message
+                : 'Upload ảnh thất bại';
 
-    const message =
-      error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE'
-        ? 'Ảnh không được vượt quá 10MB'
-        : error instanceof Error
-          ? error.message
-          : 'Upload ảnh thất bại';
-
-    const response: ApiResponse = { success: false, message };
-    res.status(400).json(response);
+        const response: ApiResponse = { success: false, message };
+        res.status(400).json(response);
+      }
+    })();
   });
 }
 

@@ -87,6 +87,7 @@ services:
       - ./nginx/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
       - ./certbot/conf:/etc/letsencrypt:ro
       - ./certbot/www:/var/www/certbot:ro
+      - nginx_image_cache:/var/cache/nginx
     environment:
       - DOMAIN=${DOMAIN}
     depends_on:
@@ -199,3 +200,4 @@ volumes:
   ollama_data:
   certbot_conf:
   certbot_www:
+  nginx_image_cache:
