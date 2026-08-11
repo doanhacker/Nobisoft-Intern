@@ -44,3 +44,6 @@ Thumbs.db
 
 # Backup files
 *.back
+
+# SSL certificates (Let's Encrypt)
+certbot/
