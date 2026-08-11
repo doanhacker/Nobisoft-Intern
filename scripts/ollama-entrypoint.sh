@@ -1,4 +1,4 @@
-#!/bin/bash
+﻿#!/bin/bash
 # Start Ollama server in background
 ollama serve &
 
