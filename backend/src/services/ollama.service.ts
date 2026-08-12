@@ -1,4 +1,5 @@
 import type { AiEmbedTextResponse } from '../types/ai.type.js';
+import { getCachedTranslation, setCachedTranslation } from './cache.service.js';
 
 const OLLAMA_URL = process.env.OLLAMA_URL;
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || 'gemma2:2b';
@@ -57,6 +58,12 @@ export class OllamaServiceError extends Error {
  * thành mô tả tiếng Anh ngắn gọn, tối ưu cho CLIP-based search.
  */
 export async function translatePrompt(userInput: string): Promise<string> {
+  // Check cache first
+  const cached = await getCachedTranslation(userInput);
+  if (cached) {
+    return cached;
+  }
+
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT_MS);
 
@@ -95,6 +102,9 @@ export async function translatePrompt(userInput: string): Promise<string> {
     if (!translated) {
       throw new OllamaServiceError('Ollama returned empty response');
     }
+
+    // Save to cache
+    await setCachedTranslation(userInput, translated);
 
     return translated;
   } catch (error) {

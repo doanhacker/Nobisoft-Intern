@@ -3,6 +3,7 @@ import type {
   AiEmbedTextResponse,
   AiProcessImageResponse,
 } from '../types/ai.type.js';
+import { getCachedEmbedding, setCachedEmbedding } from './cache.service.js';
 
 const AI_SERVICE_URL = process.env.AI_SERVICE_URL;
 const AI_TIMEOUT_MS = 30_000;
@@ -55,6 +56,15 @@ export async function embedImage(
 
 // POST /api/embed-text
 export async function embedText(text: string): Promise<AiEmbedTextResponse> {
+  // Check cache first
+  const cachedEmbedding = await getCachedEmbedding(text);
+  if (cachedEmbedding) {
+    return {
+      success: true,
+      data: { embedding: cachedEmbedding },
+    } as AiEmbedTextResponse;
+  }
+
   const response = await fetchWithTimeout(`${AI_SERVICE_URL}/api/embed-text`, {
     method: 'POST',
     headers: {
@@ -67,7 +77,14 @@ export async function embedText(text: string): Promise<AiEmbedTextResponse> {
     throw new Error(`AI embed-text failed: ${response.status} ${response.statusText}`);
   }
 
-  return response.json() as Promise<AiEmbedTextResponse>;
+  const result = await response.json() as AiEmbedTextResponse;
+
+  // Save to cache on success
+  if (result.success && result.data?.embedding) {
+    await setCachedEmbedding(text, result.data.embedding);
+  }
+
+  return result;
 }
 
 // Fetch with timeout
