@@ -1,13 +1,8 @@
 """
-Script Đánh Giá Định Lượng AI: Gemma 2B + English CLIP (Hỗ trợ Server & Local)
+Script Đánh Giá Định Lượng AI: Gemma 2B + English CLIP (Mode: Prompt Search)
 
-Mục đích: Đo lường độ chính xác và hiệu năng của hệ thống tìm kiếm trên môi trường Server/Local
-thông qua các chỉ số Information Retrieval (IR) tiêu chuẩn:
-- Precision@K
-- Recall@K
-- MRR (Mean Reciprocal Rank)
-- MAP@K (Mean Average Precision)
-- End-to-End Latency (ms)
+Mục đích: Đo lường độ chính xác và hiệu năng của chức năng "Tìm bằng Prompt"
+(Gemma 2B dịch prompt Tiếng Việt → English CLIP → Qdrant Vector Search).
 
 Cách chạy:
     # 1. Đánh giá trên Local:
@@ -22,6 +17,7 @@ import json
 import os
 import sys
 import time
+import urllib.parse
 import urllib.request
 from typing import Any
 
@@ -38,13 +34,19 @@ BENCHMARK_FILE = os.path.join(
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="AI Search Benchmark Evaluator")
+    parser = argparse.ArgumentParser(description="AI Search Benchmark Evaluator - Prompt Mode (Gemma 2B + CLIP)")
     parser.add_argument(
         "--base-url",
         default="http://localhost:8000",
-        help="Base URL của Backend API",
+        help="Base URL của Backend API (Local hoặc Server)",
     )
     parser.add_argument("--top-k", type=int, default=5, help="Số lượng kết quả Top K")
+    parser.add_argument(
+        "--mode",
+        default="prompt",
+        choices=["prompt", "semantic", "ocr"],
+        help="Chế độ tìm kiếm (mặc định: prompt = Gemma 2B + English CLIP)",
+    )
     return parser.parse_args()
 
 
@@ -86,16 +88,57 @@ def calculate_ap_at_k(results: list[str], relevant: set[str], k: int = 5) -> flo
     return score / min(len(relevant), k)
 
 
+def fetch_search_results(base_url: str, text_vi: str, mode: str, limit: int) -> tuple[list[str], str]:
+    """Gửi request tới API Backend và lấy danh sách image_id."""
+    retrieved_ids: list[str] = []
+    
+    # 1. Thử HTTP GET /api/v1/search/text?q=...&mode=prompt
+    encoded_q = urllib.parse.quote(text_vi)
+    get_url = f"{base_url}/api/v1/search/text?q={encoded_q}&mode={mode}&limit={limit}"
+    
+    try:
+        req = urllib.request.Request(get_url, headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=15) as response:
+            resp_json = json.loads(response.read().decode("utf-8"))
+            if resp_json.get("success") and "data" in resp_json:
+                items = resp_json["data"].get("items", [])
+                retrieved_ids = [img.get("id") or img.get("imageId") for img in items if img]
+                return retrieved_ids, "SUCCESS"
+    except Exception as get_err:
+        # 2. Fallback sang HTTP POST /api/v1/search/text
+        try:
+            post_url = f"{base_url}/api/v1/search/text"
+            req_data = json.dumps({"queryText": text_vi, "mode": mode, "limit": limit}).encode("utf-8")
+            req = urllib.request.Request(
+                post_url,
+                data=req_data,
+                headers={"Content-Type": "application/json", "Accept": "application/json"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=15) as response:
+                resp_json = json.loads(response.read().decode("utf-8"))
+                if resp_json.get("success") and "data" in resp_json:
+                    items = resp_json["data"].get("items", [])
+                    retrieved_ids = [img.get("id") or img.get("imageId") for img in items if img]
+                    return retrieved_ids, "SUCCESS"
+        except Exception as post_err:
+            return [], f"API offline ({get_err})"
+
+    return retrieved_ids, "EMPTY_DATA"
+
+
 def main() -> None:
     args = parse_args()
     base_url = args.base_url.rstrip("/")
     k = args.top_k
+    mode = args.mode
 
     print("\n==================================================================")
-    print("   DANH GIA DINH LUONG: GEMMA 2B + ENGLISH CLIP (SERVER/LOCAL)")
+    print("   DANH GIA DINH LUONG: GEMMA 2B + ENGLISH CLIP (MODE: PROMPT)")
     print("==================================================================\n")
 
     print(f"Target Server API : {base_url}")
+    print(f"Search Mode       : {mode.upper()} (Gemma 2B Prompt Search)")
     print(f"Top K Evaluation  : K = {k}")
     print(f"Benchmark File    : {BENCHMARK_FILE}\n")
 
@@ -122,27 +165,9 @@ def main() -> None:
         relevant_ids = set(item.get("relevant_image_ids", []))
 
         start_time = time.perf_counter()
-        retrieved_ids: list[str] = []
-        status_msg = "SUCCESS"
-
-        try:
-            search_api_url = f"{base_url}/api/v1/search/text"
-            req_data = json.dumps({"queryText": text_vi, "limit": 20}).encode("utf-8")
-            req = urllib.request.Request(
-                search_api_url,
-                data=req_data,
-                headers={"Content-Type": "application/json"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=10) as response:
-                resp_json = json.loads(response.read().decode("utf-8"))
-                if resp_json.get("success") and "data" in resp_json:
-                    items = resp_json["data"].get("items", [])
-                    retrieved_ids = [img.get("id") or img.get("imageId") for img in items if img]
-        except Exception as exc:
-            status_msg = f"API offline ({exc})"
-
+        retrieved_ids, status_msg = fetch_search_results(base_url, text_vi, mode, limit=20)
         elapsed_ms = (time.perf_counter() - start_time) * 1000
+
         latencies.append(elapsed_ms)
 
         p = calculate_precision_at_k(retrieved_ids, relevant_ids, k=k)
@@ -168,9 +193,10 @@ def main() -> None:
     avg_lat = sum(latencies) / len(latencies) if latencies else 0
 
     print("\n" + "=" * 68)
-    print("BAO CAO DANH GIA DINH LUONG TONG HOP (QUANTITATIVE BENCHMARK)")
+    print("BAO CAO DANH GIA DINH LUONG TONG HOP (PROMPT MODE - GEMMA 2B)")
     print("=" * 68)
     print(f"  * Target Environment : {base_url}")
+    print(f"  * Search Mode        : {mode.upper()}")
     print(f"  * Precision@{k}        : {avg_p:.1f}%")
     print(f"  * Recall@{k}           : {avg_r:.1f}%")
     print(f"  * MRR Score          : {avg_mrr:.3f}")
