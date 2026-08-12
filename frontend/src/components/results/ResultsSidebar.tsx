@@ -79,8 +79,8 @@ export function ResultsSidebar({ className }: ResultsSidebarProps) {
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 h-screen z-40',
-        'flex flex-col items-center py-4 gap-2',
+        'hidden md:flex fixed left-0 top-0 h-screen z-40',
+        'flex-col items-center py-4 gap-2',
         'w-[68px] shrink-0',
         'bg-background/95 backdrop-blur-xl',
         'border-r border-border/50',

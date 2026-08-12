@@ -430,7 +430,7 @@ interface PaginationProps {
 function Pagination({ page, totalPages, totalDocs, onPrev, onNext }: PaginationProps) {
   if (totalPages <= 1) return null
   return (
-    <div className="flex items-center justify-between mt-2">
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-2 gap-3">
       <p className="text-sm text-muted-foreground">
         Trang <span className="font-semibold text-foreground">{page}</span> /{' '}
         <span className="font-semibold text-foreground">{totalPages}</span>
@@ -559,7 +559,7 @@ export function AdminHistoryPage() {
         />
       )}
 
-      <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
+      <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
         {/* ── Hero header ── */}
         <div className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-primary/3 to-transparent border border-border/60 rounded-2xl p-6 shadow-sm">
           {/* Decorative blob */}
@@ -601,7 +601,7 @@ export function AdminHistoryPage() {
         <div className="flex flex-col gap-3">
           {/* Search type tabs */}
           <div
-            className="flex items-center gap-1 bg-muted/40 rounded-xl p-1 w-fit flex-wrap"
+            className="flex items-center gap-1 bg-muted/40 rounded-xl p-1 w-full overflow-x-auto scrollbar-none flex-nowrap"
             role="tablist"
             aria-label="Lọc theo loại tìm kiếm"
           >

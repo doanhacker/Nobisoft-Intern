@@ -413,19 +413,19 @@ function TrashDayGroup({ group, isSelectMode, selectedIds, onToggleSelect, onIma
   return (
     <div className="space-y-3">
       {/* Sticky group header */}
-      <div className="flex items-center gap-2.5 sticky top-[61px] z-10 py-2 bg-background/90 backdrop-blur-md">
-        <div className="flex items-center justify-center size-7 rounded-lg bg-destructive/10 shrink-0">
+      <div className="flex items-center gap-3 sticky top-0 z-10 py-2.5 -mx-1 px-1 bg-background/80 backdrop-blur-md">
+        <div className="flex items-center gap-2 pl-3 pr-3.5 py-1.5 rounded-full bg-destructive/10 border border-destructive/20 shadow-sm shrink-0">
           <CalendarDays className="size-3.5 text-destructive" />
+          <span className="font-bold text-sm text-destructive">{group.label}</span>
         </div>
-        <span className="font-bold text-sm text-foreground">{group.label}</span>
-        <div className="flex-1 h-px bg-border/50 ml-1" />
+        <div className="flex-1 h-px bg-border/40" />
         {/* Show min remainingDays of this group */}
         {(() => {
           const days = group.images.map((img) => remainingDaysMap.get(img.id) ?? 999)
           const minDays = Math.min(...days)
           if (minDays < 999) {
             return (
-              <div className="flex items-center gap-1.5 shrink-0">
+              <div className="flex items-center gap-1.5 shrink-0 pl-1">
                 <span className="text-xs text-muted-foreground">sớm nhất còn</span>
                 <RemainingDaysBadge days={minDays} />
               </div>

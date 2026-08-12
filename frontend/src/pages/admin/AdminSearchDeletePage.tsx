@@ -1,7 +1,6 @@
 import * as React from 'react'
 import { Link } from '@tanstack/react-router'
 import {
-  ArrowLeft,
   Trash2,
   CheckSquare,
   Square,
@@ -294,7 +293,11 @@ export function AdminSearchDeletePage() {
         toast.error('Xoá ảnh thất bại. Vui lòng thử lại.')
       }
 
-      const deletedSet = new Set(result.deletedIds)
+      const deletedSet = new Set(
+        result.failedIds.length > 0
+          ? ids.filter((id) => !result.failedIds.includes(id))
+          : ids,
+      )
       setResults((prev) => prev.filter((r) => !deletedSet.has(r.id)))
       setTotal((prev) => Math.max(0, prev - result.deleted))
       setSelectedIds(new Set())
@@ -476,6 +479,7 @@ export function AdminSearchDeletePage() {
                     768: 3,
                     640: 2,
                     480: 2,
+                    380: 2,
                   }}
                 />
 
@@ -496,19 +500,19 @@ export function AdminSearchDeletePage() {
 
       {/* ── Floating action bar (shows when ≥ 1 selected) ── */}
       {selectedCount > 0 && !showConfirm && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-scale-in-spring">
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-scale-in-spring w-[calc(100%-2rem)] max-w-lg">
           <div className={cn(
-            'flex items-center gap-4 px-5 py-3 rounded-2xl shadow-2xl',
+            'flex items-center gap-2 sm:gap-4 px-3 sm:px-5 py-3 rounded-2xl shadow-2xl',
             'bg-card border border-border/60 backdrop-blur-xl',
             'shadow-[0_8px_32px_rgba(0,0,0,0.25)]',
           )}>
-            <div>
+            <div className="flex-1 min-w-0">
               <p className="text-sm font-bold text-foreground">
                 Đã chọn <span className="text-destructive">{selectedCount}</span> ảnh
               </p>
-              <p className="text-xs text-muted-foreground">Sẽ được chuyển vào Thùng rác</p>
+              <p className="text-xs text-muted-foreground hidden sm:block">Sẽ được chuyển vào Thùng rác</p>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={handleDeselectAll}
@@ -521,14 +525,14 @@ export function AdminSearchDeletePage() {
                 onClick={() => setShowConfirm(true)}
                 disabled={isDeleting}
                 className={cn(
-                  'flex items-center gap-2 px-4 py-1.5 rounded-xl text-sm font-semibold text-white',
+                  'flex items-center gap-2 px-3 sm:px-4 py-1.5 rounded-xl text-sm font-semibold text-white',
                   'bg-destructive hover:bg-destructive/90 active:scale-[0.97]',
                   'transition-all disabled:opacity-50',
                   'shadow-[0_0_20px_oklch(0.53_0.24_20/0.40)]',
                 )}
               >
                 <Trash2 className="size-4" />
-                Xoá {selectedCount} ảnh
+                <span className="hidden sm:inline">Xoá</span> {selectedCount}
               </button>
             </div>
           </div>
