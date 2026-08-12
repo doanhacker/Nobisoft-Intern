@@ -42,7 +42,7 @@ def parse_args():
         default="http://localhost:8000",
         help="Base URL của Backend API (Ví dụ: https://visualsearch.duckdns.org)",
     )
-    parser.add_argument("--top-k", type=int, default=5, help="Số lượng kết quả Top K")
+    parser.add_argument("--top-k", type=int, default=5, help="Số lượng kết quả Top K để chấm điểm (từ 1 đến 20)")
     parser.add_argument(
         "--mode",
         default="prompt",
@@ -147,17 +147,18 @@ def parse_image_ids_from_api(resp_json: dict[str, Any]) -> list[str]:
     return retrieved_ids
 
 
-def fetch_search_results(base_url: str, text_vi: str, mode: str, limit: int, token: Optional[str]) -> tuple[list[str], str]:
-    """Gửi request tới API Backend và lấy danh sách image_id."""
+def fetch_search_results(base_url: str, text_vi: str, mode: str, token: Optional[str]) -> tuple[list[str], str]:
+    """Gửi request tới API Backend với limit=20 theo đúng quy định Zod Validator."""
     headers = {"Accept": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
 
     encoded_q = urllib.parse.quote(text_vi)
 
+    # Backend Zod Validator quy định limit=20 và page=1
     endpoints_to_try = [
-        f"{base_url}/api/search/text?q={encoded_q}&mode={mode}&limit={limit}",
-        f"{base_url}/api/v1/search/text?q={encoded_q}&mode={mode}&limit={limit}",
+        f"{base_url}/api/search/text?q={encoded_q}&mode={mode}&page=1&limit=20",
+        f"{base_url}/api/v1/search/text?q={encoded_q}&mode={mode}&page=1&limit=20",
     ]
 
     last_error = ""
@@ -165,7 +166,7 @@ def fetch_search_results(base_url: str, text_vi: str, mode: str, limit: int, tok
     for get_url in endpoints_to_try:
         try:
             req = urllib.request.Request(get_url, headers=headers)
-            with urllib.request.urlopen(req, timeout=20) as response:
+            with urllib.request.urlopen(req, timeout=25) as response:
                 resp_json = json.loads(response.read().decode("utf-8"))
                 retrieved_ids = parse_image_ids_from_api(resp_json)
                 if retrieved_ids:
@@ -175,22 +176,6 @@ def fetch_search_results(base_url: str, text_vi: str, mode: str, limit: int, tok
         except Exception as err:
             last_error = str(err)
             continue
-
-    # Fallback POST /api/search/text
-    try:
-        post_url = f"{base_url}/api/search/text"
-        post_headers = {**headers, "Content-Type": "application/json"}
-        req_data = json.dumps({"queryText": text_vi, "mode": mode, "limit": limit}).encode("utf-8")
-        req = urllib.request.Request(post_url, data=req_data, headers=post_headers, method="POST")
-        with urllib.request.urlopen(req, timeout=20) as response:
-            resp_json = json.loads(response.read().decode("utf-8"))
-            retrieved_ids = parse_image_ids_from_api(resp_json)
-            if retrieved_ids:
-                return retrieved_ids, f"SUCCESS (Found {len(retrieved_ids)})"
-            elif resp_json.get("success"):
-                return [], "SUCCESS (0 items)"
-    except Exception as err:
-        last_error = str(err)
 
     return [], f"API Error ({last_error})"
 
@@ -238,7 +223,7 @@ def main() -> None:
         relevant_ids = set(item.get("relevant_image_ids", []))
 
         start_time = time.perf_counter()
-        retrieved_ids, status_msg = fetch_search_results(base_url, text_vi, mode, limit=k, token=token)
+        retrieved_ids, status_msg = fetch_search_results(base_url, text_vi, mode, token=token)
         elapsed_ms = (time.perf_counter() - start_time) * 1000
 
         latencies.append(elapsed_ms)
