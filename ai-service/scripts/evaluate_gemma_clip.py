@@ -11,7 +11,7 @@ Cách chạy:
     python ai-service/scripts/evaluate_gemma_clip.py
 
     # 2. Đánh giá trên Server (Tự động đăng nhập):
-    python ai-service/scripts/evaluate_gemma_clip.py --base-url https://visualsearch.duckdns.org --email admin@example.com --password Admin123!@#
+    python ai-service/scripts/evaluate_gemma_clip.py --base-url https://visualsearch.duckdns.org --email test@gmail.com --password "@Abc1234"
 """
 
 import argparse
@@ -50,7 +50,7 @@ def parse_args():
         help="Chế độ tìm kiếm (mặc định: prompt = Gemma 2B + English CLIP)",
     )
     parser.add_argument("--email", default="admin@example.com", help="Email đăng nhập Backend")
-    parser.add_argument("--password", default="Admin123!@#", help="Mật khẩu đăng nhập Backend")
+    parser.add_argument("--password", default="ChangeMe@123", help="Mật khẩu đăng nhập Backend")
     parser.add_argument("--token", default="", help="JWT Access Token (nếu có sẵn)")
     return parser.parse_args()
 
@@ -123,17 +123,38 @@ def calculate_ap_at_k(results: list[str], relevant: set[str], k: int = 5) -> flo
     return score / min(len(relevant), k)
 
 
-def fetch_search_results(base_url: str, text_vi: str, mode: str, limit: int, token: Optional[str]) -> tuple[list[str], str]:
-    """Gửi request tới API Backend và lấy danh sách image_id (hỗ trợ cả GET & POST, hỗ trợ Auth Bearer Token)."""
+def parse_image_ids_from_api(resp_json: dict[str, Any]) -> list[str]:
+    """Trích xuất mảng image_id chuẩn từ cấu trúc response của Backend (data.results hoặc data.items)."""
     retrieved_ids: list[str] = []
+    if not resp_json.get("success") or "data" not in resp_json:
+        return []
+
+    data_obj = resp_json["data"]
+    items = []
+    if isinstance(data_obj, dict):
+        items = data_obj.get("results") or data_obj.get("items") or []
+    elif isinstance(data_obj, list):
+        items = data_obj
+
+    for img in items:
+        if isinstance(img, dict):
+            img_id = img.get("id") or img.get("imageId") or img.get("image_id")
+            if img_id:
+                retrieved_ids.append(str(img_id))
+        elif isinstance(img, str):
+            retrieved_ids.append(img)
+
+    return retrieved_ids
+
+
+def fetch_search_results(base_url: str, text_vi: str, mode: str, limit: int, token: Optional[str]) -> tuple[list[str], str]:
+    """Gửi request tới API Backend và lấy danh sách image_id."""
     headers = {"Accept": "application/json"}
     if token:
         headers["Authorization"] = f"Bearer {token}"
 
     encoded_q = urllib.parse.quote(text_vi)
 
-    # 1. Thử GET /api/search/text?q=...&mode=prompt
-    # 2. Thử GET /api/v1/search/text?q=...&mode=prompt
     endpoints_to_try = [
         f"{base_url}/api/search/text?q={encoded_q}&mode={mode}&limit={limit}",
         f"{base_url}/api/v1/search/text?q={encoded_q}&mode={mode}&limit={limit}",
@@ -146,15 +167,16 @@ def fetch_search_results(base_url: str, text_vi: str, mode: str, limit: int, tok
             req = urllib.request.Request(get_url, headers=headers)
             with urllib.request.urlopen(req, timeout=20) as response:
                 resp_json = json.loads(response.read().decode("utf-8"))
-                if resp_json.get("success") and "data" in resp_json:
-                    items = resp_json["data"].get("items", [])
-                    retrieved_ids = [img.get("id") or img.get("imageId") for img in items if img]
-                    return retrieved_ids, "SUCCESS"
+                retrieved_ids = parse_image_ids_from_api(resp_json)
+                if retrieved_ids:
+                    return retrieved_ids, f"SUCCESS (Found {len(retrieved_ids)})"
+                elif resp_json.get("success"):
+                    return [], "SUCCESS (0 items)"
         except Exception as err:
             last_error = str(err)
             continue
 
-    # Fallback: POST /api/search/text
+    # Fallback POST /api/search/text
     try:
         post_url = f"{base_url}/api/search/text"
         post_headers = {**headers, "Content-Type": "application/json"}
@@ -162,14 +184,15 @@ def fetch_search_results(base_url: str, text_vi: str, mode: str, limit: int, tok
         req = urllib.request.Request(post_url, data=req_data, headers=post_headers, method="POST")
         with urllib.request.urlopen(req, timeout=20) as response:
             resp_json = json.loads(response.read().decode("utf-8"))
-            if resp_json.get("success") and "data" in resp_json:
-                items = resp_json["data"].get("items", [])
-                retrieved_ids = [img.get("id") or img.get("imageId") for img in items if img]
-                return retrieved_ids, "SUCCESS"
+            retrieved_ids = parse_image_ids_from_api(resp_json)
+            if retrieved_ids:
+                return retrieved_ids, f"SUCCESS (Found {len(retrieved_ids)})"
+            elif resp_json.get("success"):
+                return [], "SUCCESS (0 items)"
     except Exception as err:
         last_error = str(err)
 
-    return [], f"API offline ({last_error})"
+    return [], f"API Error ({last_error})"
 
 
 def main() -> None:
@@ -215,7 +238,7 @@ def main() -> None:
         relevant_ids = set(item.get("relevant_image_ids", []))
 
         start_time = time.perf_counter()
-        retrieved_ids, status_msg = fetch_search_results(base_url, text_vi, mode, limit=20, token=token)
+        retrieved_ids, status_msg = fetch_search_results(base_url, text_vi, mode, limit=k, token=token)
         elapsed_ms = (time.perf_counter() - start_time) * 1000
 
         latencies.append(elapsed_ms)
