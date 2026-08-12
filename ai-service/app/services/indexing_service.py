@@ -20,7 +20,7 @@ class IndexingService:
     ) -> None:
         self.clip_service = clip_service
         self.ocr_service = ocr_service
-        self._inference_slots = asyncio.Semaphore(4)
+        self._inference_slots = asyncio.Semaphore(2)
 
     def _run_inference(
         self,
@@ -76,7 +76,7 @@ class IndexingService:
             )
 
             # Không chạy CLIP/EasyOCR trực tiếp trên event loop. Mỗi ảnh được
-            # đưa sang một thread và toàn service chỉ cho phép tối đa 4 thread
+            # đưa sang một thread và toàn service chỉ cho phép tối đa 2 thread
             # inference hoạt động cùng lúc.
             async with self._inference_slots:
                 embedding, ocr_results = await asyncio.to_thread(

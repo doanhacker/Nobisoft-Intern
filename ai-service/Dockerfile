@@ -21,12 +21,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy source code
 COPY app ./app
 
-# Tải trước CLIP model vào image (force re-download để fix lỗi model bị corrupt)
+# Tải trước CLIP model vào image
 RUN python -c "from transformers import CLIPModel, CLIPProcessor; CLIPModel.from_pretrained('openai/clip-vit-base-patch32'); CLIPProcessor.from_pretrained('openai/clip-vit-base-patch32'); print('CLIP model cached successfully')"
 
 # Tải trước đúng bộ EasyOCR mà ứng dụng sử dụng để runtime không cần tải thêm.
 RUN python -c "import easyocr; easyocr.Reader(['en', 'vi'], gpu=False); print('EasyOCR models cached successfully')"
 
-EXPOSE 9000
-
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9000", "--reload"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "9000"]

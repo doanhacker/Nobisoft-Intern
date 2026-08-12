@@ -1,0 +1,552 @@
+[
+  {
+    "query_id": "q01",
+    "category": "object",
+    "query_text_vi": "con mèo",
+    "ground_truth_en": "a cat",
+    "description": "Vật thể — Con mèo",
+    "relevant_image_ids": [
+      "4d3d246a-dbfb-4f91-8666-adee1bac76fe",
+      "384338fc-e6d6-4ba2-9de7-1ae5a6031a0a"
+    ]
+  },
+  {
+    "query_id": "q02",
+    "category": "object",
+    "query_text_vi": "con chó",
+    "ground_truth_en": "a dog",
+    "description": "Vật thể — Con chó",
+    "relevant_image_ids": [
+      "86cde730-b281-4c55-9eac-babb080ec469",
+      "8d6b66d3-1445-4a9f-9b53-c424825e1b2d"
+    ]
+  },
+  {
+    "query_id": "q03",
+    "category": "object",
+    "query_text_vi": "xe hơi",
+    "ground_truth_en": "a car",
+    "description": "Vật thể — Xe hơi / Ô tô",
+    "relevant_image_ids": [
+      "cf22d598-ca5c-41b3-94d6-9cc1f8b858d3",
+      "e80f49a5-8219-4e54-89fa-8eaefd911adb"
+    ]
+  },
+  {
+    "query_id": "q04",
+    "category": "object",
+    "query_text_vi": "xe đạp",
+    "ground_truth_en": "a bicycle",
+    "description": "Vật thể — Xe đạp",
+    "relevant_image_ids": [
+      "e2eeaa64-8d8b-4b3f-8591-ea656db43f68",
+      "fb3c98a9-891d-4ceb-898b-a0e88c880d76"
+    ]
+  },
+  {
+    "query_id": "q05",
+    "category": "object",
+    "query_text_vi": "tách cà phê",
+    "ground_truth_en": "coffee cup",
+    "description": "Vật thể — Tách / Ly cà phê",
+    "relevant_image_ids": [
+      "3a3e680c-844a-4978-9e29-54765480f48a",
+      "eae7e8f5-9977-4b52-b836-dc62fea45005"
+    ]
+  },
+  {
+    "query_id": "q06",
+    "category": "object",
+    "query_text_vi": "máy tính xách tay",
+    "ground_truth_en": "laptop computer",
+    "description": "Vật thể — Máy tính xách tay / Laptop",
+    "relevant_image_ids": [
+      "4049ed68-1d1d-4c2d-a61f-271b06105cb0",
+      "ebcddc97-55f6-4785-86a5-09b9d254ee76"
+    ]
+  },
+  {
+    "query_id": "q07",
+    "category": "object",
+    "query_text_vi": "điện thoại thông minh",
+    "ground_truth_en": "smartphone mobile phone",
+    "description": "Vật thể — Điện thoại",
+    "relevant_image_ids": [
+      "0f76578c-163b-467c-9ba6-981b93b7b246",
+      "ffa0c7f3-526d-4d84-ad14-1a41da47a2d5"
+    ]
+  },
+  {
+    "query_id": "q08",
+    "category": "object",
+    "query_text_vi": "bông hoa hồng",
+    "ground_truth_en": "rose flower",
+    "description": "Vật thể — Hoa hồng",
+    "relevant_image_ids": [
+      "9553b4dc-a93e-4da7-b9bc-4470fc057503",
+      "0ed5ade0-5ddb-4d27-b204-2b390ac50135"
+    ]
+  },
+  {
+    "query_id": "q09",
+    "category": "object",
+    "query_text_vi": "đồng hồ đeo tay",
+    "ground_truth_en": "wristwatch clock",
+    "description": "Vật thể — Đồng hồ đeo tay",
+    "relevant_image_ids": [
+      "640d5d23-2807-4f52-b36c-b006590d38ad",
+      "5c81030-2cb1-4853-b2b7-84bf1bf92843"
+    ]
+  },
+  {
+    "query_id": "q10",
+    "category": "object",
+    "query_text_vi": "quyển sách",
+    "ground_truth_en": "a book",
+    "description": "Vật thể — Quyển sách",
+    "relevant_image_ids": [
+      "89d7d48e-086b-4c29-adf8-0484c1010539",
+      "9739ecb2-cda4-4edf-b589-17c80137a3da"
+    ]
+  },
+  {
+    "query_id": "q11",
+    "category": "object",
+    "query_text_vi": "đôi giày thể thao",
+    "ground_truth_en": "sneakers running shoes",
+    "description": "Vật thể — Giày thể thao",
+    "relevant_image_ids": [
+      "85168f6c-c07f-4856-bf4c-8abd81256ce0",
+      "f1a05601-2dc6-49c9-b5bb-5509607dde0a"
+    ]
+  },
+  {
+    "query_id": "q12",
+    "category": "object",
+    "query_text_vi": "cây đàn guitar",
+    "ground_truth_en": "guitar musical instrument",
+    "description": "Vật thể — Đàn guitar",
+    "relevant_image_ids": [
+      "ad886b8d-ad01-4adb-8490-d5553a9be895",
+      "ac4bded1-1a09-48fb-814f-e7de51f688cf"
+    ]
+  },
+  {
+    "query_id": "q13",
+    "category": "object",
+    "query_text_vi": "máy ảnh",
+    "ground_truth_en": "photo camera",
+    "description": "Vật thể — Máy ảnh",
+    "relevant_image_ids": [
+      "1b748933-afaf-4790-88ab-05ff56003d55",
+      "9aaf4086-79c0-4912-a5d4-deaf1af754a2"
+    ]
+  },
+  {
+    "query_id": "q14",
+    "category": "object",
+    "query_text_vi": "cây nến",
+    "ground_truth_en": "wax candle light",
+    "description": "Vật thể — Cây nến",
+    "relevant_image_ids": [
+      "a32ae87d-f83b-4551-a4ae-80c1fabb2c77",
+      "252efc8d-b8be-4250-82d9-b0c281f045ea"
+    ]
+  },
+  {
+    "query_id": "q15",
+    "category": "object",
+    "query_text_vi": "túi xách",
+    "ground_truth_en": "handbag purse",
+    "description": "Vật thể — Túi xách",
+    "relevant_image_ids": [
+      "506c1a35-1f70-4ef5-bfc3-51e7cfb84055",
+      "f1124c8a-4d9f-481d-948f-eeac1cf53a3e"
+    ]
+  },
+  {
+    "query_id": "q16",
+    "category": "attribute",
+    "query_text_vi": "xe hơi màu đỏ",
+    "ground_truth_en": "red car",
+    "description": "Đặc điểm — Xe màu đỏ",
+    "relevant_image_ids": [
+      "e80f49a5-8219-4e54-89fa-8eaefd911adb",
+      "490c3149-3a57-4e25-b552-d09ce911dc75"
+    ]
+  },
+  {
+    "query_id": "q17",
+    "category": "attribute",
+    "query_text_vi": "con mèo màu trắng",
+    "ground_truth_en": "white cat",
+    "description": "Đặc điểm — Mèo màu trắng",
+    "relevant_image_ids": [
+      "408c08f9-22e3-41cb-bebb-5af44be94e15",
+      "c501c19a-8594-4a80-bcbd-fcf40cc6e361"
+    ]
+  },
+  {
+    "query_id": "q18",
+    "category": "attribute",
+    "query_text_vi": "bông hoa màu vàng",
+    "ground_truth_en": "yellow flower",
+    "description": "Đặc điểm — Hoa màu vàng",
+    "relevant_image_ids": [
+      "afdfafd5-b292-4527-b183-8dc8e1723e12",
+      "b2764597-264c-4899-8f4d-27b76f423db1"
+    ]
+  },
+  {
+    "query_id": "q19",
+    "category": "attribute",
+    "query_text_vi": "áo phông màu đen",
+    "ground_truth_en": "black t-shirt",
+    "description": "Đặc điểm — Áo t-shirt đen",
+    "relevant_image_ids": [
+      "25233550-b8b4-42d5-b346-a0a5e2dc9998",
+      "9eb94e02-49f4-4d08-8aea-d88787ac5551"
+    ]
+  },
+  {
+    "query_id": "q20",
+    "category": "attribute",
+    "query_text_vi": "ngôi nhà gỗ",
+    "ground_truth_en": "wooden house cabin",
+    "description": "Đặc điểm — Nhà bằng gỗ",
+    "relevant_image_ids": [
+      "73b23abb-a426-4159-8c25-a2a0eedeeb16",
+      "5c39c9a9-5892-4384-910d-0c786b310045"
+    ]
+  },
+  {
+    "query_id": "q21",
+    "category": "attribute",
+    "query_text_vi": "chiếc bánh ngọt màu hồng",
+    "ground_truth_en": "pink sweet cake",
+    "description": "Đặc điểm — Bánh ngọt hồng",
+    "relevant_image_ids": [
+      "2dba4f1b-a595-44ea-bcc4-01dad4543e9d",
+      "7c56719a-6262-415f-bb01-42d99410909d"
+    ]
+  },
+  {
+    "query_id": "q22",
+    "category": "attribute",
+    "query_text_vi": "con chó con nhỏ",
+    "ground_truth_en": "little cute puppy dog",
+    "description": "Đặc điểm — Con chó nhỏ cute",
+    "relevant_image_ids": [
+      "4848706f-a9e2-4374-bc11-e39aa1b8745e",
+      "61f4258d-eb4c-444a-8adb-08ca302d7fe8"
+    ]
+  },
+  {
+    "query_id": "q23",
+    "category": "attribute",
+    "query_text_vi": "mặt hồ xanh biếc",
+    "ground_truth_en": "deep blue lake water",
+    "description": "Đặc điểm — Hồ nước xanh",
+    "relevant_image_ids": [
+      "64872118-8629-4414-9de9-d3002d5f6ada",
+      "ad1e55eb-3709-4d95-81a2-a63ebbebe287"
+    ]
+  },
+  {
+    "query_id": "q24",
+    "category": "attribute",
+    "query_text_vi": "chiếc lá vàng mùa thu",
+    "ground_truth_en": "yellow autumn leaf",
+    "description": "Đặc điểm — Lá vàng mùa thu",
+    "relevant_image_ids": [
+      "7e05454a-9073-49a1-bdc1-8ecbb6b50c27",
+      "06db9351-aae4-475e-8fd7-672fa45635cd"
+    ]
+  },
+  {
+    "query_id": "q25",
+    "category": "attribute",
+    "query_text_vi": "tòa nhà cao tầng kính",
+    "ground_truth_en": "glass skyscraper building",
+    "description": "Đặc điểm — Tòa nhà kính cao tầng",
+    "relevant_image_ids": [
+      "f44135f0-0121-4f6a-9ed9-831a0c2d7956",
+      "392c9307-a4da-4c1e-8f72-d97ea11ac009"
+    ]
+  },
+  {
+    "query_id": "q26",
+    "category": "scene",
+    "query_text_vi": "bãi biển hoàng hôn",
+    "ground_truth_en": "sunset ocean beach",
+    "description": "Cảnh trí — Hoàng hôn trên biển",
+    "relevant_image_ids": [
+      "285b5b56-ecc9-4d49-b05e-5ad5eab68dd8",
+      "bd9af564-d21d-406f-b954-b1a09ec10766"
+    ]
+  },
+  {
+    "query_id": "q27",
+    "category": "scene",
+    "query_text_vi": "thành phố về đêm",
+    "ground_truth_en": "city night skyline buildings",
+    "description": "Cảnh trí — Thành phố đêm",
+    "relevant_image_ids": [
+      "41b6e020-c5c7-462d-93f5-20268b1d3363",
+      "a4ec94ed-7743-4ca9-9074-4728f308c21e"
+    ]
+  },
+  {
+    "query_id": "q28",
+    "category": "scene",
+    "query_text_vi": "núi tuyết phủ",
+    "ground_truth_en": "snow covered mountain peak",
+    "description": "Cảnh trí — Núi phủ đầy tuyết",
+    "relevant_image_ids": [
+      "140057ad-60f3-48ca-853d-2adb5248251a",
+      "f7af0628-38bb-4ff5-bfe2-818dbaef0172"
+    ]
+  },
+  {
+    "query_id": "q29",
+    "category": "scene",
+    "query_text_vi": "rừng cây xanh mát",
+    "ground_truth_en": "dense green forest trees",
+    "description": "Cảnh trí — Rừng cây xanh mát",
+    "relevant_image_ids": [
+      "8dd29159-fdd4-4434-a1a2-9df3bc404168",
+      "20863b57-d210-4d0b-9533-4764f3163a03"
+    ]
+  },
+  {
+    "query_id": "q30",
+    "category": "scene",
+    "query_text_vi": "cánh đồng cỏ xanh",
+    "ground_truth_en": "green grass field landscape",
+    "description": "Cảnh trí — Cánh đồng cỏ",
+    "relevant_image_ids": [
+      "94a83a3d-7736-4d13-b5a8-0b75fa1e5d66",
+      "c89dd1f9-1e22-4a16-a35d-c0b5bc3d9c84"
+    ]
+  },
+  {
+    "query_id": "q31",
+    "category": "scene",
+    "query_text_vi": "con đường mùa thu",
+    "ground_truth_en": "autumn road path",
+    "description": "Cảnh trí — Con đường mùa thu",
+    "relevant_image_ids": [
+      "8ed282e5-e37a-4b62-9cd8-4becd2eebc27",
+      "666cc21b-adab-4d4e-af95-eadd18ddd01a"
+    ]
+  },
+  {
+    "query_id": "q32",
+    "category": "scene",
+    "query_text_vi": "sa mạc nắng vàng",
+    "ground_truth_en": "sunny desert sand dunes",
+    "description": "Cảnh trí — Sa mạc đồi cát",
+    "relevant_image_ids": [
+      "d1795fa2-d403-46a5-b922-e4eaa5162b78",
+      "bdbefd37-eb0d-450b-811e-61df07ae4013"
+    ]
+  },
+  {
+    "query_id": "q33",
+    "category": "scene",
+    "query_text_vi": "quán ăn không gian ấm cúng",
+    "ground_truth_en": "cozy warm restaurant interior",
+    "description": "Cảnh trí — Quán ăn ấm cúng",
+    "relevant_image_ids": [
+      "c780d818-6597-4e87-b9dd-708066d8e607",
+      "28750758-e200-4868-8e1d-c5ba8a61a97a"
+    ]
+  },
+  {
+    "query_id": "q34",
+    "category": "scene",
+    "query_text_vi": "bầu trời đầy sao",
+    "ground_truth_en": "night sky full of stars galaxy",
+    "description": "Cảnh trí — Bầu trời sao đêm",
+    "relevant_image_ids": [
+      "d1148f8f-173a-4b00-b2c3-c8e5ab69584f",
+      "7c6480b7-2b59-4760-a9b6-2435bbd2332d"
+    ]
+  },
+  {
+    "query_id": "q35",
+    "category": "scene",
+    "query_text_vi": "thác nước thiên nhiên",
+    "ground_truth_en": "natural flowing waterfall",
+    "description": "Cảnh trí — Thác nước",
+    "relevant_image_ids": [
+      "423329d0-05b4-475d-a85d-31126f277077",
+      "13e3e572-e665-4a66-8781-5a003f6f2abb"
+    ]
+  },
+  {
+    "query_id": "q36",
+    "category": "complex",
+    "query_text_vi": "người đàn ông đang làm việc với máy tính",
+    "ground_truth_en": "man working on laptop computer at desk",
+    "description": "Phức tạp — Làm việc máy tính",
+    "relevant_image_ids": [
+      "d6f9d3a8-1a05-456d-a4b8-7169019294c8",
+      "36bf4d21-319a-4512-9cf6-be6d9a4c9dd9"
+    ]
+  },
+  {
+    "query_id": "q37",
+    "category": "complex",
+    "query_text_vi": "người phụ nữ đang uống cà phê",
+    "ground_truth_en": "woman drinking cup of coffee",
+    "description": "Phức tạp — Phụ nữ uống cà phê",
+    "relevant_image_ids": [
+      "77c989cf-75af-4b10-867c-c2fe1cb7856a",
+      "905ea741-25d4-4109-a7af-426e949bee41"
+    ]
+  },
+  {
+    "query_id": "q38",
+    "category": "complex",
+    "query_text_vi": "người đàn ông đang chạy bộ",
+    "ground_truth_en": "man running jogging outdoors",
+    "description": "Phức tạp — Đàn ông chạy bộ",
+    "relevant_image_ids": [
+      "696d48dd-28cc-4f5a-8049-55fbcbd22751",
+      "94965bed-0e26-4f72-80ac-2f5c25fad046"
+    ]
+  },
+  {
+    "query_id": "q39",
+    "category": "complex",
+    "query_text_vi": "mọi người đang họp nhóm",
+    "ground_truth_en": "people having business team meeting",
+    "description": "Phức tạp — Họp nhóm làm việc",
+    "relevant_image_ids": [
+      "3102f442-fc74-4714-b0a8-2c35f3507a37",
+      "b22efd75-56a9-4d78-af4f-ad7239f5b973"
+    ]
+  },
+  {
+    "query_id": "q40",
+    "category": "complex",
+    "query_text_vi": "con mèo đang nằm ngủ trên ghế",
+    "ground_truth_en": "cat sleeping on chair sofa",
+    "description": "Phức tạp — Mèo ngủ trên ghế",
+    "relevant_image_ids": [
+      "b4c034ba-df62-4b48-b8ec-f133b96a37e3",
+      "bc95e851-ad58-4392-9d93-8e4aff367003"
+    ]
+  },
+  {
+    "query_id": "q41",
+    "category": "complex",
+    "query_text_vi": "người đang nấu ăn trong bếp",
+    "ground_truth_en": "person cooking food in kitchen",
+    "description": "Phức tạp — Nấu ăn trong bếp",
+    "relevant_image_ids": [
+      "0daf6b21-973c-4a50-8bb4-fddba93f5fcf",
+      "44b25ecd-b30c-4b52-976d-255881ce74d2"
+    ]
+  },
+  {
+    "query_id": "q42",
+    "category": "complex",
+    "query_text_vi": "gia đình đang cùng nhau ăn tối",
+    "ground_truth_en": "family eating dinner together at table",
+    "description": "Phức tạp — Gia đình ăn tối",
+    "relevant_image_ids": [
+      "a46b530e-76bc-4516-8ede-ec57a601a77a",
+      "2ef92221-87cc-4d0f-8b96-f8acff8b87c1"
+    ]
+  },
+  {
+    "query_id": "q43",
+    "category": "complex",
+    "query_text_vi": "người đang đạp xe trên đường núi",
+    "ground_truth_en": "cyclist riding bicycle on mountain road",
+    "description": "Phức tạp — Đạp xe trên núi",
+    "relevant_image_ids": [
+      "815ce129-f173-4bb0-9744-5a000297d720",
+      "9eda9686-7386-4a93-a023-9736e70ce64b"
+    ]
+  },
+  {
+    "query_id": "q44",
+    "category": "complex",
+    "query_text_vi": "cô gái cầm ô đi dưới mưa",
+    "ground_truth_en": "girl holding umbrella walking in rain",
+    "description": "Phức tạp — Cô gái đi dưới mưa",
+    "relevant_image_ids": [
+      "7737f0d3-7ff2-40db-95b4-1c3c500c5a3d",
+      "814b13d4-3d24-4cae-ad6b-fb7abe543d9e"
+    ]
+  },
+  {
+    "query_id": "q45",
+    "category": "complex",
+    "query_text_vi": "người đang chơi đàn guitar",
+    "ground_truth_en": "person playing acoustic guitar",
+    "description": "Phức tạp — Chơi đàn guitar",
+    "relevant_image_ids": [
+      "836e35a6-7e0e-42ba-9b69-73c9498b2c3a",
+      "7c82649b-3edf-4269-8fe1-75f8a5d534e1"
+    ]
+  },
+  {
+    "query_id": "q46",
+    "category": "ocr",
+    "query_text_vi": "biển hiệu Open",
+    "ground_truth_en": "Open sign board",
+    "description": "OCR — Chữ Open",
+    "relevant_image_ids": [
+      "18330026-7fdf-4652-bb18-d53bf0645e39",
+      "055a2fcb-b165-4a17-8009-a82e06a19291"
+    ]
+  },
+  {
+    "query_id": "q47",
+    "category": "ocr",
+    "query_text_vi": "chữ Coffee",
+    "ground_truth_en": "Coffee text sign logo",
+    "description": "OCR — Chữ Coffee",
+    "relevant_image_ids": [
+      "e45f6ffd-5316-46aa-9799-ba0e7d1eb3e8",
+      "3a3e680c-844a-4978-9e29-54765480f48a"
+    ]
+  },
+  {
+    "query_id": "q48",
+    "category": "ocr",
+    "query_text_vi": "chữ Starbucks",
+    "ground_truth_en": "Starbucks text sign logo",
+    "description": "OCR — Chữ Starbucks",
+    "relevant_image_ids": [
+      "1f65cf64-c294-4439-8b7b-c7f5b18ae230",
+      "4f70c157-6866-4619-a581-5e534f74a033"
+    ]
+  },
+  {
+    "query_id": "q49",
+    "category": "ocr",
+    "query_text_vi": "chữ Welcome",
+    "ground_truth_en": "Welcome text sign",
+    "description": "OCR — Chữ Welcome",
+    "relevant_image_ids": [
+      "a1ce91b6-ce90-49ba-88bb-9a1b782bc3ef",
+      "a6d4dbe4-e83a-4479-aa3a-34e682128e8f"
+    ]
+  },
+  {
+    "query_id": "q50",
+    "category": "ocr",
+    "query_text_vi": "chữ Sale",
+    "ground_truth_en": "Sale text sign tag",
+    "description": "OCR — Chữ Sale",
+    "relevant_image_ids": [
+      "27e4940a-0f84-45ec-9c3f-24f67ef5560f",
+      "27e4940a-0f84-45ec-9c3f-24f67ef5560f"
+    ]
+  }
+]
