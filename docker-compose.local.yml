@@ -27,7 +27,7 @@ services:
       - ADMIN_NAME=${ADMIN_NAME}
       - ADMIN_PASSWORD=${ADMIN_PASSWORD}
       - OLLAMA_URL=${OLLAMA_URL:-http://ollama:11434}
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma2:2b}
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-qwen2.5:3b}
       - REDIS_URL=${REDIS_URL:-redis://redis:6379}
     command: sh -c "npx prisma db push && npm run init:db-extensions && npm run seed:admin && npm start"
     depends_on:
@@ -152,6 +152,8 @@ services:
     environment:
       - OLLAMA_MODEL=${OLLAMA_MODEL:-gemma2:2b}
       - OLLAMA_KEEP_ALIVE=-1
+      - OLLAMA_NUM_PARALLEL=4
+      - OLLAMA_MAX_LOADED_MODELS=1
     healthcheck:
       test: [ "CMD-SHELL", "curl -sf http://localhost:11434/api/tags || exit 1" ]
       interval: 15s
