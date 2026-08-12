@@ -1,8 +1,11 @@
 import * as React from 'react'
 import { createPortal } from 'react-dom'
-import { X, Download, Search, ExternalLink, FileText, Maximize2, Ruler } from 'lucide-react'
+import { X, Download, Search, ExternalLink, FileText, Maximize2, Ruler, Trash2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import type { SearchResult } from './MasonryGrid'
+import { bulkDeleteImages } from '@/services/myImagesService'
+import { DeleteConfirmModal } from '@/components/ui/DeleteConfirmModal'
+import { useToast } from '@/components/ui/Toast'
 
 // ============================================================
 // ImageDetailModal — Full-screen detail view (FR-04.3)
@@ -12,25 +15,31 @@ interface ImageDetailModalProps {
   result: SearchResult | null
   onClose: () => void
   onSearchSimilar: (result: SearchResult) => void
+  onDeleteSuccess?: (imageId: string) => void
 }
 
-export function ImageDetailModal({ result, onClose, onSearchSimilar }: ImageDetailModalProps) {
+export function ImageDetailModal({ result, onClose, onSearchSimilar, onDeleteSuccess }: ImageDetailModalProps) {
   const [imageLoaded, setImageLoaded] = React.useState(false)
+  const [showConfirmDelete, setShowConfirmDelete] = React.useState(false)
+  const [isDeleting, setIsDeleting] = React.useState(false)
+  const toast = useToast()
 
   // Reset on new image
   React.useEffect(() => {
     setImageLoaded(false)
+    setShowConfirmDelete(false)
+    setIsDeleting(false)
   }, [result?.id])
 
   // Close on Escape
   React.useEffect(() => {
     if (!result) return
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose()
+      if (e.key === 'Escape' && !showConfirmDelete) onClose()
     }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
-  }, [result, onClose])
+  }, [result, onClose, showConfirmDelete])
 
   // Prevent body scroll when open without losing scroll position
   React.useEffect(() => {
@@ -43,6 +52,27 @@ export function ImageDetailModal({ result, onClose, onSearchSimilar }: ImageDeta
     }
   }, [result])
 
+  const handleDeleteConfirm = async () => {
+    if (!result) return
+    setIsDeleting(true)
+    try {
+      const res = await bulkDeleteImages([result.id])
+      if (res.failedIds && res.failedIds.length > 0) {
+        toast.error('Xoá ảnh thất bại, vui lòng thử lại')
+      } else {
+        toast.success('Đã chuyển ảnh vào thùng rác')
+        setShowConfirmDelete(false)
+        onDeleteSuccess?.(result.id)
+        onClose()
+      }
+    } catch (error) {
+      console.error('Delete image failed:', error)
+      toast.error('Xoá ảnh thất bại, vui lòng thử lại')
+    } finally {
+      setIsDeleting(false)
+    }
+  }
+
   if (!result) return null
 
   return createPortal(
@@ -50,7 +80,7 @@ export function ImageDetailModal({ result, onClose, onSearchSimilar }: ImageDeta
       {/* ── Backdrop ── */}
       <div
         className="fixed inset-0 z-[var(--z-overlay)] bg-black/70 backdrop-blur-md animate-fade-in"
-        onClick={onClose}
+        onClick={!showConfirmDelete ? onClose : undefined}
         aria-hidden
       />
 
@@ -206,10 +236,31 @@ export function ImageDetailModal({ result, onClose, onSearchSimilar }: ImageDeta
               <Download className="size-4" />
               Tải xuống
             </button>
+
+            {/* Delete button */}
+            <button
+              type="button"
+              onClick={() => setShowConfirmDelete(true)}
+              className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl border border-destructive/30 bg-destructive/10 text-destructive text-sm font-semibold hover:bg-destructive hover:text-white transition-all duration-200 cursor-pointer"
+            >
+              <Trash2 className="size-4" />
+              Xoá ảnh
+            </button>
           </div>
         </div>
       </div>
+
+      {/* Delete confirmation modal */}
+      {showConfirmDelete && (
+        <DeleteConfirmModal
+          imageTitle={result.title || `Ảnh #${result.id}`}
+          isDeleting={isDeleting}
+          onConfirm={handleDeleteConfirm}
+          onCancel={() => setShowConfirmDelete(false)}
+        />
+      )}
     </>,
     document.body,
   )
 }
+

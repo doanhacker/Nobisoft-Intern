@@ -48,7 +48,7 @@ export function AdminLayout() {
                 onClick={() => setMobileSidebarOpen(false)}
               />
               {/* Sidebar drawer */}
-              <div className="fixed inset-y-0 left-0 z-50 lg:hidden flex animate-fade-slide-down">
+              <div className="fixed inset-y-0 left-0 z-50 lg:hidden flex animate-in slide-in-from-left duration-200">
                 <AdminSidebar onClose={() => setMobileSidebarOpen(false)} />
               </div>
             </>
@@ -69,7 +69,7 @@ export function AdminLayout() {
                 <Menu className="size-4" />
               </button>
 
-              <span className="font-bold text-sm text-gradient-brand">Admin Panel</span>
+              <span className="font-bold text-sm text-gradient-brand">Quản lý cá nhân</span>
 
               <ThemeToggle />
             </div>

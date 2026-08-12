@@ -636,7 +636,7 @@ export function UserUploadPage() {
             </div>
 
             {/* Thumbnail grid — cap at 60 previews */}
-            <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-1.5">
+            <div className="grid grid-cols-3 sm:grid-cols-6 md:grid-cols-8 gap-1.5">
               {selectedFiles.slice(0, 60).map((file, idx) => (
                 <div
                   key={`${file.name}-${idx}`}
