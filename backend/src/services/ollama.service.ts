@@ -11,10 +11,10 @@ if (!OLLAMA_URL) {
 
 const TRANSLATE_SYSTEM_PROMPT = `You are an image search query translator for a CLIP-based visual search engine.
 
-Task: Convert user input (any language) into a short, accurate English image description that a visual AI model can understand.
+Task: Convert user input (any language) into a short, accurate English noun phrase that a visual AI model can understand.
 
 Rules:
-1. Output ONLY the English description — no explanation, no quotes, no prefix, no extra text
+1. Output ONLY the bare noun phrase of the visual subject and its attributes (e.g., "red car", "running dog on beach"). Output must be a noun phrase, never a full sentence.
 2. Remove filler words and meta-instructions ("tôi muốn tìm", "hãy tìm cho tôi", "I want to find")
 3. Auto-correct obvious typos before translating:
    - "con chos" → "con chó" → "dog"
@@ -26,18 +26,37 @@ Rules:
    - "quốc phục Nhật Bản" → "kimono" (Japan's national costume)
    - "thủ đô Pháp" → "Paris city"
    - "kỳ quan thế giới" → "world wonder landmark"
-5. Keep proper nouns EXACTLY as given — do NOT substitute or reinterpret person names:
-   - "Ronaldo de Lima" → "Ronaldo de Lima", NOT "Cristiano Ronaldo"
+5. Keep proper nouns EXACTLY as given — preserve person names as-is:
+   - "Ronaldo de Lima" → "Ronaldo de Lima"
    - "Son Tung MTP" → "Son Tung MTP"
-6. Use the most visually specific English term:
+6. For well-known person names, prepend their role or identity to help visual recognition:
+   - "Haaland" → "soccer player Haaland"
+   - "Messi" → "soccer player Messi"
+   - "Elon Musk" → "businessman Elon Musk"
+   - "Son Tung MTP" → "singer Son Tung MTP"
+   - "Trump" → "politician Donald Trump"
+   If the name is not well-known, keep it as-is.
+7. Use the most visually specific English term:
    - "giấy tờ tuỳ thân" → "ID card"
    - "bằng lái xe" → "driver license card"
    - "xe máy" → "motorcycle"
    - "hoa sen" → "lotus flower"
-7. Keep output under 15 words, use simple concrete nouns and adjectives
-8. Include visual attributes when mentioned: color, count, action, setting, size
-9. Do NOT append "photo", "picture", "image", or "portrait" — describe only the subject
-10. If input is already in English, clean and simplify it`;
+8. Keep output under 15 words, use simple concrete nouns and adjectives
+9. Include visual attributes when mentioned: color, count, action, setting, size
+10. If input is already in English, clean and simplify it
+
+Examples:
+Input: "tôi muốn tìm hình ảnh con chó"
+Output: dog
+
+Input: "cho tôi xem ảnh phong cảnh hoàng hôn"
+Output: sunset landscape
+
+Input: "red sports car on highway"
+Output: red sports car on highway
+
+Input: "Haaland"
+Output: soccer player Haaland`;
 
 
 interface OllamaGenerateResponse {
@@ -51,6 +70,22 @@ export class OllamaServiceError extends Error {
     super(message);
     this.name = 'OllamaServiceError';
   }
+}
+
+/**
+ * Hậu xử lý output từ LLM: xóa các từ thừa mà model nhỏ hay sinh ra.
+ * Chạy regex rất nhanh, đảm bảo query luôn sạch 100% cho CLIP.
+ */
+function sanitizeTranslatedQuery(raw: string): string {
+  let query = raw
+    .replace(/^["'`]+|["'`]+$/g, '')                                      // Xóa quotes bao quanh
+    .replace(/\b(a|an|the|photo|picture|image|portrait|photograph)\b/gi, '') // Xóa articles & từ thừa
+    .replace(/\bof\b/gi, '')                                               // Xóa "of" thừa
+    .replace(/\s+/g, ' ')                                                  // Gộp khoảng trắng
+    .trim();
+
+  // Nếu regex xóa hết → trả về raw đã trim
+  return query || raw.trim();
 }
 
 /**
@@ -93,20 +128,22 @@ export async function translatePrompt(userInput: string): Promise<string> {
     }
 
     const json = (await response.json()) as OllamaGenerateResponse;
-    const translated = json.response?.trim();
+    const rawResponse = json.response?.trim();
 
-    console.log('[Ollama] Input:', JSON.stringify(userInput));
-    console.log('[Ollama] Raw response:', JSON.stringify(json.response));
-    console.log('[Ollama] Cleaned:', JSON.stringify(translated));
-
-    if (!translated) {
+    if (!rawResponse) {
       throw new OllamaServiceError('Ollama returned empty response');
     }
 
-    // Save to cache
-    await setCachedTranslation(userInput, translated);
+    const sanitized = sanitizeTranslatedQuery(rawResponse);
 
-    return translated;
+    console.log('[Ollama] Input:', JSON.stringify(userInput));
+    console.log('[Ollama] Raw response:', JSON.stringify(rawResponse));
+    console.log('[Ollama] Sanitized:', JSON.stringify(sanitized));
+
+    // Save to cache
+    await setCachedTranslation(userInput, sanitized);
+
+    return sanitized;
   } catch (error) {
     if (error instanceof OllamaServiceError) {
       throw error;

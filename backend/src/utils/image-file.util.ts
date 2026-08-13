@@ -13,9 +13,16 @@ export class InvalidImageContentError extends Error { }
 export async function validateImageContent(
   input: Buffer | string,
   declaredMimeType: string,
+  originalName?: string,
 ) {
   const expectedFormats = EXPECTED_FORMATS_BY_MIME_TYPE[declaredMimeType];
   if (!expectedFormats) {
+    console.error('[validateImageContent] Unsupported MIME type:', {
+      originalName,
+      declaredMimeType,
+      inputType: typeof input === 'string' ? 'path' : 'buffer',
+      ...(typeof input === 'string' ? { filePath: input } : { bufferSize: input.length }),
+    });
     throw new InvalidImageContentError('Định dạng ảnh không được hỗ trợ');
   }
 
@@ -26,6 +33,12 @@ export async function validateImageContent(
     }).metadata();
 
     if (!metadata.format || !expectedFormats.includes(metadata.format)) {
+      console.error('[validateImageContent] Format mismatch:', {
+        originalName,
+        declaredMimeType,
+        actualFormat: metadata.format,
+        expectedFormats,
+      });
       throw new InvalidImageContentError('Nội dung file không khớp với định dạng ảnh');
     }
 
@@ -37,6 +50,14 @@ export async function validateImageContent(
       throw new InvalidImageContentError('Ảnh vượt quá giới hạn 40 triệu pixel');
     }
   } catch (error) {
+    console.error('[validateImageContent] Error processing image:', {
+      originalName,
+      declaredMimeType,
+      inputType: typeof input === 'string' ? 'path' : 'buffer',
+      ...(typeof input === 'string' ? { filePath: input } : { bufferSize: input.length }),
+      error: error instanceof Error ? error.message : error,
+    });
+
     if (error instanceof InvalidImageContentError) {
       throw error;
     }
