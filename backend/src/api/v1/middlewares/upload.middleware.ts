@@ -90,7 +90,7 @@ function createSecureUploadMiddleware(
           if (uploadError) throw uploadError;
 
           for (const file of getUploadedFiles(req)) {
-            await validateImageContent(file.path, file.mimetype);
+            await validateImageContent(file.path, file.mimetype, file.originalname);
           }
 
           next();
