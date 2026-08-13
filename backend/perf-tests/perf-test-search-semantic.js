@@ -20,20 +20,20 @@ const REQUEST_TIMEOUT_MS = 60_000;        // 1 phút timeout
 const DELAY_BETWEEN_SCENARIOS_MS = 3_000; // Nghỉ giữa scenarios
 
 // Các mức concurrent cần test
-const CONCURRENCY_LEVELS = [1, 100, 1000];
+const CONCURRENCY_LEVELS = [1, 10, 50, 100, 200, 1000];
 
-// Pool query tiếng Anh — random chọn cho mỗi request
+// Pool 50 query tiếng Anh — random chọn cho mỗi request để tránh bị hit cache toàn bộ
 const QUERY_POOL = [
-  'cat sitting on table',
-  'sunset over ocean',
-  'red sports car',
-  'mountain landscape snow',
-  'dog running in park',
-  'city skyline at night',
-  'flower garden colorful',
-  'coffee cup on desk',
-  'beach with palm trees',
-  'person riding bicycle',
+  'cat sitting on table', 'sunset over ocean', 'red sports car', 'mountain landscape snow', 'dog running in park',
+  'city skyline at night', 'flower garden colorful', 'coffee cup on desk', 'beach with palm trees', 'person riding bicycle',
+  'vintage leather jacket', 'modern minimalist kitchen', 'group of friends laughing', 'close up of butterfly', 'rainy street scene',
+  'freshly baked pizza', 'laptop on wooden desk', 'acoustic guitar leaning against wall', 'snowy pine forest', 'hot air balloons in sky',
+  'cute fluffy kitten', 'professional camera gear', 'delicious chocolate cake', 'people walking in rain', 'beautiful starry night',
+  'colorful abstract painting', 'abandoned old house', 'green forest path', 'skater doing a trick', 'swimming pool overhead',
+  'wild tiger in jungle', 'bowl of fresh fruit', 'old books stacked', 'sunrise over mountains', 'horse running in field',
+  'baby smiling happily', 'drone flying in sky', 'delicious sushi platter', 'man reading a book', 'woman practicing yoga',
+  'classic sports car', 'busy market street', 'beautiful wedding dress', 'cup of hot tea', 'skiers on snowy mountain',
+  'camping tent under stars', 'golden retriever puppy', 'fresh vegetables on table', 'neon lights in city', 'surfer riding a wave'
 ];
 // ────────────────────────────────────────────────────────────────
 

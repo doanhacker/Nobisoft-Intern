@@ -1,16 +1,3 @@
-#!/usr/bin/env node
-/**
- * ══════════════════════════════════════════════════════════════
- * PERFORMANCE TEST: SEARCH BY IMAGE
- * ══════════════════════════════════════════════════════════════
- *
- * Test POST /api/search/image — gửi 1 file ảnh thật, nhận kết quả tìm kiếm.
- * Ảnh lấy từ thư mục val2017/ (COCO val2017 dataset).
- * Đo thời gian phản hồi ở các mức concurrent: 1, 100, 1000.
- *
- * Chạy:  node perf-test-search-image.js
- * Output: JSON kết quả in ra stdout, progress in ra stderr
- */
 
 import { readFileSync, readdirSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -19,25 +6,18 @@ import { fileURLToPath } from 'node:url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// ─── CẤU HÌNH ──────────────────────────────────────────────────
 const BASE_URL = 'https://visualsearch.duckdns.org';
 const ACCESS_TOKEN =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImYyNDc2YmRkLWUwNjEtNDgwZi1hZjljLTI0NjIzN2YwY2JmMSIsImVtYWlsIjoidXNlckBleGFtcGxlLmNvbSIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc4NjYxODkzMSwiZXhwIjoxNzg2NzA1MzMxfQ.5Xc659gKoPlKRdDi6RJ-VqlgOpqy5j2naZVfNZPrxWE';
 
-const REQUEST_TIMEOUT_MS = 60_000;        // 1 phút timeout
-const DELAY_BETWEEN_SCENARIOS_MS = 3_000; // Nghỉ giữa scenarios
+const REQUEST_TIMEOUT_MS = 60_000;
+const DELAY_BETWEEN_SCENARIOS_MS = 3_000;
 
-// Các mức concurrent cần test
-const CONCURRENCY_LEVELS = [1, 100, 1000];
+const CONCURRENCY_LEVELS = [1, 10, 50, 100, 200, 1000];
 
-// Đường dẫn thư mục ảnh COCO val2017
 const IMAGE_DIR = join(__dirname, 'val2017');
 
-// Số ảnh load vào pool cho search (không cần nhiều, random chọn)
 const POOL_SIZE = 100;
-// ────────────────────────────────────────────────────────────────
-
-// ─── ĐỌC ẢNH THẬT TỪ COCO val2017 ─────────────────────────────
 
 function loadImagePool(dir, maxCount) {
   if (!existsSync(dir)) {
@@ -115,13 +95,8 @@ function calcStats(times) {
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
-// ─── CORE LOGIC ─────────────────────────────────────────────────
-
-/**
- * Gửi 1 request search by image — dùng ảnh thật từ pool.
- */
 async function sendSearchByImage() {
-  // Random chọn 1 ảnh từ pool
+
   const img = IMAGE_POOL[Math.floor(Math.random() * IMAGE_POOL.length)];
   const formData = new FormData();
   const blob = new Blob([img.buffer], { type: img.type });

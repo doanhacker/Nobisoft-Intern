@@ -1,40 +1,24 @@
-#!/usr/bin/env node
-/**
- * ══════════════════════════════════════════════════════════════
- * PERFORMANCE TEST: SEARCH BY TEXT (PROMPT)
- * ══════════════════════════════════════════════════════════════
- *
- * Test GET /api/search/text?mode=prompt&q=...
- * Gửi query tiếng Việt, backend dùng Ollama dịch → CLIP embed → Qdrant search.
- * Luồng này chậm hơn semantic do thêm bước dịch qua Ollama (LLM).
- *
- * Chạy:  node perf-test-search-prompt.js
- * Output: JSON kết quả in ra stdout, progress in ra stderr
- */
 
-// ─── CẤU HÌNH ──────────────────────────────────────────────────
 const BASE_URL = 'https://visualsearch.duckdns.org';
 const ACCESS_TOKEN =
   'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImYyNDc2YmRkLWUwNjEtNDgwZi1hZjljLTI0NjIzN2YwY2JmMSIsImVtYWlsIjoidXNlckBleGFtcGxlLmNvbSIsInJvbGUiOiJBRE1JTiIsImlhdCI6MTc4NjYxODkzMSwiZXhwIjoxNzg2NzA1MzMxfQ.5Xc659gKoPlKRdDi6RJ-VqlgOpqy5j2naZVfNZPrxWE';
 
-const REQUEST_TIMEOUT_MS = 90_000;        // 1.5 phút timeout (Ollama có thể chậm)
-const DELAY_BETWEEN_SCENARIOS_MS = 5_000; // Nghỉ lâu hơn vì Ollama cần thời gian phục hồi
+const REQUEST_TIMEOUT_MS = 90_000;
+const DELAY_BETWEEN_SCENARIOS_MS = 5_000;
 
-// Các mức concurrent cần test
-const CONCURRENCY_LEVELS = [1, 100, 1000];
+const CONCURRENCY_LEVELS = [1, 10, 50, 100, 200];
 
-// Pool query tiếng Việt — Ollama sẽ dịch sang tiếng Anh trước khi search
 const QUERY_POOL = [
-  'con mèo nằm trên bàn',
-  'hoàng hôn trên biển',
-  'xe hơi thể thao màu đỏ',
-  'phong cảnh núi tuyết',
-  'chó chạy trong công viên',
-  'thành phố về đêm',
-  'vườn hoa đầy màu sắc',
-  'tách cà phê trên bàn làm việc',
-  'bãi biển có cây dừa',
-  'người đi xe đạp',
+  'tìm cho tôi ảnh một con mèo đang ngồi trên bàn', 'ảnh phong cảnh hoàng hôn trên biển', 'chiếc xe thể thao màu đỏ đang chạy trên phố', 'cảnh núi non phủ tuyết trắng', 'một chú chó đang chạy nhảy trong công viên',
+  'khung cảnh thành phố lung linh về đêm', 'khu vườn hoa rực rỡ sắc màu', 'tách cà phê nóng để trên bàn làm việc', 'bãi biển xanh mướt với những cây cọ', 'người đàn ông đang đạp xe đạp',
+  'áo khoác da phong cách cổ điển', 'căn bếp thiết kế tối giản hiện đại', 'nhóm bạn đang cười đùa vui vẻ', 'ảnh chụp cận cảnh một con bướm', 'cảnh đường phố dưới trời mưa',
+  'chiếc bánh pizza nướng thơm phức', 'máy tính xách tay trên bàn gỗ', 'cây đàn guitar acoustic dựa vào tường', 'rừng thông chìm trong tuyết', 'những chiếc khinh khí cầu bay trên bầu trời',
+  'con mèo con lông xù dễ thương', 'bộ đồ nghề máy ảnh chuyên nghiệp', 'chiếc bánh kem sô cô la hấp dẫn', 'những người đi bộ dưới cơn mưa', 'bầu trời đêm đầy sao tuyệt đẹp',
+  'bức tranh trừu tượng nhiều màu sắc', 'ngôi nhà cổ bị bỏ hoang', 'con đường mòn xanh mướt trong rừng', 'người trượt ván đang biểu diễn', 'góc nhìn từ trên cao của hồ bơi',
+  'con hổ hoang dã trong rừng rậm', 'một bát trái cây tươi ngon', 'những cuốn sách cũ xếp chồng lên nhau', 'bình minh ló rạng trên đỉnh núi', 'đàn ngựa đang chạy trên cánh đồng',
+  'em bé đang mỉm cười hạnh phúc', 'flycam đang bay lơ lửng trên không', 'đĩa sushi cuộn hải sản ngon mắt', 'người đàn ông say sưa đọc sách', 'người phụ nữ đang tập yoga',
+  'chiếc xe đua cổ điển sang trọng', 'khu chợ sầm uất đông đúc', 'chiếc váy cưới trắng tinh khôi đẹp mắt', 'một ly trà nóng bốc khói', 'người trượt tuyết trên sườn núi',
+  'lều cắm trại dưới bầu trời đầy sao', 'chú cún con lông vàng đáng yêu', 'rau củ quả tươi xanh trên bàn ăn', 'ánh đèn neon rực cả góc phố', 'người lướt sóng cưỡi trên ngọn sóng lớn'
 ];
 // ────────────────────────────────────────────────────────────────
 
