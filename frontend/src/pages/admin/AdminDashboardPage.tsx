@@ -1,182 +1,148 @@
 import * as React from 'react'
-import { useQueries } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from '@tanstack/react-router'
-import { Users, Images, ArrowRight, Database, Activity } from 'lucide-react'
-import { getUsers } from '@/services/adminUserService'
+import {
+  Images,
+  History,
+  Trash2,
+  ArrowRight,
+  UserCheck,
+} from 'lucide-react'
 import { getImages } from '@/services/adminImageService'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
 // ============================================================
-// AdminDashboardPage
+// QuickActionRow (1 button per row)
 // ============================================================
 
-interface StatCardProps {
-  label: string
-  value: number | undefined
-  isLoading: boolean
-  icon: React.ComponentType<{ className?: string }>
-  iconColor: string
-  iconBg: string
-  link: string
-  linkLabel: string
-}
-
-function StatCard({
-  label,
-  value,
-  isLoading,
-  icon: Icon,
-  iconColor,
-  iconBg,
-  link,
-  linkLabel,
-}: StatCardProps) {
-  return (
-    <div className="bg-card border border-border/60 rounded-2xl p-6 shadow-card hover:shadow-lg transition-shadow duration-200">
-      <div className="flex items-start justify-between mb-4">
-        <div className={cn('flex items-center justify-center size-12 rounded-xl', iconBg)}>
-          <Icon className={cn('size-6', iconColor)} />
-        </div>
-        <Link
-          to={link}
-          className="text-xs font-medium text-muted-foreground hover:text-primary flex items-center gap-1 transition-colors"
-        >
-          {linkLabel}
-          <ArrowRight className="size-3" />
-        </Link>
-      </div>
-
-      <div>
-        {isLoading ? (
-          <Skeleton className="h-9 w-24 mb-1" />
-        ) : (
-          <p className="text-3xl font-black text-foreground tabular-nums">
-            {value?.toLocaleString('vi-VN') ?? '—'}
-          </p>
-        )}
-        <p className="text-sm text-muted-foreground font-medium mt-0.5">{label}</p>
-      </div>
-    </div>
-  )
-}
-
-// ─── Quick action card ────────────────────────────────────────
-
-interface QuickActionProps {
+interface QuickActionRowProps {
   to: string
   icon: React.ComponentType<{ className?: string }>
   title: string
   description: string
-  accent: string
+  iconBg: string
+  iconColor: string
 }
 
-function QuickAction({ to, icon: Icon, title, description, accent }: QuickActionProps) {
+function QuickActionRow({
+  to,
+  icon: Icon,
+  title,
+  description,
+  iconBg,
+  iconColor,
+}: QuickActionRowProps) {
   return (
     <Link
       to={to}
-      className="group flex items-center gap-4 p-4 rounded-xl border border-border/50 bg-muted/20 hover:bg-muted/50 hover:border-border transition-all duration-200"
+      className="group flex items-center justify-between p-4 rounded-xl border border-border/60 bg-card hover:bg-muted/40 hover:border-primary/40 transition-all duration-150 shadow-sm"
     >
-      <div
-        className={cn(
-          'flex items-center justify-center size-10 rounded-lg shrink-0 transition-transform duration-200 group-hover:scale-110',
-          accent,
-        )}
-      >
-        <Icon className="size-5 text-white" />
+      <div className="flex items-center gap-4">
+        <div className={cn('flex items-center justify-center size-10 rounded-lg shrink-0', iconBg)}>
+          <Icon className={cn('size-5', iconColor)} />
+        </div>
+        <div>
+          <h3 className="font-bold text-sm text-foreground group-hover:text-primary transition-colors">
+            {title}
+          </h3>
+          <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+        </div>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="font-semibold text-sm text-foreground">{title}</p>
-        <p className="text-xs text-muted-foreground truncate">{description}</p>
+
+      <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground group-hover:text-primary transition-colors">
+        <span>Truy cập</span>
+        <ArrowRight className="size-4 group-hover:translate-x-1 transition-transform" />
       </div>
-      <ArrowRight className="size-4 text-muted-foreground group-hover:text-primary group-hover:translate-x-0.5 transition-all duration-200" />
     </Link>
   )
 }
 
-// ─── Main page ───────────────────────────────────────────────
+// ============================================================
+// AdminDashboardPage
+// ============================================================
 
 export function AdminDashboardPage() {
-  const results = useQueries({
-    queries: [
-      {
-        queryKey: ['admin', 'users', { page: 1, limit: 1 }],
-        queryFn: () => getUsers({ page: 1, limit: 1 }),
-        staleTime: 30_000,
-      },
-      {
-        queryKey: ['admin', 'images', { page: 1, limit: 1 }],
-        queryFn: () => getImages({ page: 1, limit: 1 }),
-        staleTime: 30_000,
-      },
-    ],
+  const { data, isLoading } = useQuery({
+    queryKey: ['admin', 'stats', 'images'],
+    queryFn: () => getImages({ page: 1, limit: 1 }),
+    staleTime: 30_000,
   })
 
-  const [usersResult, imagesResult] = results
-  const totalUsers = usersResult.data?.meta?.totalDocs
-  const totalImages = imagesResult.data?.meta?.totalDocs
-  const isLoadingUsers = usersResult.isLoading
-  const isLoadingImages = imagesResult.isLoading
+  const totalImages = data?.meta?.totalDocs
 
   return (
-    <div className="p-6 lg:p-8 max-w-5xl mx-auto space-y-8">
+    <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
       {/* Header */}
-      <div>
-        <div className="flex items-center gap-2 mb-1">
-          <Activity className="size-5 text-primary" />
-          <span className="text-xs font-bold text-primary uppercase tracking-widest">
-            Tổng quan hệ thống
-          </span>
+      <div className="border-b border-border/50 pb-5">
+        <div className="flex items-center gap-2 text-primary mb-1">
+          <UserCheck className="size-5" />
+          <span className="text-xs font-bold uppercase tracking-widest">Quản lý cá nhân</span>
         </div>
-        <h1 className="text-2xl font-black text-foreground">Dashboard</h1>
-        <p className="text-sm text-muted-foreground mt-0.5">
-          Thống kê nhanh về dữ liệu hệ thống Nobisoft Visual Search Engine
-        </p>
+        <h1 className="text-2xl font-black text-foreground">Tổng quan cá nhân</h1>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <StatCard
-          label="Ảnh đã được index"
-          value={totalImages}
-          isLoading={isLoadingImages}
-          icon={Database}
-          iconColor="text-violet-500"
-          iconBg="bg-violet-500/10"
-          link="/admin/images"
-          linkLabel="Xem kho ảnh"
-        />
-        <StatCard
-          label="Người dùng đã đăng ký"
-          value={totalUsers}
-          isLoading={isLoadingUsers}
-          icon={Users}
-          iconColor="text-blue-500"
-          iconBg="bg-blue-500/10"
-          link="/admin/users"
-          linkLabel="Quản lý user"
-        />
+      {/* Main Stat Card - Only Indexed Images */}
+      <div className="p-5 rounded-2xl border border-border/60 bg-card shadow-sm flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <div className="flex items-center justify-center size-12 rounded-xl bg-primary/10 text-primary">
+            <Images className="size-6" />
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Tổng số ảnh đã upload
+            </p>
+            {isLoading ? (
+              <Skeleton className="h-8 w-24 mt-1 rounded-lg" />
+            ) : (
+              <p className="text-2xl font-black text-foreground tabular-nums">
+                {totalImages?.toLocaleString('vi-VN') ?? '0'}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <Link
+          to="/admin/images"
+          className="text-xs font-semibold text-primary hover:underline flex items-center gap-1"
+        >
+          Quản lý kho ảnh
+          <ArrowRight className="size-3.5" />
+        </Link>
       </div>
 
-      {/* Quick actions */}
-      <div>
-        <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-widest mb-3">
-          Thao tác nhanh
+      {/* Quick Action Navigation - 1 item per row */}
+      <div className="space-y-3 pt-2">
+        <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-widest px-1">
+          Lối tắt quản lý
         </h2>
-        <div className="space-y-2">
-          <QuickAction
-            to="/admin/users"
-            icon={Users}
-            title="Danh sách người dùng"
-            description="Xem và tìm kiếm tài khoản, xem lịch sử tìm kiếm"
-            accent="bg-blue-500"
-          />
-          <QuickAction
+
+        <div className="space-y-2.5">
+          <QuickActionRow
             to="/admin/images"
             icon={Images}
-            title="Quản lý kho ảnh"
-            description="Xem danh sách ảnh đã index, xoá ảnh vi phạm"
-            accent="bg-violet-500"
+            title="Quản lý Kho ảnh"
+            description="Xem danh sách ảnh đã index, tìm kiếm và xoá dữ liệu"
+            iconBg="bg-violet-500/10"
+            iconColor="text-violet-500"
+          />
+
+          <QuickActionRow
+            to="/admin/history"
+            icon={History}
+            title="Lịch sử tìm kiếm"
+            description="Xem nhật ký lượt tìm kiếm hình ảnh và OCR"
+            iconBg="bg-blue-500/10"
+            iconColor="text-blue-500"
+          />
+
+          <QuickActionRow
+            to="/admin/trash"
+            icon={Trash2}
+            title="Thùng rác"
+            description="Quản lý các hình ảnh đã tạm xoá"
+            iconBg="bg-amber-500/10"
+            iconColor="text-amber-500"
           />
         </div>
       </div>

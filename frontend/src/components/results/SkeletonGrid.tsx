@@ -16,7 +16,8 @@ const BREAKPOINTS_DEFAULT: BreakpointCols = {
     1024: 4,
     768: 3,
     640: 2,
-    480: 1,
+    480: 2,
+    380: 2,
 }
 
 const BREAKPOINTS_COMPACT: BreakpointCols = {
@@ -25,8 +26,9 @@ const BREAKPOINTS_COMPACT: BreakpointCols = {
     1280: 4,
     1024: 3,
     768: 2,
-    640: 1,
-    480: 1,
+    640: 2,
+    480: 2,
+    380: 2,
 }
 
 // Varied heights for visual variety in skeleton placeholders

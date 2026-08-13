@@ -20,13 +20,11 @@ import { Route as HistoryRouteImport } from './routes/history'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
-import { Route as AdminUsersRouteImport } from './routes/admin/users'
 import { Route as AdminTrashRouteImport } from './routes/admin/trash'
 import { Route as AdminSearchDeleteRouteImport } from './routes/admin/search-delete'
 import { Route as AdminImagesRouteImport } from './routes/admin/images'
 import { Route as AdminHistoryRouteImport } from './routes/admin/history'
 import { Route as AdminDashboardRouteImport } from './routes/admin/dashboard'
-import { Route as AdminUsersUserIdRouteImport } from './routes/admin/users.$userId'
 
 const UploadRoute = UploadRouteImport.update({
   id: '/upload',
@@ -83,11 +81,6 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   path: '/',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminUsersRoute = AdminUsersRouteImport.update({
-  id: '/users',
-  path: '/users',
-  getParentRoute: () => AdminRoute,
-} as any)
 const AdminTrashRoute = AdminTrashRouteImport.update({
   id: '/trash',
   path: '/trash',
@@ -113,11 +106,6 @@ const AdminDashboardRoute = AdminDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminUsersUserIdRoute = AdminUsersUserIdRouteImport.update({
-  id: '/$userId',
-  path: '/$userId',
-  getParentRoute: () => AdminUsersRoute,
-} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -135,9 +123,7 @@ export interface FileRoutesByFullPath {
   '/admin/images': typeof AdminImagesRoute
   '/admin/search-delete': typeof AdminSearchDeleteRoute
   '/admin/trash': typeof AdminTrashRoute
-  '/admin/users': typeof AdminUsersRouteWithChildren
   '/admin/': typeof AdminIndexRoute
-  '/admin/users/$userId': typeof AdminUsersUserIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -154,9 +140,7 @@ export interface FileRoutesByTo {
   '/admin/images': typeof AdminImagesRoute
   '/admin/search-delete': typeof AdminSearchDeleteRoute
   '/admin/trash': typeof AdminTrashRoute
-  '/admin/users': typeof AdminUsersRouteWithChildren
   '/admin': typeof AdminIndexRoute
-  '/admin/users/$userId': typeof AdminUsersUserIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -175,9 +159,7 @@ export interface FileRoutesById {
   '/admin/images': typeof AdminImagesRoute
   '/admin/search-delete': typeof AdminSearchDeleteRoute
   '/admin/trash': typeof AdminTrashRoute
-  '/admin/users': typeof AdminUsersRouteWithChildren
   '/admin/': typeof AdminIndexRoute
-  '/admin/users/$userId': typeof AdminUsersUserIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -197,9 +179,7 @@ export interface FileRouteTypes {
     | '/admin/images'
     | '/admin/search-delete'
     | '/admin/trash'
-    | '/admin/users'
     | '/admin/'
-    | '/admin/users/$userId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -216,9 +196,7 @@ export interface FileRouteTypes {
     | '/admin/images'
     | '/admin/search-delete'
     | '/admin/trash'
-    | '/admin/users'
     | '/admin'
-    | '/admin/users/$userId'
   id:
     | '__root__'
     | '/'
@@ -236,9 +214,7 @@ export interface FileRouteTypes {
     | '/admin/images'
     | '/admin/search-delete'
     | '/admin/trash'
-    | '/admin/users'
     | '/admin/'
-    | '/admin/users/$userId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -333,13 +309,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/users': {
-      id: '/admin/users'
-      path: '/users'
-      fullPath: '/admin/users'
-      preLoaderRoute: typeof AdminUsersRouteImport
-      parentRoute: typeof AdminRoute
-    }
     '/admin/trash': {
       id: '/admin/trash'
       path: '/trash'
@@ -375,27 +344,8 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminDashboardRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/users/$userId': {
-      id: '/admin/users/$userId'
-      path: '/$userId'
-      fullPath: '/admin/users/$userId'
-      preLoaderRoute: typeof AdminUsersUserIdRouteImport
-      parentRoute: typeof AdminUsersRoute
-    }
   }
 }
-
-interface AdminUsersRouteChildren {
-  AdminUsersUserIdRoute: typeof AdminUsersUserIdRoute
-}
-
-const AdminUsersRouteChildren: AdminUsersRouteChildren = {
-  AdminUsersUserIdRoute: AdminUsersUserIdRoute,
-}
-
-const AdminUsersRouteWithChildren = AdminUsersRoute._addFileChildren(
-  AdminUsersRouteChildren,
-)
 
 interface AdminRouteChildren {
   AdminDashboardRoute: typeof AdminDashboardRoute
@@ -403,7 +353,6 @@ interface AdminRouteChildren {
   AdminImagesRoute: typeof AdminImagesRoute
   AdminSearchDeleteRoute: typeof AdminSearchDeleteRoute
   AdminTrashRoute: typeof AdminTrashRoute
-  AdminUsersRoute: typeof AdminUsersRouteWithChildren
   AdminIndexRoute: typeof AdminIndexRoute
 }
 
@@ -413,7 +362,6 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminImagesRoute: AdminImagesRoute,
   AdminSearchDeleteRoute: AdminSearchDeleteRoute,
   AdminTrashRoute: AdminTrashRoute,
-  AdminUsersRoute: AdminUsersRouteWithChildren,
   AdminIndexRoute: AdminIndexRoute,
 }
 

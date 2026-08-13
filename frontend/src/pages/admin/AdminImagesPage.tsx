@@ -314,7 +314,8 @@ function DayGroup({ group, onImageClick, onSearchSimilar, onDelete, isSelectMode
           1024: 4,
           768: 3,
           640: 2,
-          480: 1,
+          480: 2,
+          380: 2,
         }}
       />
     </div>
@@ -833,7 +834,7 @@ export function AdminImagesPage() {
               </div>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0 flex-wrap justify-end">
               {/* Select mode toggle */}
               {status === 'success' && images.length > 0 && (
                 <button
@@ -849,7 +850,7 @@ export function AdminImagesPage() {
                   {isSelectMode ? (
                     <>
                       <X className="size-3.5" />
-                      Huỷ chọn
+                      <span className="hidden sm:inline">Huỷ chọn</span>
                       {selectedIds.size > 0 && (
                         <span className="ml-0.5 px-1.5 py-0.5 rounded-full bg-destructive text-destructive-foreground text-[10px] font-bold">
                           {selectedIds.size}
@@ -859,7 +860,7 @@ export function AdminImagesPage() {
                   ) : (
                     <>
                       <CheckSquare className="size-3.5" />
-                      Chọn để xoá
+                      <span className="hidden sm:inline">Chọn để xoá</span>
                     </>
                   )}
                 </button>
@@ -874,7 +875,7 @@ export function AdminImagesPage() {
               >
                 <Link to="/admin/search-delete">
                   <SearchX className="size-4" />
-                  Tìm &amp; Xoá
+                  <span className="hidden sm:inline">Tìm &amp; Xoá</span>
                 </Link>
               </Button>
 
@@ -887,7 +888,7 @@ export function AdminImagesPage() {
               >
                 <Link to="/admin/trash">
                   <Trash2 className="size-4" />
-                  Thùng rác
+                  <span className="hidden sm:inline">Thùng rác</span>
                 </Link>
               </Button>
 
@@ -900,7 +901,7 @@ export function AdminImagesPage() {
               >
                 <Link to="/upload">
                   <UploadCloud className="size-4" />
-                  Tải thêm ảnh
+                  <span className="hidden sm:inline">Tải thêm ảnh</span>
                 </Link>
               </Button>
             </div>

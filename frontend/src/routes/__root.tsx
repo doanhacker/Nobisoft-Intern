@@ -1,7 +1,6 @@
 import * as React from 'react'
 import { createRootRoute, Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
-import { TanStackRouterDevtools } from '@tanstack/router-devtools'
-import { ScanSearch, LogIn, LogOut, Search, Menu, X, LayoutDashboard, UploadCloud } from 'lucide-react'
+import { ScanSearch, LogIn, LogOut, Search, Menu, X, UserCheck, UploadCloud } from 'lucide-react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ThemeProvider } from '@/context/ThemeContext'
 import { AuthProvider } from '@/context/AuthContext'
@@ -13,7 +12,7 @@ import { ToastProvider } from '@/components/ui/Toast'
 import { UploadProvider } from '@/context/UploadContext'
 
 // Routes that use their own full-page layout (no shared header/footer)
-const FULL_PAGE_ROUTES = ['/results']
+const FULL_PAGE_ROUTES = ['/results', '/admin']
 
 export const Route = createRootRoute({
   component: RootComponent,
@@ -178,8 +177,8 @@ function AppShell() {
               {isAuthenticated ? (
                 <>
                   {isAdmin && (
-                    <NavLink to="/admin" icon={<LayoutDashboard className="size-3.5" />}>
-                      Admin Dashboard
+                    <NavLink to="/admin" icon={<UserCheck className="size-3.5" />}>
+                      Quản lý cá nhân
                     </NavLink>
                   )}
                   <Button
@@ -280,10 +279,10 @@ function AppShell() {
                       {isAdmin && (
                         <MobileNavLink
                           to="/admin"
-                          icon={<LayoutDashboard className="size-4 text-muted-foreground" />}
+                          icon={<UserCheck className="size-4 text-muted-foreground" />}
                           onClick={() => setMenuOpen(false)}
                         >
-                          Admin Dashboard
+                          Quản lý cá nhân
                         </MobileNavLink>
                       )}
 
@@ -350,7 +349,7 @@ function AppShell() {
       )}
 
       {/* Devtools */}
-      <TanStackRouterDevtools position="bottom-right" />
+
     </div>
   )
 }
