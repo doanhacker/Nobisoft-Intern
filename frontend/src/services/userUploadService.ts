@@ -60,8 +60,14 @@ export interface UploadPhaseProgress {
   chunksUploaded: number
   /** total chunks to send */
   totalChunks: number
-  /** running tally of results already uploaded */
-  uploadedResults: UserUploadResult[]
+}
+
+/** Fired once after ALL chunks have been uploaded successfully */
+export interface AllChunksCompleteEvent {
+  /** All upload results aggregated from every chunk */
+  allResults: UserUploadResult[]
+  /** The batchId assigned by the backend */
+  batchId: string
 }
 
 /** Fired on each poll tick (phase 2: indexing) */
@@ -75,6 +81,12 @@ export interface IndexingPhaseProgress {
 
 export interface UploadCallbacks {
   onUploadProgress?: (e: UploadPhaseProgress) => void
+  /**
+   * Called ONCE after the last chunk upload completes.
+   * This is the correct place to display per-image results,
+   * ensuring partial/intermediate results are never shown.
+   */
+  onAllChunksComplete?: (e: AllChunksCompleteEvent) => void
   onIndexingProgress?: (e: IndexingPhaseProgress) => void
 }
 
@@ -164,8 +176,11 @@ export async function resumeIndexingPoll(
  * Both phases fire progress callbacks so the UI can show user-friendly progress
  * without exposing any internal batch/chunk concepts.
  *
+ * The `onAllChunksComplete` callback fires exactly once after the last chunk,
+ * providing all aggregated results — never partial/intermediate results.
+ *
  * @throws {Error} on network/server errors. Individual file failures are surfaced
- *                 in the returned `UserUploadResult[]` with `success = false`.
+ *                 in `onAllChunksComplete` with `success = false`.
  */
 export async function uploadUserImages(
   files: File[],
@@ -174,6 +189,7 @@ export async function uploadUserImages(
 ): Promise<{ results: UserUploadResult[]; finalStatus: BatchIndexingStatus }> {
   const chunks = splitIntoChunks(files)
   const totalChunks = chunks.length
+  // Accumulate results internally — never expose partial results
   const allResults: UserUploadResult[] = []
   let batchId: string | null = null
 
@@ -201,7 +217,7 @@ export async function uploadUserImages(
       timeout: 60_000,
     })
 
-    // Capture batchId from first response
+    // Capture batchId from first response — immutable for the rest of this batch
     if (!batchId && data.data?.batchId) {
       batchId = data.data.batchId
     }
@@ -209,15 +225,24 @@ export async function uploadUserImages(
     const chunkResults: UserUploadResult[] = Array.isArray(data.data?.results)
       ? data.data.results
       : []
+    // Accumulate internally — do NOT expose partial results via callbacks
     allResults.push(...chunkResults)
 
     const uploadPercent = Math.round(((i + 1) / totalChunks) * 100)
+    // Fire progress (no uploadedResults — prevents premature display)
     callbacks?.onUploadProgress?.({
       uploadPercent,
       chunksUploaded: i + 1,
       totalChunks,
-      uploadedResults: allResults,
     })
+
+    // After the LAST chunk: flush all aggregated results at once
+    if (isLastChunk && batchId) {
+      callbacks?.onAllChunksComplete?.({
+        allResults,
+        batchId,
+      })
+    }
   }
 
   // ── Phase 2: Indexing polling ─────────────────────────────
