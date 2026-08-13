@@ -211,37 +211,68 @@ export async function uploadUserImages(
       formData.append('isLastChunk', 'true')
     }
 
-    const { data } = await axiosClient.post<ChunkApiResponse>('/upload', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-      signal,
-      timeout: 60_000,
-    })
-
-    // Capture batchId from first response — immutable for the rest of this batch
-    if (!batchId && data.data?.batchId) {
-      batchId = data.data.batchId
-    }
-
-    const chunkResults: UserUploadResult[] = Array.isArray(data.data?.results)
-      ? data.data.results
-      : []
-    // Accumulate internally — do NOT expose partial results via callbacks
-    allResults.push(...chunkResults)
-
-    const uploadPercent = Math.round(((i + 1) / totalChunks) * 100)
-    // Fire progress (no uploadedResults — prevents premature display)
-    callbacks?.onUploadProgress?.({
-      uploadPercent,
-      chunksUploaded: i + 1,
-      totalChunks,
-    })
-
-    // After the LAST chunk: flush all aggregated results at once
-    if (isLastChunk && batchId) {
-      callbacks?.onAllChunksComplete?.({
-        allResults,
-        batchId,
+    try {
+      const { data } = await axiosClient.post<ChunkApiResponse>('/upload', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        signal,
+        timeout: 60_000,
       })
+
+      // Capture batchId from first response — immutable for the rest of this batch
+      if (!batchId && data.data?.batchId) {
+        batchId = data.data.batchId
+      }
+
+      const chunkResults: UserUploadResult[] = Array.isArray(data.data?.results)
+        ? data.data.results
+        : []
+      // Accumulate internally — do NOT expose partial results via callbacks
+      allResults.push(...chunkResults)
+
+      const uploadPercent = Math.round(((i + 1) / totalChunks) * 100)
+      // Fire progress (no uploadedResults — prevents premature display)
+      callbacks?.onUploadProgress?.({
+        uploadPercent,
+        chunksUploaded: i + 1,
+        totalChunks,
+      })
+
+      // After the LAST chunk: flush all aggregated results at once
+      if (isLastChunk && batchId) {
+        callbacks?.onAllChunksComplete?.({
+          allResults,
+          batchId,
+        })
+      }
+    } catch (error: any) {
+      const failedResultMessage = error?.response?.data?.message || error?.message || 'Upload thất bại'
+
+      // If a chunk fails, keep the batch alive for subsequent chunks only when
+      // we already have a valid batchId from an earlier successful request.
+      const failedChunkResults: UserUploadResult[] = chunk.map((file) => ({
+        filename: file.name,
+        success: false,
+        error: failedResultMessage,
+      }))
+      allResults.push(...failedChunkResults)
+
+      const uploadPercent = Math.round(((i + 1) / totalChunks) * 100)
+      callbacks?.onUploadProgress?.({
+        uploadPercent,
+        chunksUploaded: i + 1,
+        totalChunks,
+      })
+
+      if (isLastChunk && batchId) {
+        callbacks?.onAllChunksComplete?.({
+          allResults,
+          batchId,
+        })
+      }
+
+      if (!batchId && !isLastChunk) {
+        break
+      }
     }
   }
 
