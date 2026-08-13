@@ -1,6 +1,5 @@
 import * as React from 'react'
 import { createRootRoute, Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
-import { TanStackRouterDevtools } from '@tanstack/router-devtools'
 import { ScanSearch, LogIn, LogOut, Search, Menu, X, UserCheck, UploadCloud } from 'lucide-react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ThemeProvider } from '@/context/ThemeContext'
@@ -350,7 +349,7 @@ function AppShell() {
       )}
 
       {/* Devtools */}
-      <TanStackRouterDevtools position="bottom-right" />
+
     </div>
   )
 }

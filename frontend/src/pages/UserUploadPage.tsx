@@ -12,10 +12,15 @@ import {
   FolderOpen,
   Info,
   StopCircle,
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  PackageCheck,
 } from 'lucide-react'
 import { uploadUserImages } from '@/services/userUploadService'
-import type { UploadPhaseProgress, IndexingPhaseProgress, BatchIndexingStatus, UserUploadResult } from '@/services/userUploadService'
+import type { UploadPhaseProgress, IndexingPhaseProgress, AllChunksCompleteEvent } from '@/services/userUploadService'
 import { useUploadContext } from '@/context/UploadContext'
+import type { BatchHistoryItem } from '@/context/UploadContext'
 import { Button } from '@/components/ui/button'
 import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
@@ -27,6 +32,17 @@ import { cn } from '@/lib/utils'
 const MAX_FILES = 1000
 const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB per file
 const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/avif']
+
+// ============================================================
+// Helpers
+// ============================================================
+
+function formatTime(isoString: string): string {
+  return new Date(isoString).toLocaleTimeString('vi-VN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
 
 // ============================================================
 // HowItWorks Banner
@@ -257,7 +273,7 @@ function UploadDropZone({ onFilesSelected, disabled, fileCount }: UploadDropZone
 }
 
 // ============================================================
-// UploadingCard — Phase 1
+// UploadingCard — Phase 1 (uploading)
 // ============================================================
 
 interface UploadingCardProps {
@@ -318,72 +334,241 @@ function UploadingCard({ totalFiles, uploadPercent, isCancelled, onCancel }: Upl
 }
 
 // ============================================================
-// DoneCard — Summary after completion
+// BatchHistoryCard — one item in the batch history list
 // ============================================================
 
-interface DoneCardProps {
-  results: UserUploadResult[]
-  finalStatus: BatchIndexingStatus
+interface BatchHistoryCardProps {
+  item: BatchHistoryItem
+  batchNumber: number
 }
 
-function DoneCard({ results, finalStatus }: DoneCardProps) {
-  const successCount = results.filter((r) => r.success).length
-  const failCount = results.length - successCount
-  const indexingFailed = finalStatus === 'FAILED'
+function BatchHistoryCard({ item, batchNumber }: BatchHistoryCardProps) {
+  const [expanded, setExpanded] = React.useState(false)
+
+  const isProcessing =
+    item.indexingStatus === 'PENDING' ||
+    item.indexingStatus === 'PROCESSING' ||
+    item.indexingStatus === 'UPLOADING'
+  const isCompleted = item.indexingStatus === 'COMPLETED'
+  const isFailed = item.indexingStatus === 'FAILED'
+  const hasUploadErrors = item.failedUploadFiles.length > 0
+  const uploadSuccessCount = item.totalImages - item.failedUploadFiles.length
+
+  // Indexing progress derived from polling data already in context
+  const indexingPercent = item.totalImages > 0
+    ? isCompleted
+      ? 100
+      : Math.min(Math.round((item.indexedCount / item.totalImages) * 100), 99)
+    : 0
+
+  // Status label mapping — user-friendly, no jargon
+  const statusLabel = isProcessing
+    ? 'Đang xử lý...'
+    : isCompleted
+      ? 'Hoàn tất'
+      : isFailed
+        ? 'Có lỗi xử lý'
+        : 'Đang chờ'
+
+  const statusColor = isProcessing
+    ? 'text-violet-600 dark:text-violet-400 bg-violet-500/10 border-violet-500/20'
+    : isCompleted
+      ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 border-emerald-500/20'
+      : isFailed
+        ? 'text-amber-600 dark:text-amber-400 bg-amber-500/10 border-amber-500/20'
+        : 'text-muted-foreground bg-muted/50 border-border/50'
 
   return (
-    <div className="rounded-2xl border border-border/60 bg-card overflow-hidden">
-      <div
-        className={cn(
-          'flex items-center gap-3 px-5 py-4 border-b border-border/50',
-          indexingFailed ? 'bg-amber-500/5' : 'bg-emerald-500/5',
-        )}
-      >
-        {indexingFailed ? (
-          <AlertCircle className="size-5 text-amber-500 shrink-0" />
-        ) : (
-          <CheckCircle2 className="size-5 text-emerald-500 shrink-0" />
-        )}
-        <div className="flex-1">
-          <h3 className="font-bold text-foreground text-sm">
-            {indexingFailed ? 'Upload hoàn tất, có lỗi xử lý' : 'Hoàn tất! Ảnh đã sẵn sàng tìm kiếm'}
-          </h3>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            {indexingFailed
-              ? 'Một số ảnh có thể chưa được tìm kiếm ngay. Vui lòng thử lại sau.'
-              : 'Bạn có thể tìm lại ảnh bất kỳ lúc nào bằng mô tả hoặc ảnh tương tự.'}
-          </p>
+    <div
+      className={cn(
+        'rounded-xl border bg-card overflow-hidden transition-all duration-200',
+        hasUploadErrors || isFailed ? 'border-amber-500/30' : 'border-border/60',
+      )}
+    >
+      {/* Header row */}
+      <div className="flex items-center gap-3 px-4 py-3">
+        {/* Batch icon */}
+        <div
+          className={cn(
+            'flex items-center justify-center size-8 rounded-lg shrink-0',
+            isProcessing
+              ? 'bg-violet-500/10'
+              : isCompleted
+                ? 'bg-emerald-500/10'
+                : 'bg-amber-500/10',
+          )}
+        >
+          {isProcessing ? (
+            <Loader2 className="size-4 text-violet-500 animate-spin" />
+          ) : isCompleted ? (
+            <PackageCheck className="size-4 text-emerald-500" />
+          ) : (
+            <AlertCircle className="size-4 text-amber-500" />
+          )}
         </div>
+
+        {/* Main info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="font-semibold text-foreground text-sm">
+              Lần tải #{batchNumber}
+            </span>
+            <span
+              className={cn(
+                'inline-flex items-center gap-1 text-[11px] font-medium px-2 py-0.5 rounded-full border',
+                statusColor,
+              )}
+            >
+              {isProcessing && <Loader2 className="size-2.5 animate-spin" />}
+              {statusLabel}
+            </span>
+          </div>
+          <div className="flex items-center gap-3 mt-0.5 text-xs text-muted-foreground flex-wrap">
+            <span className="flex items-center gap-1">
+              <Clock className="size-3" />
+              {formatTime(item.startedAt)}
+            </span>
+            <span>
+              <strong className="text-foreground">{uploadSuccessCount.toLocaleString()}</strong>
+              {' '}ảnh đã tải lên
+              {hasUploadErrors && (
+                <span className="text-amber-600 dark:text-amber-400 ml-2">
+                  · <strong>{item.failedUploadFiles.length}</strong> ảnh gặp lỗi
+                </span>
+              )}
+            </span>
+            {isCompleted && item.completedAt && (
+              <span className="text-emerald-600 dark:text-emerald-400">
+                Xong lúc {formatTime(item.completedAt)}
+              </span>
+            )}
+          </div>
+        </div>
+
+        {/* Expand/collapse for error details */}
+        {hasUploadErrors && (
+          <button
+            onClick={() => setExpanded((v) => !v)}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors shrink-0 px-2 py-1 rounded-lg hover:bg-muted/50"
+          >
+            {expanded ? (
+              <>Ẩn <ChevronUp className="size-3.5" /></>
+            ) : (
+              <>Xem ảnh lỗi <ChevronDown className="size-3.5" /></>
+            )}
+          </button>
+        )}
       </div>
 
-      <div className="flex divide-x divide-border/40">
-        <div className="flex-1 flex flex-col items-center py-4">
-          <span className="text-2xl font-black text-foreground tabular-nums">
-            {successCount.toLocaleString()}
-          </span>
-          <span className="text-xs text-muted-foreground mt-0.5">ảnh đã tải lên</span>
-        </div>
-        {failCount > 0 && (
-          <div className="flex-1 flex flex-col items-center py-4">
-            <span className="text-2xl font-black text-destructive tabular-nums">
-              {failCount.toLocaleString()}
+      {/* ── Indexing progress bar (visible while processing or when done) ── */}
+      {!isFailed && (
+        <div className="px-4 pb-3 space-y-1.5">
+          <div className="flex items-center justify-between text-xs text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              {isProcessing ? (
+                <>
+                  <Sparkles className="size-3 text-violet-500" />
+                  AI đang phân tích ảnh...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="size-3 text-emerald-500" />
+                  Đã phân tích xong
+                </>
+              )}
             </span>
-            <span className="text-xs text-muted-foreground mt-0.5">ảnh thất bại</span>
+            <span className="font-semibold tabular-nums text-foreground">
+              {isProcessing
+                ? `${item.indexedCount.toLocaleString()} / ${item.totalImages.toLocaleString()} ảnh`
+                : `${item.totalImages.toLocaleString()} ảnh`}
+            </span>
           </div>
-        )}
-        <div className="flex-1 flex flex-col items-center py-4">
-          <span
-            className={cn(
-              'text-2xl font-black tabular-nums',
-              indexingFailed ? 'text-amber-500' : 'text-emerald-500',
-            )}
-          >
-            {indexingFailed ? '⚠' : '✓'}
-          </span>
-          <span className="text-xs text-muted-foreground mt-0.5">
-            {indexingFailed ? 'Lỗi xử lý' : 'Đã lập chỉ mục'}
+          <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+            <div
+              className={cn(
+                'h-full rounded-full transition-all duration-700 ease-out',
+                isCompleted ? 'bg-emerald-500' : 'gradient-brand',
+              )}
+              style={{ width: `${indexingPercent}%` }}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Expandable: list of failed upload files */}
+      {hasUploadErrors && expanded && (
+        <div className="border-t border-border/40 bg-amber-500/5 px-4 py-3 space-y-1.5">
+          <p className="text-xs font-semibold text-amber-700 dark:text-amber-400 mb-2">
+            {item.failedUploadFiles.length} ảnh không thể tải lên:
+          </p>
+          <div className="space-y-1 max-h-48 overflow-y-auto pr-1">
+            {item.failedUploadFiles.map((f, idx) => (
+              <div
+                key={idx}
+                className="flex items-start gap-2 text-xs text-muted-foreground bg-background/60 rounded-lg px-3 py-2"
+              >
+                <AlertCircle className="size-3.5 text-amber-500 shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  <p className="font-medium text-foreground truncate">{f.filename}</p>
+                  {f.error && (
+                    <p className="text-muted-foreground/70 mt-0.5 line-clamp-2">{f.error}</p>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ============================================================
+// BatchHistoryList
+// ============================================================
+
+interface BatchHistoryListProps {
+  items: BatchHistoryItem[]
+}
+
+function BatchHistoryList({ items }: BatchHistoryListProps) {
+  if (items.length === 0) return null
+
+  const processingCount = items.filter(
+    (b) =>
+      b.indexingStatus === 'PENDING' ||
+      b.indexingStatus === 'PROCESSING' ||
+      b.indexingStatus === 'UPLOADING',
+  ).length
+
+  return (
+    <div className="space-y-3">
+      {/* Section header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Images className="size-4 text-muted-foreground" />
+          <h3 className="font-bold text-foreground text-sm">Lịch sử tải lên</h3>
+          <span className="text-xs text-muted-foreground font-medium">
+            ({items.length} lần)
           </span>
         </div>
+        {processingCount > 0 && (
+          <span className="flex items-center gap-1.5 text-xs text-violet-600 dark:text-violet-400 font-medium">
+            <Loader2 className="size-3.5 animate-spin" />
+            {processingCount} đợt đang xử lý
+          </span>
+        )}
+      </div>
+
+      {/* Cards — newest first (items already sorted newest first in context) */}
+      <div className="space-y-2">
+        {items.map((item, idx) => (
+          <BatchHistoryCard
+            key={item.batchId}
+            item={item}
+            batchNumber={items.length - idx}
+          />
+        ))}
       </div>
     </div>
   )
@@ -394,24 +579,30 @@ function DoneCard({ results, finalStatus }: DoneCardProps) {
 // ============================================================
 
 export function UserUploadPage() {
-  // ── Context (persisted state) ─────────────────────────────
-  const { session, updateSession, clearSession, abortControllerRef } = useUploadContext()
+  // ── Context ────────────────────────────────────────────────
   const {
-    phase,
-    uploadPercent,
-    isCancelled,
-    uploadResults,
-    finalStatus,
+    activeBatch,
+    batchHistory,
     totalUploadedSession,
-    totalFilesUploading,
-  } = session
+    startBatch,
+    updateActiveBatch,
+    promoteBatchToHistory,
+    finishActiveBatch,
+    cancelActiveBatch,
+    clearAll,
+    activeBatchControllerRef,
+  } = useUploadContext()
 
-  // Local-only state (not worth persisting)
+  // Local-only state
   const [selectedFiles, setSelectedFiles] = React.useState<File[]>([])
-
   const toast = useToast()
-  // Keep a stable ref to abortController for cancel
-  const localAbortRef = useRef<AbortController | null>(null)
+  const userCancelledRef = useRef(false)
+
+  // ── Derived ────────────────────────────────────────────────
+  const isUploading = activeBatch?.phase === 'uploading'
+  const isIndexing = activeBatch?.phase === 'indexing'
+  const isError = activeBatch?.phase === 'error'
+  const isDropZoneDisabled = isUploading
 
   // ── File selection ─────────────────────────────────────────
 
@@ -433,125 +624,85 @@ export function UserUploadPage() {
     setSelectedFiles((prev) => prev.filter((_, i) => i !== index))
   }
 
-  const userCancelledRef = React.useRef(false)
-
-  // ── Cancel (upload phase only) ─────────────────────────────
+  // ── Cancel ─────────────────────────────────────────────────
 
   const handleCancel = () => {
     userCancelledRef.current = true
-    abortControllerRef.current?.abort()
-    localAbortRef.current?.abort()
-    updateSession({ isCancelled: true })
+    cancelActiveBatch()
   }
 
-  // ── Reset ─────────────────────────────────────────────────
-
-  const handleReset = () => {
-    clearSession()
-    setSelectedFiles([])
-  }
-
-  // ── Upload ────────────────────────────────────────────────
+  // ── Upload ─────────────────────────────────────────────────
 
   const handleUpload = async () => {
     if (selectedFiles.length === 0) return
 
     userCancelledRef.current = false
-
-    // If currently indexing a previous batch, abort its polling loop quietly so we can start fresh.
-    if (isIndexing) {
-      abortControllerRef.current?.abort()
-    }
-
     const filesToUpload = [...selectedFiles]
-
-    updateSession({
-      phase: 'uploading',
-      isCancelled: false,
-      uploadPercent: 0,
-      indexingPercent: 0,
-      uploadResults: [],
-      batchId: null,
-      totalFilesUploading: filesToUpload.length,
-    })
     setSelectedFiles([])
 
+    // startBatch creates a new AbortController and sets activeBatch state
+    startBatch(filesToUpload.length)
+
+    // Grab the controller ref right after startBatch sets it
+    // (startBatch is sync, so the ref is immediately available)
     const controller = new AbortController()
-    abortControllerRef.current = controller
-    localAbortRef.current = controller
+    activeBatchControllerRef.current = controller
 
     try {
-      const { results, finalStatus: status } = await uploadUserImages(
+      await uploadUserImages(
         filesToUpload,
         {
           onUploadProgress: (e: UploadPhaseProgress) => {
-            updateSession({ uploadPercent: e.uploadPercent })
+            updateActiveBatch({ uploadPercent: e.uploadPercent })
+          },
+          onAllChunksComplete: (e: AllChunksCompleteEvent) => {
+            // All chunks done — promote to history and start indexing polling
+            promoteBatchToHistory({
+              batchId: e.batchId,
+              finalResults: e.allResults,
+              totalImages: filesToUpload.length,
+            })
+
+            const failCount = e.allResults.filter((r) => !r.success).length
+            const successCount = e.allResults.length - failCount
+            const wasUserCancelled = userCancelledRef.current
+
+            if (wasUserCancelled) {
+              toast.warning(`Đã huỷ. ${successCount.toLocaleString()} ảnh đã được tải lên trước khi dừng.`)
+            } else if (failCount === 0) {
+              toast.success(`Đã tải lên ${successCount.toLocaleString()} ảnh thành công 🎉`, {
+                description: 'AI đang phân tích ảnh của bạn trong nền.',
+              })
+            } else {
+              // Always show "upload succeeded" toast — errors shown in history list
+              toast.success(`Đã tải lên ${successCount.toLocaleString()} ảnh thành công 🎉`, {
+                description: `${failCount} ảnh gặp sự cố — xem chi tiết bên dưới.`,
+              })
+            }
           },
           onIndexingProgress: (e: IndexingPhaseProgress) => {
-            updateSession({
+            updateActiveBatch({
               phase: 'indexing',
-              indexingPercent: e.indexingPercent,
-              processedImages: e.processedImages,
-              totalImages: e.totalImages,
-              indexingStatus: e.status,
             })
+            // Indexing status is tracked per-batch in batchHistory via context polling
+            void e
           },
         },
         controller.signal,
       )
 
-      const successCount = results.filter((r) => r.success).length
-      const failCount = results.length - successCount
-      const wasUserCancelled = userCancelledRef.current
-
-      updateSession({
-        uploadResults: results,
-        finalStatus: status,
-        totalUploadedSession: totalUploadedSession + successCount,
-        phase: 'done',
-      })
-
-      if (wasUserCancelled) {
-        toast.warning(`Đã huỷ. ${successCount} ảnh đã được tải lên trước khi dừng.`)
-      } else if (failCount === 0) {
-        toast.success(`${successCount} ảnh đã được thêm vào thư viện thành công 🎉`)
-      } else if (successCount === 0) {
-        toast.error('Tất cả ảnh đều tải lên thất bại. Vui lòng thử lại.')
-      } else {
-        toast.warning(`${successCount} ảnh thành công, ${failCount} ảnh thất bại.`)
-      }
+      finishActiveBatch('done')
     } catch (error: any) {
       if (error?.name === 'AbortError' || error?.code === 'ERR_CANCELED') {
-        // handled via wasCancelled above
+        // Handled via userCancelledRef / cancel flow
+        finishActiveBatch('done')
       } else {
         console.error('Upload error:', error)
-        updateSession({ phase: 'error' })
+        finishActiveBatch('error')
         toast.error(error?.response?.data?.message || 'Có lỗi xảy ra. Vui lòng thử lại.')
       }
     }
   }
-
-  // ── Derived ───────────────────────────────────────────────
-
-  const isIdle = phase === 'idle'
-  const isUploading = phase === 'uploading'
-  const isIndexing = phase === 'indexing'
-  const isDone = phase === 'done'
-  const isError = phase === 'error'
-  // Drop zone only disabled during active upload, not during background indexing
-  const isDropZoneDisabled = isUploading
-
-  // Toast when indexing completes in background (phase: indexing → done)
-  const prevPhaseRef = React.useRef(phase)
-  React.useEffect(() => {
-    if (prevPhaseRef.current === 'indexing' && phase === 'done') {
-      toast.success('Ảnh đã được phân tích xong và sẵn sàng tìm kiếm! 🌟', {
-        description: `${uploadResults.filter((r) => r.success).length.toLocaleString()} ảnh đã được lập chỉ mục.`,
-      })
-    }
-    prevPhaseRef.current = phase
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase])
 
   return (
     <div className="min-h-[calc(100vh-4rem)] bg-background">
@@ -592,15 +743,15 @@ export function UserUploadPage() {
           </div>
         )}
 
-        {/* ── How it works (idle only) ── */}
-        {isIdle && <HowItWorksBanner />}
+        {/* ── How it works (only when no history yet) ── */}
+        {batchHistory.length === 0 && !activeBatch && <HowItWorksBanner />}
 
-        {/* ── Background indexing indicator (minimal, non-blocking) ── */}
+        {/* ── Background indexing indicator ── */}
         {isIndexing && (
           <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-violet-500/20 bg-violet-500/5 text-sm">
             <Sparkles className="size-4 text-violet-500 animate-pulse shrink-0" />
             <p className="text-violet-700 dark:text-violet-300 text-xs font-medium flex-1">
-              AI đang phân tích ảnh trong nền… Bạn có thể tiếp tục upload ảnh mới.
+              AI đang phân tích ảnh trong nền… Bạn có thể tiếp tục tải thêm ảnh mới.
             </p>
           </div>
         )}
@@ -688,17 +839,14 @@ export function UserUploadPage() {
         )}
 
         {/* ── Phase 1: Uploading ── */}
-        {isUploading && (
+        {isUploading && activeBatch && (
           <UploadingCard
-            totalFiles={totalFilesUploading}
-            uploadPercent={uploadPercent}
-            isCancelled={isCancelled}
+            totalFiles={activeBatch.totalFilesUploading}
+            uploadPercent={activeBatch.uploadPercent}
+            isCancelled={activeBatch.isCancelled}
             onCancel={handleCancel}
           />
         )}
-
-        {/* ── Phase 2: Indexing — hidden (runs in background) ── */}
-        {/* IndexingCard intentionally removed — user sees a minimal banner above instead. */}
 
         {/* ── Error state ── */}
         {isError && (
@@ -710,29 +858,44 @@ export function UserUploadPage() {
                 Vui lòng kiểm tra kết nối mạng và thử lại.
               </p>
             </div>
-            <Button variant="outline" size="sm" onClick={handleReset}>
+            <Button variant="outline" size="sm" onClick={clearAll}>
               Thử lại
             </Button>
           </div>
         )}
 
-        {/* ── Done: summary + next actions ── */}
-        {isDone && (
+        {/* ── Batch History List ── */}
+        {batchHistory.length > 0 && (
           <div className="space-y-4">
-            <DoneCard results={uploadResults} finalStatus={finalStatus} />
+            <BatchHistoryList items={batchHistory} />
 
-            <div className="flex flex-col sm:flex-row items-center gap-3">
-              <Button variant="outline" onClick={handleReset} className="w-full sm:w-auto">
-                <UploadCloud className="size-4 mr-2" />
-                Tải thêm ảnh
-              </Button>
-              <Button variant="brand" asChild className="w-full sm:w-auto">
-                <a href="/search">
-                  <Search className="size-4 mr-2" />
-                  Đến trang Tìm kiếm
-                </a>
-              </Button>
-            </div>
+            {/* Clear history button — only when all done */}
+            {batchHistory.every(
+              (b) => b.indexingStatus === 'COMPLETED' || b.indexingStatus === 'FAILED',
+            ) && !isUploading && !isIndexing && (
+              <div className="flex justify-center">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearAll}
+                  className="text-muted-foreground hover:text-foreground text-xs"
+                >
+                  Xoá lịch sử & bắt đầu lại
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── Quick search CTA (when history has completed items) ── */}
+        {batchHistory.some((b) => b.indexingStatus === 'COMPLETED') && (
+          <div className="flex justify-center pt-2">
+            <Button variant="brand" asChild>
+              <a href="/search">
+                <Search className="size-4 mr-2" />
+                Tìm kiếm ảnh ngay
+              </a>
+            </Button>
           </div>
         )}
       </div>
