@@ -47,3 +47,7 @@ Thumbs.db
 
 # SSL certificates (Let's Encrypt)
 certbot/
+
+# Performance Tests Data
+backend/perf-tests/val2017/
+backend/perf-tests/*.zip
