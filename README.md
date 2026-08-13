@@ -11,7 +11,7 @@ Hệ thống tìm kiếm ảnh trực quan hỗ trợ tìm kiếm bằng ảnh, 
 - Lưu lịch sử tìm kiếm và ảnh người dùng đã click.
 - Đề xuất ảnh dựa trên lịch sử tương tác.
 - Quản lý ảnh cá nhân của người dùng.
-- Quản trị người dùng, kho ảnh, thùng rác, khôi phục và xóa vĩnh viễn ảnh.
+- Quản lý kho ảnh, thùng rác, khôi phục và xóa vĩnh viễn ảnh.
 - Resize ảnh, tạo thumbnail và cache tại Nginx.
 - Tự động xóa vĩnh viễn ảnh đã ở trong thùng rác quá thời hạn.
 - Rate limit tại Backend và Nginx.
@@ -63,7 +63,7 @@ Nginx :80/:443
 ## Cấu trúc thư mục
 
 ```text
-Nobisoft-Intern/
+Visual-Search-Engine/
 |-- ai-service/              # Embedding, OCR và indexing AI
 |-- backend/                 # Express API, Prisma và Swagger
 |-- datasets/                # Dataset cục bộ, không commit dữ liệu lớn
@@ -92,7 +92,7 @@ Không cần cài Node.js, Python, .NET, PostgreSQL hay Qdrant nếu chạy toà
 
 ```powershell
 git clone <repository-url>
-cd Nobisoft-Intern
+cd Visual-Search-Engine
 Copy-Item .env.example .env
 ```
 
@@ -145,7 +145,6 @@ Backend tự động thực hiện các bước sau khi container khởi động
 | Frontend | http://localhost |
 | Backend API | http://localhost:8000/api |
 | Swagger Backend | http://localhost:8000/api-docs |
-| OpenAPI JSON | http://localhost:8000/api-docs.json |
 | Health check | http://localhost:8000/api/health |
 | Swagger AI Service | http://localhost:9000/docs |
 | RabbitMQ Management | http://localhost:15672 |
@@ -233,27 +232,73 @@ Ollama chuyển prompt tự nhiên, đặc biệt là tiếng Việt, thành tru
 
 ## Các lệnh Docker thường dùng
 
+### Môi trường local
+
 ```powershell
+# Build và khởi động toàn bộ hệ thống
+docker compose -f docker-compose.local.yml up -d --build
+
+# Khởi động lại bằng các image đã build, không build lại
+docker compose -f docker-compose.local.yml up -d
+
 # Xem container
 docker compose -f docker-compose.local.yml ps
 
 # Xem log toàn hệ thống
 docker compose -f docker-compose.local.yml logs -f
 
-# Xem log một service
+# Xem log từng service
 docker compose -f docker-compose.local.yml logs -f backend
+docker compose -f docker-compose.local.yml logs -f frontend
 docker compose -f docker-compose.local.yml logs -f ai-service
 docker compose -f docker-compose.local.yml logs -f indexing-worker
+docker compose -f docker-compose.local.yml logs -f database
+docker compose -f docker-compose.local.yml logs -f qdrant
+docker compose -f docker-compose.local.yml logs -f rabbitmq
+docker compose -f docker-compose.local.yml logs -f ollama
 
-# Khởi động lại, không build image
-docker compose -f docker-compose.local.yml up -d
-
-# Build lại riêng Backend sau khi sửa code
+# Build lại riêng service có source vừa thay đổi
 docker compose -f docker-compose.local.yml up -d --build backend
+docker compose -f docker-compose.local.yml up -d --build frontend
+docker compose -f docker-compose.local.yml up -d --build ai-service
+docker compose -f docker-compose.local.yml up -d --build indexing-worker
+
+# Khởi động lại riêng service, không build lại
+docker compose -f docker-compose.local.yml up -d backend
+docker compose -f docker-compose.local.yml up -d frontend
+docker compose -f docker-compose.local.yml up -d ai-service
+docker compose -f docker-compose.local.yml up -d indexing-worker
 
 # Dừng container nhưng giữ dữ liệu
 docker compose -f docker-compose.local.yml down
 ```
+
+Chỉ chạy lệnh tương ứng với service cần xử lý. Nếu sửa nhiều service, có thể build chúng trong một lệnh, ví dụ:
+
+```powershell
+docker compose -f docker-compose.local.yml up -d --build backend frontend ai-service indexing-worker
+```
+
+### Môi trường production
+
+File Compose mặc định là `docker-compose.yml`, vì vậy không cần truyền tùy chọn `-f`:
+
+```bash
+# Build và khởi động toàn bộ hệ thống
+docker compose up -d --build
+
+# Khởi động lại bằng các image đã build
+docker compose up -d
+
+# Xem trạng thái và log
+docker compose ps
+docker compose logs -f
+
+# Dừng container nhưng giữ dữ liệu
+docker compose down
+```
+
+Sử dụng `--build` khi chạy lần đầu, vừa pull code mới hoặc vừa sửa source/Dockerfile. Chỉ dùng `up -d` khi image hiện tại đã chứa đúng phiên bản code cần chạy.
 
 Không chạy `docker compose down -v` trừ khi thực sự muốn xóa toàn bộ volume PostgreSQL, Qdrant, RabbitMQ, Redis và Ollama.
 
@@ -296,15 +341,6 @@ Frontend mặc định chạy tại `http://localhost:5173`. Đảm bảo `ALLOW
 ```powershell
 # Tạo lại tài khoản admin nếu chưa tồn tại
 docker compose -f docker-compose.local.yml exec backend npm run seed:admin
-
-# Tạo dữ liệu ảnh mock
-docker compose -f docker-compose.local.yml exec backend npm run seed:mock-images
-
-# Khởi tạo collection Qdrant
-docker compose -f docker-compose.local.yml exec backend npm run init:qdrant
-```
-
-Các script import dataset lớn nằm trong `backend/src/scripts/`. Hãy chạy ở chế độ kiểm tra hoặc giới hạn số lượng trước khi import toàn bộ dataset.
 
 ## Triển khai production với HTTPS
 
@@ -404,7 +440,5 @@ Sử dụng prefix commit phù hợp: `feat`, `fix`, `refactor`, `docs`, `test`,
 
 ## Tài liệu liên quan
 
-- `docs/api_flow_documentation.md`: luồng API và hợp đồng dữ liệu.
-- `docs/architecture.md`: ghi chú kiến trúc.
-- Swagger Backend: `/api-docs`.
+- Swagger Backend: `:8000/api-docs`.
 - Swagger AI Service: `:9000/docs` trong môi trường local.
