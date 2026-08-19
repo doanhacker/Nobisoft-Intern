@@ -116,7 +116,10 @@ export async function getBatchStatus(batchId: string) {
   let failedImages: Array<{ id: string; imageId: string }> = [];
   if (batch.status === 'COMPLETED' && batch.failedCount > 0) {
     const failedIndexes = await prisma.imageIndex.findMany({
-      where: { batchId, status: 'FAILED' },
+      where: {
+        batchId,
+        status: { in: ['FAILED', 'ERROR'] },
+      },
       select: { id: true, imageId: true },
     });
     failedImages = failedIndexes;

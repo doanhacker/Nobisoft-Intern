@@ -171,7 +171,7 @@ const options: swaggerJsdoc.Options = {
               nullable: true,
               properties: {
                 id: { type: 'string', format: 'uuid' },
-                status: { type: 'string', enum: ['PENDING', 'SUCCESS', 'FAILED'] },
+                status: { type: 'string', enum: ['PENDING', 'SUCCESS', 'FAILED', 'ERROR'] },
                 indexedAt: { type: 'string', format: 'date-time' },
                 ocrLines: {
                   type: 'array',

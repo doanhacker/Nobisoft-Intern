@@ -1,8 +1,6 @@
 namespace indexing_worker.Models;
 
-/// <summary>
-/// Message nhận từ RabbitMQ — chứa batchId và danh sách ảnh cần index.
-/// </summary>
+// Message nhận từ RabbitMQ — chứa batchId và danh sách ảnh cần index.
 public class IndexingMessage
 {
     public string BatchId { get; set; } = string.Empty;

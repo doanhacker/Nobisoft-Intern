@@ -42,7 +42,7 @@ public class Worker : BackgroundService
             return;
         }
 
-        // Đảm bảo queue tồn tại (durable = true, khớp với backend)
+        // Đảm bảo queue tồn tại
         _channel.QueueDeclare(queue: QueueName, durable: true, exclusive: false, autoDelete: false);
 
         // Prefetch 1 message tại 1 thời điểm
@@ -77,29 +77,41 @@ public class Worker : BackgroundService
 
             if (message == null || message.Images.Count == 0 || string.IsNullOrEmpty(message.BatchId))
             {
-                _logger.LogWarning("Message rỗng, không hợp lệ hoặc thiếu BatchId. Bỏ qua.");
+                // Lỗi không thể khắc phục → ACK và bỏ qua
+                _logger.LogWarning("Message không hợp lệ hoặc thiếu dữ liệu. ACK và bỏ qua.");
                 _channel?.BasicAck(ea.DeliveryTag, multiple: false);
                 return;
             }
 
-            _logger.LogInformation("Nhận batch {BatchId} có {Count} ảnh từ RabbitMQ.", message.BatchId, message.Images.Count);
+            _logger.LogInformation("Nhận {Count} ảnh (batch {BatchId}) từ RabbitMQ.",
+                message.Images.Count, message.BatchId);
 
-            // Gọi ProcessBatchAsync — tự động chia thành các sub-batch tối đa 4 ảnh
+            // ProcessBatchAsync xử lý lỗi ở cấp độ từng ảnh:
+            // ảnh lỗi được đánh dấu FAILED riêng, các ảnh khác vẫn tiếp tục xử lý.
             var (success, failed) = await _processor.ProcessBatchAsync(message.BatchId, message.Images, ct);
 
-            _logger.LogInformation("Chunk của batch {BatchId} hoàn tất: {Success} thành công, {Failed} thất bại.", message.BatchId, success, failed);
+            _logger.LogInformation("Hoàn tất {Count} ảnh (batch {BatchId}): {Success} thành công, {Failed} thất bại.",
+                message.Images.Count, message.BatchId, success, failed);
+
+            // ACK vì mọi ảnh đã được xử lý (thành công hoặc đánh dấu FAILED trong DB)
+            _channel?.BasicAck(ea.DeliveryTag, multiple: false);
         }
         catch (JsonException ex)
         {
-            _logger.LogError(ex, "Lỗi parse JSON message: {Body}", body);
+            // Message sai format JSON → không thể parse → ACK và bỏ qua
+            _logger.LogError(ex, "Lỗi parse JSON (bỏ qua message): {Body}", body);
+            _channel?.BasicAck(ea.DeliveryTag, multiple: false);
+        }
+        catch (OperationCanceledException)
+        {
+            // Worker đang shutdown → trả message lại queue để worker khác xử lý
+            _logger.LogWarning("Worker đang dừng, trả message lại queue.");
+            _channel?.BasicNack(ea.DeliveryTag, multiple: false, requeue: true);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Lỗi không xác định khi xử lý message.");
-        }
-        finally
-        {
-            // Luôn ACK để tránh message bị kẹt trong queue
+            // Lỗi không mong đợi (rất hiếm vì ProcessBatchAsync đã xử lý lỗi từng ảnh).
+            _logger.LogError(ex, "Lỗi không mong đợi khi xử lý message. ACK để tránh re-process ảnh đã thành công.");
             _channel?.BasicAck(ea.DeliveryTag, multiple: false);
         }
     }

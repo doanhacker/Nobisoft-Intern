@@ -17,6 +17,7 @@ enum IndexStatus {
   PENDING
   SUCCESS
   FAILED
+  ERROR
 }
 
 enum BatchStatus {
