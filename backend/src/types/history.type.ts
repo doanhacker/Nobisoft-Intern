@@ -1,6 +1,6 @@
 import type { ApiResponse } from './apiResponse.js';
 
-export type HistorySearchType = 'IMAGE_ONLY' | 'TEXT_SEMANTIC' | 'TEXT_OCR';
+export type HistorySearchType = 'IMAGE_ONLY' | 'TEXT_SEMANTIC' | 'TEXT_OCR' | 'TEXT_PROMPT';
 
 export interface SearchHistoryListQuery {
   page: number;

@@ -38,20 +38,20 @@ const historyRouter = Router();
  *         name: searchType
  *         schema:
  *           $ref: '#/components/schemas/SearchType'
- *         description: Lọc theo IMAGE_ONLY, TEXT_SEMANTIC hoặc TEXT_OCR
+ *         description: Lọc theo IMAGE_ONLY, TEXT_SEMANTIC, TEXT_OCR hoặc TEXT_PROMPT
  *       - in: query
  *         name: fromDate
  *         schema:
  *           type: string
  *           format: date
- *         description: Lấy lịch sử từ ngày này, định dạng YYYY-MM-DD, theo múi giờ Asia/Ho_Chi_Minh
+ *         description: Lấy lịch sử từ ngày này, không lớn hơn ngày hiện tại, theo múi giờ Asia/Ho_Chi_Minh
  *         example: '2026-07-01'
  *       - in: query
  *         name: toDate
  *         schema:
  *           type: string
  *           format: date
- *         description: Lấy lịch sử đến hết ngày này, định dạng YYYY-MM-DD, theo múi giờ Asia/Ho_Chi_Minh
+ *         description: Lấy lịch sử đến hết ngày này, không lớn hơn ngày hiện tại, theo múi giờ Asia/Ho_Chi_Minh
  *         example: '2026-07-23'
  *     responses:
  *       200:

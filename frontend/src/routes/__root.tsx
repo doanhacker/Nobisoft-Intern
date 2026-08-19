@@ -1,7 +1,6 @@
 import * as React from 'react'
 import { createRootRoute, Link, Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
-import { TanStackRouterDevtools } from '@tanstack/router-devtools'
-import { ScanSearch, LogIn, LogOut, Search, UserCircle2, Menu, X, LayoutDashboard, UploadCloud } from 'lucide-react'
+import { ScanSearch, LogIn, LogOut, Search, Menu, X, UserCheck, UploadCloud } from 'lucide-react'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { ThemeProvider } from '@/context/ThemeContext'
 import { AuthProvider } from '@/context/AuthContext'
@@ -13,7 +12,7 @@ import { ToastProvider } from '@/components/ui/Toast'
 import { UploadProvider } from '@/context/UploadContext'
 
 // Routes that use their own full-page layout (no shared header/footer)
-const FULL_PAGE_ROUTES = ['/results']
+const FULL_PAGE_ROUTES = ['/results', '/admin']
 
 export const Route = createRootRoute({
   component: RootComponent,
@@ -90,7 +89,7 @@ function MobileNavLink({ to, children, icon, onClick }: NavLinkProps) {
 
 // ── App shell ─────────────────────────────────────────────────
 function AppShell() {
-  const { isAuthenticated, user, logout, isAdmin } = useAuth()
+  const { isAuthenticated, logout, isAdmin } = useAuth()
   const navigate = useNavigate()
   const [menuOpen, setMenuOpen] = React.useState(false)
   const menuRef = React.useRef<HTMLDivElement>(null)
@@ -178,13 +177,10 @@ function AppShell() {
               {isAuthenticated ? (
                 <>
                   {isAdmin && (
-                    <NavLink to="/admin" icon={<LayoutDashboard className="size-3.5" />}>
-                      Admin Dashboard
+                    <NavLink to="/admin" icon={<UserCheck className="size-3.5" />}>
+                      Quản lý cá nhân
                     </NavLink>
                   )}
-                  <NavLink to="/dashboard" icon={<UserCircle2 className="size-3.5" />}>
-                    {user?.name?.split(' ').at(-1) ?? 'Dashboard'}
-                  </NavLink>
                   <Button
                     id="header-logout"
                     variant="ghost"
@@ -283,19 +279,12 @@ function AppShell() {
                       {isAdmin && (
                         <MobileNavLink
                           to="/admin"
-                          icon={<LayoutDashboard className="size-4 text-muted-foreground" />}
+                          icon={<UserCheck className="size-4 text-muted-foreground" />}
                           onClick={() => setMenuOpen(false)}
                         >
-                          Admin Dashboard
+                          Quản lý cá nhân
                         </MobileNavLink>
                       )}
-                      <MobileNavLink
-                        to="/dashboard"
-                        icon={<UserCircle2 className="size-4 text-muted-foreground" />}
-                        onClick={() => setMenuOpen(false)}
-                      >
-                        {user?.name ?? 'Dashboard'}
-                      </MobileNavLink>
 
                       <div className="h-px bg-border/60 my-1" />
 
@@ -360,7 +349,7 @@ function AppShell() {
       )}
 
       {/* Devtools */}
-      <TanStackRouterDevtools position="bottom-right" />
+
     </div>
   )
 }

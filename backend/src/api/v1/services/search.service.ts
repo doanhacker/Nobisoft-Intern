@@ -1,5 +1,6 @@
 import { prisma } from '../../../config/prisma.js';
 import { embedImage, embedText } from '../../../services/ai.service.js';
+import { translatePrompt } from '../../../services/ollama.service.js';
 import {
   searchSimilarImageVectors,
   type SimilarImagePoint,
@@ -11,6 +12,7 @@ import type {
   SearchTextOcrInput,
   SearchTextOcrResult,
   SearchTextOcrResultItem,
+  SearchTextPromptInput,
   SearchTextSemanticInput,
   SearchTextSemanticResult,
 } from '../../../types/search.type.js';
@@ -27,6 +29,7 @@ import {
 export class ImageSearchHistoryNotFoundError extends Error { }
 export class TextSearchHistoryNotFoundError extends Error { }
 export class OcrSearchHistoryNotFoundError extends Error { }
+export class PromptSearchHistoryNotFoundError extends Error { }
 export class SearchPageOutOfRangeError extends Error { }
 
 export async function searchImagesByImage(input: SearchImageInput): Promise<SearchImageResult> {
@@ -104,7 +107,46 @@ export async function searchImagesByTextSemantic(
   };
 }
 
-// Ocr Search
+// Prompt Search
+export async function searchImagesByPrompt(
+  input: SearchTextPromptInput,
+): Promise<SearchTextSemanticResult> {
+  const queryText = await resolvePromptSearchQuery(input);
+  const translatedQuery = await translatePrompt(queryText);
+  const aiResponse = await embedText(translatedQuery);
+
+  if (!aiResponse.success || !aiResponse.data) {
+    throw new Error(aiResponse.error_message || 'AI không thể xử lý nội dung tìm kiếm');
+  }
+
+  const vectorResult = await searchSimilarImageVectors(
+    aiResponse.data.embedding,
+    input.page,
+    input.limit,
+    'semantic',
+  );
+  validateSearchPage(input.page, input.limit, vectorResult.total);
+
+  const results = await getSearchResults(vectorResult.points);
+  const searchHistoryId = 'searchHistoryId' in input
+    ? input.searchHistoryId
+    : (
+      await createSearchHistory({
+        userId: input.userId,
+        searchType: 'TEXT_PROMPT',
+        queryText,
+      })
+    ).id;
+
+  return {
+    searchHistoryId,
+    results,
+    total: vectorResult.total,
+    page: input.page,
+    limit: input.limit,
+  };
+}
+
 
 export async function searchImagesByTextOcr(
   input: SearchTextOcrInput,
@@ -153,7 +195,9 @@ async function findImagesByAllTokens(tokens: string[]): Promise<string[]> {
     `SELECT ii."imageId" as "imageId"
      FROM image_ocr io
      JOIN image_index ii ON ii.id = io."imageIndexId"
+     JOIN images i ON i.id = ii."imageId"
      WHERE ii.status = 'SUCCESS'
+       AND i."deletedAt" IS NULL
        AND (${likeConditions.join(' OR ')})
      GROUP BY ii."imageId"
      HAVING ${havingConditions.join(' AND ')}
@@ -171,7 +215,10 @@ async function getOcrSearchResults(
   if (imageIds.length === 0) return [];
 
   const images = await prisma.image.findMany({
-    where: { id: { in: imageIds } },
+    where: {
+      id: { in: imageIds },
+      deletedAt: null,
+    },
     select: {
       id: true,
       path: true,
@@ -241,9 +288,7 @@ async function resolveOcrSearchQuery(input: SearchTextOcrInput): Promise<string>
   return history.queryText;
 }
 
-// ============================
-// Shared helpers
-// ============================
+//Search Helper
 
 function validateSearchPage(page: number, limit: number, total: number): void {
   const totalPages = Math.ceil(total / limit);
@@ -292,11 +337,32 @@ async function resolveTextSearchQuery(input: SearchTextSemanticInput): Promise<s
   return history.queryText;
 }
 
+async function resolvePromptSearchQuery(input: SearchTextPromptInput): Promise<string> {
+  if ('queryText' in input) {
+    return input.queryText;
+  }
+
+  const history = await getTextSearchHistory(
+    input.userId,
+    input.searchHistoryId,
+    'TEXT_PROMPT',
+  );
+
+  if (!history) {
+    throw new PromptSearchHistoryNotFoundError('Không tìm thấy lịch sử tìm kiếm prompt');
+  }
+
+  return history.queryText;
+}
+
 async function getSearchResults(points: SimilarImagePoint[]): Promise<SearchImageResultItem[]> {
   const imageIds = points.map((point) => point.imageId);
   const images = imageIds.length > 0
     ? await prisma.image.findMany({
-      where: { id: { in: imageIds } },
+      where: {
+        id: { in: imageIds },
+        deletedAt: null,
+      },
       select: {
         id: true,
         path: true,
@@ -336,4 +402,3 @@ function getImageMimeType(fileFormat: string): string {
 
   return mimeTypes[fileFormat.toLowerCase()] ?? 'application/octet-stream';
 }
-

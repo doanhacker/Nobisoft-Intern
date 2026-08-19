@@ -11,7 +11,7 @@ const uploadRouter = Router();
  *     tags: [Client - Upload]
  *     summary: Upload ảnh (hỗ trợ batch upload)
  *     description: |
- *       Upload tối đa 100 ảnh mỗi lần gọi (jpg, png, webp, avif). Mỗi file tối đa 10MB.
+ *       Upload tối đa 100 ảnh mỗi lần gọi (jpg, png, webp, avif). Mỗi file tối đa 10MB và 40 triệu pixel.
  *
  *       **Luồng batch upload:**
  *       1. **Lần gọi đầu** (không truyền `batchId`): Server tạo batch mới, trả về `batchId`.
@@ -35,8 +35,8 @@ const uploadRouter = Router();
  *                 items:
  *                   type: string
  *                   format: binary
- *                 maxItems: 4
- *                 description: Danh sách ảnh (tối đa 4 file, mỗi file tối đa 10MB)
+ *                 maxItems: 100
+ *                 description: Danh sách ảnh (tối đa 100 file, mỗi file tối đa 10MB và 40 triệu pixel)
  *               batchId:
  *                 type: string
  *                 format: uuid
@@ -78,6 +78,12 @@ const uploadRouter = Router();
  *               $ref: '#/components/schemas/ErrorResponse'
  *       401:
  *         description: Chưa đăng nhập
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
+ *       429:
+ *         description: Vượt quá giới hạn số lần upload
  *         content:
  *           application/json:
  *             schema:

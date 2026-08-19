@@ -1,5 +1,9 @@
 import { Router } from 'express';
 import * as authController from '../../controllers/auth/auth.controller.js';
+import {
+  loginRateLimiter,
+  registerRateLimiter,
+} from '../../middlewares/rate-limit.middleware.js';
 import { validateLogin, validateRegister } from '../../validators/auth/auth.validate.js';
 
 const authRouter = Router();
@@ -54,6 +58,12 @@ const authRouter = Router();
  *             example:
  *               success: false
  *               message: "Email đã được sử dụng"
+ *       429:
+ *         description: Vượt quá giới hạn số lần đăng ký
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Lỗi server
  *         content:
@@ -64,7 +74,7 @@ const authRouter = Router();
  *               success: false
  *               message: "Đăng ký thất bại"
  */
-authRouter.post('/register', validateRegister, authController.register);
+authRouter.post('/register', registerRateLimiter, validateRegister, authController.register);
 
 /**
  * @swagger
@@ -104,6 +114,12 @@ authRouter.post('/register', validateRegister, authController.register);
  *             example:
  *               success: false
  *               message: "Email hoặc mật khẩu không đúng"
+ *       429:
+ *         description: Vượt quá giới hạn số lần đăng nhập thất bại
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/ErrorResponse'
  *       500:
  *         description: Lỗi server
  *         content:
@@ -114,6 +130,6 @@ authRouter.post('/register', validateRegister, authController.register);
  *               success: false
  *               message: "Đăng nhập thất bại"
  */
-authRouter.post('/login', validateLogin, authController.login);
+authRouter.post('/login', loginRateLimiter, validateLogin, authController.login);
 
 export default authRouter;

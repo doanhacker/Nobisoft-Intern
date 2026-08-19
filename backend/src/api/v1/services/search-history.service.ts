@@ -108,7 +108,7 @@ export async function getImageSearchHistory(
 export async function getTextSearchHistory(
   userId: string,
   searchHistoryId: string,
-  searchType: 'TEXT_SEMANTIC' | 'TEXT_OCR',
+  searchType: 'TEXT_SEMANTIC' | 'TEXT_OCR' | 'TEXT_PROMPT',
 ): Promise<TextSearchHistoryQuery | null> {
   const history = await prisma.searchHistory.findFirst({
     where: {
@@ -149,8 +149,11 @@ export async function saveSearchClick(input: SearchClickInput): Promise<SaveSear
     };
   }
 
-  const clickedImage = await prisma.image.findUnique({
-    where: { id: input.clickedImageId },
+  const clickedImage = await prisma.image.findFirst({
+    where: {
+      id: input.clickedImageId,
+      deletedAt: null,
+    },
     select: { id: true },
   });
 

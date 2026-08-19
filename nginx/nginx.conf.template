@@ -1,0 +1,139 @@
+upstream frontend_upstream {
+    server frontend:5173;
+}
+
+upstream backend_upstream {
+    server backend:8000;
+}
+
+# Shared request counters are stored in Nginx memory.
+limit_req_zone $binary_remote_addr zone=api_rate_limit:10m rate=9999r/s;
+limit_req_zone $binary_remote_addr zone=image_rate_limit:10m rate=9999r/s;
+limit_conn_zone $binary_remote_addr zone=connection_limit:10m;
+proxy_cache_path /var/cache/nginx/images
+    levels=1:2
+    keys_zone=image_cache:50m
+    max_size=2g
+    inactive=1h
+    use_temp_path=off;
+
+# ─── HTTP → HTTPS redirect + ACME challenge ───
+server {
+    listen 80;
+    listen [::]:80;
+    server_name ${DOMAIN};
+
+    # Let's Encrypt challenge
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+
+    # Redirect everything else to HTTPS
+    location / {
+        return 301 https://$host$request_uri;
+    }
+}
+
+# ─── HTTPS ───
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    server_name ${DOMAIN};
+
+    # SSL certificates (managed by Certbot)
+    ssl_certificate     /etc/letsencrypt/live/${DOMAIN}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/${DOMAIN}/privkey.pem;
+
+    # SSL settings
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+
+    # Security headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+
+    # Max upload size (for image uploads)
+    client_max_body_size 100M;
+    limit_req_status 429;
+    limit_conn_status 429;
+
+    error_page 429 = @rate_limited;
+
+    location @rate_limited {
+        default_type application/json;
+        return 429 '{"success":false,"message":"Quá nhiều yêu cầu, vui lòng thử lại sau"}';
+    }
+
+    # ─── Backend API ───
+    location /api/ {
+        limit_req zone=api_rate_limit burst=9999 nodelay;
+        limit_conn connection_limit 9999;
+
+        proxy_pass http://backend_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Large uploads + long-running requests
+        client_max_body_size 500M;
+        proxy_read_timeout 600s;
+        proxy_send_timeout 600s;
+    }
+
+    # ─── Backend: Image serving ───
+    location /images/ {
+        limit_req zone=image_rate_limit burst=9999 nodelay;
+        limit_conn connection_limit 9999;
+
+        proxy_pass http://backend_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # Cache each original/thumbnail URL, including its w/h query parameters.
+        proxy_cache image_cache;
+        proxy_cache_key "$scheme$proxy_host$request_uri";
+        proxy_cache_methods GET HEAD;
+        proxy_cache_valid 200 1h;
+        proxy_cache_valid 404 1m;
+        proxy_cache_lock on;
+        proxy_cache_lock_timeout 10s;
+        proxy_cache_use_stale error timeout updating http_500 http_502 http_503 http_504;
+        proxy_hide_header Cache-Control;
+        add_header X-Image-Cache $upstream_cache_status always;
+        add_header Cache-Control "public, max-age=3600";
+    }
+
+    # ─── Backend: Swagger docs ───
+    location /api-docs {
+        proxy_pass http://backend_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+
+    # ─── Frontend (Vite dev server) ───
+    location / {
+        proxy_pass http://frontend_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+
+        # WebSocket support (Vite HMR)
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}

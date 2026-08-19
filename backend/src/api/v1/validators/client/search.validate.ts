@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from 'express';
 import multer from 'multer';
 import { z } from 'zod';
 import type { ApiResponse } from '../../../../types/apiResponse.js';
+import { InvalidImageContentError, validateImageContent } from '../../../../utils/image-file.util.js';
 import { uploadSearchImageMemory } from '../../middlewares/search.middleware.js';
 
 const searchImageSchema = z.object({
@@ -61,20 +62,26 @@ export type SearchClickBody = z.infer<typeof searchClickSchema>;
 
 export function uploadSearchImage(req: Request, res: Response, next: NextFunction) {
   uploadSearchImageMemory(req, res, (error: unknown) => {
-    if (!error) {
-      next();
-      return;
-    }
+    void (async () => {
+      try {
+        if (error) throw error;
+        if (req.file) await validateImageContent(req.file.buffer, req.file.mimetype);
+        next();
+        return;
+      } catch (uploadError) {
+        const message =
+          uploadError instanceof multer.MulterError && uploadError.code === 'LIMIT_FILE_SIZE'
+            ? 'Ảnh không được vượt quá 10MB'
+            : uploadError instanceof InvalidImageContentError
+              ? uploadError.message
+              : uploadError instanceof Error
+                ? uploadError.message
+                : 'Upload ảnh thất bại';
 
-    const message =
-      error instanceof multer.MulterError && error.code === 'LIMIT_FILE_SIZE'
-        ? 'Ảnh không được vượt quá 10MB'
-        : error instanceof Error
-          ? error.message
-          : 'Upload ảnh thất bại';
-
-    const response: ApiResponse = { success: false, message };
-    res.status(400).json(response);
+        const response: ApiResponse = { success: false, message };
+        res.status(400).json(response);
+      }
+    })();
   });
 }
 
@@ -128,6 +135,55 @@ export function validateSearchTextSemantic(req: Request, res: Response, next: Ne
   }
 
   res.locals.searchTextSemanticQuery = result.data;
+  next();
+}
+
+const searchTextPromptSchema = z
+  .object({
+    q: z.preprocess(
+      (value) => value === '' ? undefined : value,
+      z
+        .string()
+        .trim()
+        .min(1, 'Nội dung tìm kiếm không được để trống')
+        .max(1000, 'Nội dung tìm kiếm không được vượt quá 1000 ký tự')
+        .optional(),
+    ),
+    searchHistoryId: z.preprocess(
+      (value) => value === '' ? undefined : value,
+      z.string().uuid('searchHistoryId không hợp lệ').optional(),
+    ),
+    mode: z.literal('prompt', 'mode chỉ được phép là prompt'),
+    page: z.coerce.number().int().min(1, 'Trang phải lớn hơn hoặc bằng 1').default(1),
+    limit: z.coerce
+      .number()
+      .int()
+      .pipe(z.literal(20, 'Số lượng kết quả mỗi trang chỉ được là 20'))
+      .default(20),
+  })
+  .refine((data) => Boolean(data.q) !== Boolean(data.searchHistoryId), {
+    message: 'Chỉ gửi q khi tìm kiếm mới hoặc searchHistoryId khi chuyển trang',
+  })
+  .refine((data) => !data.q || data.page === 1, {
+    message: 'Tìm kiếm mới phải bắt đầu từ trang 1',
+    path: ['page'],
+  });
+
+export type SearchTextPromptQuery = z.infer<typeof searchTextPromptSchema>;
+
+export function validateSearchTextPrompt(req: Request, res: Response, next: NextFunction) {
+  const result = searchTextPromptSchema.safeParse(req.query);
+
+  if (!result.success) {
+    const response: ApiResponse = {
+      success: false,
+      message: result.error.issues[0]?.message ?? 'Tham số tìm kiếm không hợp lệ',
+    };
+    res.status(400).json(response);
+    return;
+  }
+
+  res.locals.searchTextPromptQuery = result.data;
   next();
 }
 

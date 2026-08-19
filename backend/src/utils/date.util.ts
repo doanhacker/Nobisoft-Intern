@@ -3,6 +3,19 @@ import { z } from 'zod';
 const HO_CHI_MINH_OFFSET_MS = 7 * 60 * 60 * 1000;
 const MILLISECONDS_PER_DAY = 24 * 60 * 60 * 1000;
 
+function isNotAfterCurrentHoChiMinhDate(value: string): boolean {
+  const nowInHoChiMinh = new Date(Date.now() + HO_CHI_MINH_OFFSET_MS);
+  const currentDate = Date.UTC(
+    nowInHoChiMinh.getUTCFullYear(),
+    nowInHoChiMinh.getUTCMonth(),
+    nowInHoChiMinh.getUTCDate(),
+  );
+  const [yearText = '', monthText = '', dayText = ''] = value.split('-');
+  const requestedDate = Date.UTC(Number(yearText), Number(monthText) - 1, Number(dayText));
+
+  return requestedDate <= currentDate;
+}
+
 export const dateOnlySchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, 'Ngày phải có định dạng YYYY-MM-DD')
@@ -19,6 +32,10 @@ export const dateOnlySchema = z
       && date.getUTCDate() === day
     );
   }, 'Ngày không hợp lệ')
+  .refine(
+    isNotAfterCurrentHoChiMinhDate,
+    'Ngày lọc không được lớn hơn ngày hiện tại',
+  )
   .transform((value) => new Date(`${value}T00:00:00.000Z`));
 
 function hoChiMinhDayStart(date: Date): Date {

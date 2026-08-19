@@ -5,6 +5,7 @@ from PIL import Image, UnidentifiedImageError
 
 from app.core.config import ALLOWED_CONTENT_TYPES, MAX_FILE_SIZE
 from app.schemas.indexing import ImageMetadata
+from app.services.preprocessing import preprocess_image
 
 
 class InvalidImageError(Exception):
@@ -35,8 +36,11 @@ async def read_and_preprocess_image(
 
     original_format = (pil_image.format or "unknown").lower()
     width, height = pil_image.size
-    
+
     rgb_image = pil_image.convert("RGB")
+
+    # Tiền xử lý ảnh: xoay đúng chiều, resize, tăng chất lượng OCR
+    rgb_image = preprocess_image(rgb_image)
 
     metadata = ImageMetadata(
         width=width,

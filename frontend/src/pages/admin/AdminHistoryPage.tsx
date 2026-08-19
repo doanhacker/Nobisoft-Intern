@@ -1,15 +1,10 @@
 import * as React from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useNavigate, useParams, useSearch, Link } from '@tanstack/react-router'
+import { useNavigate, useSearch } from '@tanstack/react-router'
 import {
-  ArrowLeft,
   History,
   Image as ImageIcon,
   FileText,
-  Eye,
-  ChevronLeft,
-  ChevronRight,
-  AlertCircle,
   Search,
   X,
   ZoomIn,
@@ -17,15 +12,20 @@ import {
   BarChart2,
   ScanText,
   CalendarRange,
+  ChevronLeft,
+  ChevronRight,
+  AlertCircle,
+  Sparkles,
 } from 'lucide-react'
-import { getUserSearchHistory } from '@/services/adminUserService'
+import { getMySearchHistory } from '@/services/historyService'
 import type { SearchHistoryItem } from '@/types/admin'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 
 // ============================================================
-// AdminUserDetailPage — Search history of a single user
+// AdminHistoryPage — Lịch sử tìm kiếm trong admin layout
+// Route: /admin/history
 // ============================================================
 
 const PAGE_SIZE = 20
@@ -73,6 +73,16 @@ const SEARCH_TYPE_CONFIG = {
     accent: 'border-l-amber-400',
     glow: 'shadow-amber-100 dark:shadow-amber-950/30',
   },
+  TEXT_PROMPT: {
+    label: 'Prompt',
+    icon: Sparkles,
+    gradient: 'from-emerald-500 to-teal-600',
+    badge:
+      'bg-emerald-50 text-emerald-700 border-emerald-200/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-700/40',
+    dot: 'bg-emerald-500',
+    accent: 'border-l-emerald-400',
+    glow: 'shadow-emerald-100 dark:shadow-emerald-950/30',
+  },
 } as const
 
 type SearchTypeKey = keyof typeof SEARCH_TYPE_CONFIG
@@ -86,7 +96,6 @@ interface LightboxProps {
 }
 
 function ImageLightbox({ src, alt, onClose }: LightboxProps) {
-  // Close on Escape key
   React.useEffect(() => {
     const handleKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') onClose()
@@ -104,7 +113,6 @@ function ImageLightbox({ src, alt, onClose }: LightboxProps) {
         className="relative max-w-4xl max-h-[90vh] w-full mx-4 animate-in zoom-in-95 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Close button */}
         <button
           onClick={onClose}
           className="absolute -top-10 right-0 flex items-center gap-1.5 text-white/80 hover:text-white text-sm transition-colors"
@@ -113,8 +121,6 @@ function ImageLightbox({ src, alt, onClose }: LightboxProps) {
           <X className="size-4" />
           Đóng (Esc)
         </button>
-
-        {/* Image */}
         <div className="rounded-2xl overflow-hidden shadow-2xl border border-white/10 bg-black/40">
           <img
             src={src}
@@ -172,7 +178,6 @@ function ImageThumb({ src, alt, className, aspectRatio = 'aspect-square', onOpen
         onError={() => setError(true)}
         loading="lazy"
       />
-      {/* Zoom overlay */}
       <div className="absolute inset-0 flex items-center justify-center bg-black/0 group-hover:bg-black/30 transition-all duration-200 opacity-0 group-hover:opacity-100">
         <div className="flex items-center justify-center size-7 rounded-full bg-white/90 shadow text-gray-800">
           <ZoomIn className="size-3.5" />
@@ -255,7 +260,7 @@ function HistoryCard({ item, index, onOpenImage }: HistoryCardProps) {
               </p>
 
               {item.queryImage ? (
-                /* Image query — searchType = IMAGE_ONLY */
+                /* Image query — IMAGE_ONLY */
                 <div className="flex items-center gap-3">
                   <ImageThumb
                     src={item.queryImage.imageUrl}
@@ -325,11 +330,6 @@ function SkeletonCard() {
                 <Skeleton className="h-4 w-48" />
               </div>
             </div>
-            <Skeleton className="size-7 rounded-full" />
-            <div className="shrink-0 space-y-2">
-              <Skeleton className="h-3 w-20" />
-              <Skeleton className="w-24 h-20 rounded-lg" />
-            </div>
           </div>
         </div>
       </div>
@@ -344,11 +344,20 @@ const TABS: { value: SearchTypeKey; label: string }[] = [
   { value: 'IMAGE_ONLY', label: 'Tìm bằng ảnh' },
   { value: 'TEXT_SEMANTIC', label: 'Semantic' },
   { value: 'TEXT_OCR', label: 'OCR' },
+  { value: 'TEXT_PROMPT', label: 'Prompt' },
 ]
 
 // ── Stats badge ───────────────────────────────────────────────
 
-function StatBadge({ icon: Icon, label, value }: { icon: React.ComponentType<{ className?: string }>; label: string; value: string | number }) {
+function StatBadge({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  label: string
+  value: string | number
+}) {
   return (
     <div className="flex items-center gap-2 px-3.5 py-2.5 bg-card border border-border/60 rounded-xl shadow-sm">
       <div className="flex items-center justify-center size-8 rounded-lg bg-primary/10">
@@ -362,42 +371,7 @@ function StatBadge({ icon: Icon, label, value }: { icon: React.ComponentType<{ c
   )
 }
 
-// ── Pagination ────────────────────────────────────────────────
-
-interface PaginationProps {
-  page: number
-  totalPages: number
-  totalDocs: number
-  onPrev: () => void
-  onNext: () => void
-}
-
-function Pagination({ page, totalPages, totalDocs, onPrev, onNext }: PaginationProps) {
-  if (totalPages <= 1) return null
-  return (
-    <div className="flex items-center justify-between mt-2">
-      <p className="text-sm text-muted-foreground">
-        Trang <span className="font-semibold text-foreground">{page}</span> /{' '}
-        <span className="font-semibold text-foreground">{totalPages}</span>
-        <span className="ml-2 text-muted-foreground">
-          ({totalDocs.toLocaleString('vi-VN')} bản ghi)
-        </span>
-      </p>
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" disabled={page <= 1} onClick={onPrev} className="gap-1">
-          <ChevronLeft className="size-3.5" />
-          Trước
-        </Button>
-        <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={onNext} className="gap-1">
-          Sau
-          <ChevronRight className="size-3.5" />
-        </Button>
-      </div>
-    </div>
-  )
-}
-
-// ── Date range filter ─────────────────────────────────────────
+// ── Date filter ───────────────────────────────────────────────
 
 interface DateFilterProps {
   fromDate: string
@@ -420,7 +394,6 @@ function DateFilter({ fromDate, toDate, onFromChange, onToChange, onClear }: Dat
         value={fromDate}
         onChange={(e) => onFromChange(e.target.value)}
         className="h-8 rounded-lg border border-border/60 bg-background px-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-        placeholder="Từ ngày"
         title="Từ ngày"
       />
       <span className="text-muted-foreground text-xs">→</span>
@@ -429,7 +402,6 @@ function DateFilter({ fromDate, toDate, onFromChange, onToChange, onClear }: Dat
         value={toDate}
         onChange={(e) => onToChange(e.target.value)}
         className="h-8 rounded-lg border border-border/60 bg-background px-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/30"
-        placeholder="Đến ngày"
         title="Đến ngày"
       />
       {hasFilter && (
@@ -445,16 +417,52 @@ function DateFilter({ fromDate, toDate, onFromChange, onToChange, onClear }: Dat
   )
 }
 
+// ── Pagination ────────────────────────────────────────────────
+
+interface PaginationProps {
+  page: number
+  totalPages: number
+  totalDocs: number
+  onPrev: () => void
+  onNext: () => void
+}
+
+function Pagination({ page, totalPages, totalDocs, onPrev, onNext }: PaginationProps) {
+  if (totalPages <= 1) return null
+  return (
+    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mt-2 gap-3">
+      <p className="text-sm text-muted-foreground">
+        Trang <span className="font-semibold text-foreground">{page}</span> /{' '}
+        <span className="font-semibold text-foreground">{totalPages}</span>
+        <span className="ml-2 text-muted-foreground">
+          ({totalDocs.toLocaleString('vi-VN')} bản ghi)
+        </span>
+      </p>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="sm" disabled={page <= 1} onClick={onPrev} className="gap-1">
+          <ChevronLeft className="size-3.5" />
+          Trước
+        </Button>
+        <Button variant="outline" size="sm" disabled={page >= totalPages} onClick={onNext} className="gap-1">
+          Sau
+          <ChevronRight className="size-3.5" />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 // ── Main Page ─────────────────────────────────────────────────
 
-export function AdminUserDetailPage() {
-  const { userId } = useParams({ from: '/admin/users/$userId' })
+export function AdminHistoryPage() {
   const navigate = useNavigate()
-  const { page, searchType, fromDate: fromDateParam, toDate: toDateParam } = useSearch({ from: '/admin/users/$userId' })
+  const { page, searchType, fromDate: fromDateParam, toDate: toDateParam } = useSearch({
+    from: '/admin/history',
+  })
 
   const activeType = (searchType as SearchTypeKey) ?? ''
 
-  // Local date state (controlled inputs)
+  // Local date state
   const [fromDate, setFromDate] = React.useState<string>((fromDateParam as string) ?? '')
   const [toDate, setToDate] = React.useState<string>((toDateParam as string) ?? '')
 
@@ -462,9 +470,9 @@ export function AdminUserDetailPage() {
   const [lightbox, setLightbox] = React.useState<{ src: string; alt: string } | null>(null)
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ['admin', 'users', userId, 'history', { page, searchType: activeType, fromDate, toDate }],
+    queryKey: ['admin-history', 'me', { page, searchType: activeType, fromDate, toDate }],
     queryFn: () =>
-      getUserSearchHistory(userId, {
+      getMySearchHistory({
         page,
         limit: PAGE_SIZE,
         searchType: activeType || undefined,
@@ -483,35 +491,51 @@ export function AdminUserDetailPage() {
 
   function goToPage(p: number) {
     navigate({
-      to: '/admin/users/$userId',
-      params: { userId },
-      search: { page: p, searchType: activeType, fromDate: fromDate || undefined, toDate: toDate || undefined },
+      to: '/admin/history',
+      search: {
+        page: p,
+        searchType: activeType,
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
+      },
     })
   }
 
   function changeType(type: SearchTypeKey) {
     navigate({
-      to: '/admin/users/$userId',
-      params: { userId },
-      search: { page: 1, searchType: type, fromDate: fromDate || undefined, toDate: toDate || undefined },
+      to: '/admin/history',
+      search: {
+        page: 1,
+        searchType: type,
+        fromDate: fromDate || undefined,
+        toDate: toDate || undefined,
+      },
     })
   }
 
   function handleFromDateChange(v: string) {
     setFromDate(v)
     navigate({
-      to: '/admin/users/$userId',
-      params: { userId },
-      search: { page: 1, searchType: activeType, fromDate: v || undefined, toDate: toDate || undefined },
+      to: '/admin/history',
+      search: {
+        page: 1,
+        searchType: activeType,
+        fromDate: v || undefined,
+        toDate: toDate || undefined,
+      },
     })
   }
 
   function handleToDateChange(v: string) {
     setToDate(v)
     navigate({
-      to: '/admin/users/$userId',
-      params: { userId },
-      search: { page: 1, searchType: activeType, fromDate: fromDate || undefined, toDate: v || undefined },
+      to: '/admin/history',
+      search: {
+        page: 1,
+        searchType: activeType,
+        fromDate: fromDate || undefined,
+        toDate: v || undefined,
+      },
     })
   }
 
@@ -519,8 +543,7 @@ export function AdminUserDetailPage() {
     setFromDate('')
     setToDate('')
     navigate({
-      to: '/admin/users/$userId',
-      params: { userId },
+      to: '/admin/history',
       search: { page: 1, searchType: activeType },
     })
   }
@@ -536,20 +559,10 @@ export function AdminUserDetailPage() {
         />
       )}
 
-      <div className="p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
-        {/* ── Back link ── */}
-        <Link
-          to="/admin/users"
-          className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors group"
-          id="back-to-users-link"
-        >
-          <ArrowLeft className="size-4 transition-transform group-hover:-translate-x-0.5" />
-          Quay lại danh sách người dùng
-        </Link>
-
+      <div className="p-4 sm:p-6 lg:p-8 max-w-4xl mx-auto space-y-6">
         {/* ── Hero header ── */}
         <div className="relative overflow-hidden bg-gradient-to-br from-primary/5 via-primary/3 to-transparent border border-border/60 rounded-2xl p-6 shadow-sm">
-          {/* Decorative gradient blob */}
+          {/* Decorative blob */}
           <div className="absolute -top-8 -right-8 size-40 rounded-full bg-primary/8 blur-3xl pointer-events-none" />
 
           <div className="relative flex flex-col sm:flex-row sm:items-center gap-5">
@@ -561,12 +574,9 @@ export function AdminUserDetailPage() {
             {/* Info */}
             <div className="flex-1 min-w-0">
               <h1 className="text-xl font-black text-foreground">Lịch sử tìm kiếm</h1>
-              <div className="flex items-center gap-2 mt-1.5">
-                <span className="text-xs text-muted-foreground">User ID:</span>
-                <code className="text-xs font-mono bg-muted/60 px-2 py-0.5 rounded text-foreground truncate max-w-[280px]">
-                  {userId}
-                </code>
-              </div>
+              <p className="text-sm text-muted-foreground mt-1">
+                Xem lại các lượt tìm kiếm bằng ảnh, văn bản Semantic và OCR của bạn.
+              </p>
             </div>
 
             {/* Stats */}
@@ -578,7 +588,7 @@ export function AdminUserDetailPage() {
                   value={totalDocs.toLocaleString('vi-VN')}
                 />
                 <StatBadge
-                  icon={Eye}
+                  icon={History}
                   label="Trang hiện tại"
                   value={`${currentPage} / ${totalPages}`}
                 />
@@ -587,10 +597,11 @@ export function AdminUserDetailPage() {
           </div>
         </div>
 
-        {/* ── Filter tabs + date range ── */}
+        {/* ── Filters ── */}
         <div className="flex flex-col gap-3">
+          {/* Search type tabs */}
           <div
-            className="flex items-center gap-1 bg-muted/40 rounded-xl p-1 w-fit flex-wrap"
+            className="flex items-center gap-1 bg-muted/40 rounded-xl p-1 w-full overflow-x-auto scrollbar-none flex-nowrap"
             role="tablist"
             aria-label="Lọc theo loại tìm kiếm"
           >
@@ -602,7 +613,7 @@ export function AdminUserDetailPage() {
                 <button
                   key={tab.value}
                   role="tab"
-                  id={`tab-${tab.value || 'all'}`}
+                  id={`admin-tab-${tab.value || 'all'}`}
                   aria-selected={isActive}
                   onClick={() => changeType(tab.value)}
                   className={cn(
@@ -618,6 +629,8 @@ export function AdminUserDetailPage() {
               )
             })}
           </div>
+
+          {/* Date range filter */}
           <DateFilter
             fromDate={fromDate}
             toDate={toDate}
@@ -629,7 +642,6 @@ export function AdminUserDetailPage() {
 
         {/* ── Content ── */}
         {isError ? (
-          /* Error state */
           <div className="flex flex-col items-center gap-4 py-20 text-center bg-card border border-border/60 rounded-2xl">
             <div className="flex items-center justify-center size-14 rounded-2xl bg-destructive/10">
               <AlertCircle className="size-7 text-destructive" />
@@ -638,19 +650,17 @@ export function AdminUserDetailPage() {
               <p className="font-semibold text-foreground">Không thể tải lịch sử</p>
               <p className="text-sm text-muted-foreground mt-0.5">Đã xảy ra lỗi khi gọi API</p>
             </div>
-            <Button variant="outline" size="sm" onClick={() => refetch()} id="retry-btn">
+            <Button variant="outline" size="sm" onClick={() => refetch()} id="admin-retry-btn">
               Thử lại
             </Button>
           </div>
         ) : isLoading ? (
-          /* Loading skeleton */
           <div className="space-y-0">
             {Array.from({ length: 6 }).map((_, i) => (
               <SkeletonCard key={i} />
             ))}
           </div>
         ) : items.length === 0 ? (
-          /* Empty state */
           <div className="flex flex-col items-center gap-4 py-20 text-center bg-card border border-border/60 rounded-2xl">
             <div className="flex items-center justify-center size-14 rounded-2xl bg-muted/60">
               <History className="size-7 text-muted-foreground" />
@@ -660,17 +670,25 @@ export function AdminUserDetailPage() {
               <p className="text-sm text-muted-foreground mt-0.5">
                 {activeType
                   ? `Không có lịch sử cho loại "${SEARCH_TYPE_CONFIG[activeType].label}"`
-                  : 'User này chưa thực hiện lượt tìm kiếm nào'}
+                  : fromDate || toDate
+                    ? 'Không có lịch sử trong khoảng thời gian này'
+                    : 'Bạn chưa thực hiện lượt tìm kiếm nào'}
               </p>
             </div>
-            {activeType && (
-              <Button variant="outline" size="sm" onClick={() => changeType('')}>
+            {(activeType || fromDate || toDate) && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  changeType('')
+                  clearDateFilter()
+                }}
+              >
                 Xem tất cả
               </Button>
             )}
           </div>
         ) : (
-          /* Timeline list */
           <div className="space-y-0">
             {items.map((item, index) => (
               <HistoryCard

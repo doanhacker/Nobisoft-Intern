@@ -1,5 +1,5 @@
 import * as React from 'react'
-import { useNavigate, useSearch, useRouterState } from '@tanstack/react-router'
+import { Link, useNavigate, useSearch, useRouterState } from '@tanstack/react-router'
 import {
   Search,
   ImageIcon,
@@ -8,6 +8,11 @@ import {
   FileText,
   Eye,
   CheckCircle2,
+  Sparkles,
+  ScanSearch,
+  Home,
+  LogOut,
+  LogIn,
 } from 'lucide-react'
 import { MasonryGrid, type SearchResult } from '@/components/results/MasonryGrid'
 import { SkeletonGrid } from '@/components/results/SkeletonGrid'
@@ -19,13 +24,15 @@ import { searchByImageFile, searchByImagePage, getPendingImageFile, setPendingIm
 import { useToast } from '@/components/ui/Toast'
 import { cn } from '@/lib/utils'
 import { AuthContext } from '@/context/AuthContext'
+import { useAuth } from '@/hooks/useAuth'
+import { ThemeToggle } from '@/components/ui/ThemeToggle'
 
 // ============================================================
 // ResultsPage — Pinterest-style layout with Infinite Scroll
 // - Vertical sidebar left (68px)
 // - Sticky search bar at top
 // - Split view for image mode (query image left, results right)
-// - Full width for text modes (semantic/ocr)
+// - Full width for text modes (semantic/ocr/prompt)
 // - Infinite scroll: IntersectionObserver on sentinel div
 // ============================================================
 
@@ -41,6 +48,7 @@ const MODE_LABELS: Record<SearchMode, { label: string; icon: React.ElementType }
   image: { label: 'Tìm bằng hình ảnh', icon: ImageIcon },
   semantic: { label: 'Tìm bằng mô tả', icon: Search },
   ocr: { label: 'Tìm bằng chữ trong ảnh', icon: FileText },
+  prompt: { label: 'Tìm bằng prompt AI', icon: Sparkles },
 }
 
 // ── Empty state ───────────────────────────────────────────────
@@ -62,6 +70,12 @@ function EmptyState({ mode, query }: { mode: SearchMode; query: string }) {
           <p className="text-sm text-muted-foreground leading-relaxed">
             Không tìm thấy ảnh chứa chữ{' '}
             <span className="text-foreground font-semibold">"{query}"</span>.
+          </p>
+        )}
+        {mode === 'prompt' && (
+          <p className="text-sm text-muted-foreground leading-relaxed">
+            Không có ảnh phù hợp với prompt{' '}
+            <span className="text-foreground font-semibold">"{query}"</span>. Thử thay đổi prompt.
           </p>
         )}
         {mode === 'image' && (
@@ -102,8 +116,8 @@ function ResultsInfoBar({
   mode,
   query,
   queryId,
-  count,
-  total,
+  count: _count,
+  total: _total,
   isLoading,
 }: {
   mode: SearchMode
@@ -129,11 +143,6 @@ function ResultsInfoBar({
             </>
           )}
           {queryId && !query && <>Kết quả tìm ảnh tương tự</>}
-          {!isLoading && count > 0 && (
-            <span className="text-muted-foreground/70">
-              {' '}— {total} ảnh
-            </span>
-          )}
         </p>
       )}
     </div>
@@ -179,7 +188,7 @@ function QueryImagePanel({
   onChangeImage: () => void
 }) {
   return (
-    <div className="shrink-0 w-64 xl:w-72 sticky top-0 self-start">
+    <div className="hidden lg:block shrink-0 w-64 xl:w-72 sticky top-0 self-start">
       <div className="rounded-2xl border border-border/50 bg-background/60 backdrop-blur-sm overflow-hidden shadow-sm">
         {/* Header */}
         <div className="px-4 py-3 border-b border-border/40">
@@ -220,6 +229,12 @@ export function ResultsPage() {
   const pathname = useRouterState({ select: (s) => s.location.pathname })
   const { error: toastError } = useToast()
   const auth = React.useContext(AuthContext)
+  const { isAuthenticated, logout } = useAuth()
+
+  const handleLogout = () => {
+    logout()
+    navigate({ to: '/login' })
+  }
 
   // ── State ──
 
@@ -271,8 +286,8 @@ export function ResultsPage() {
   }, []) // intentionally run only on mount
 
   const { mode, q, query_id, imageId } = search
-  // Show similarity badge only to ADMIN users, and only for image/semantic modes (not OCR)
-  const showSimilarityBadge = Boolean(auth?.isAdmin) && (mode === 'image' || mode === 'semantic')
+  // Show similarity badge only to ADMIN users, and only for image/semantic/prompt modes (not OCR)
+  const showSimilarityBadge = Boolean(auth?.isAdmin) && (mode === 'image' || mode === 'semantic' || mode === 'prompt')
 
   // ── fetchInitial: page 1 — always a NEW search session ───────
   // Called when mode/query changes. Resets all state and creates a new SearchHistory.
@@ -348,7 +363,7 @@ export function ResultsPage() {
         } else {
           console.log(`[ResultsPage] fetchInitial [Text]: Calling searchByTextNew for mode: ${fetchMode}, query: "${fetchQuery}"`);
           const response = await searchByTextNew(
-            fetchMode as 'semantic' | 'ocr',
+            fetchMode as 'semantic' | 'ocr' | 'prompt',
             fetchQuery,
             20,
             controller.signal,
@@ -428,7 +443,7 @@ export function ResultsPage() {
       } else {
         console.log(`[ResultsPage] fetchMore [Text]: Calling searchByTextPage for mode: ${mode}, page: ${nextPage}`);
         const response = await searchByTextPage(
-          mode as 'semantic' | 'ocr',
+          mode as 'semantic' | 'ocr' | 'prompt',
           searchHistoryId,
           nextPage,
           _limitRef.current,
@@ -439,11 +454,16 @@ export function ResultsPage() {
       }
 
       console.log(`[ResultsPage] fetchMore succeeded. Received ${data.length} results, total: ${fetchedTotal}`);
-      setResults((prev) => [...prev, ...data])
+      // Use functional update so `next.length` is the committed array length
+      // (avoids stale-closure bug where results.length was captured at
+      // fetchMore creation time and may not reflect the latest state).
+      setResults((prev) => {
+        const next = [...prev, ...data]
+        setHasMore(next.length < fetchedTotal && data.length > 0)
+        return next
+      })
       setTotal(fetchedTotal)
       setCurrentPage(nextPage)
-      const allLoaded = results.length + data.length >= fetchedTotal
-      setHasMore(!allLoaded && data.length > 0)
     } catch (err) {
       if ((err as Error).name === 'AbortError' || (err as { code?: string }).code === 'ERR_CANCELED') {
         console.log(`[ResultsPage] fetchMore: Request was aborted/canceled`);
@@ -461,7 +481,7 @@ export function ResultsPage() {
     } finally {
       setIsLoadingMore(false)
     }
-  }, [searchHistoryId, isLoadingMore, hasMore, currentPage, mode, results.length, toastError])
+  }, [searchHistoryId, isLoadingMore, hasMore, currentPage, mode, toastError])
 
   // ── Effect: fire fetchInitial when URL search params change ──
   React.useEffect(() => {
@@ -554,6 +574,18 @@ export function ResultsPage() {
     })
   }
 
+  const handleDeleteSuccess = (deletedId: string) => {
+    setResults((prev) => {
+      const next = prev.filter((r) => r.id !== deletedId)
+      if (next.length === 0) {
+        setStatus('empty')
+      }
+      return next
+    })
+    setTotal((prev) => Math.max(0, prev - 1))
+    handleModalClose()
+  }
+
   const handleSearchSimilar = async (result: SearchResult) => {
     try {
       setStatus('loading')
@@ -593,11 +625,64 @@ export function ResultsPage() {
       {/* ── Sidebar (fixed, 68px) ── */}
       <ResultsSidebar />
 
-      {/* ── Main area (offset by sidebar) ── */}
-      <div className="flex-1 flex flex-col min-w-0" style={{ marginLeft: '68px' }}>
+      {/* ── Main area (offset by sidebar on desktop, 0 on mobile) ── */}
+      <div className="flex-1 flex flex-col min-w-0 md:ml-[68px]">
 
-        {/* ── Sticky Search Bar ── */}
+        {/* ── Sticky Top Bar & Search Bar ── */}
         <div className="sticky top-0 z-30 shadow-sm">
+          {/* ── Mobile Top Bar (< md) ── */}
+          <div className="md:hidden flex items-center justify-between px-4 py-2 bg-background/95 backdrop-blur-xl border-b border-border/50">
+            {/* Brand Logo */}
+            <Link to="/" className="flex items-center gap-2 group">
+              <div className="h-8 w-8 rounded-lg gradient-brand flex items-center justify-center shadow-brand">
+                <ScanSearch className="size-4 text-white" strokeWidth={2.5} />
+              </div>
+              <div className="flex flex-col">
+                <span className="font-extrabold text-sm text-gradient-brand leading-none">Nobisoft</span>
+                <span className="text-[9px] text-muted-foreground font-semibold tracking-wider uppercase leading-none mt-0.5">Visual Search</span>
+              </div>
+            </Link>
+
+            {/* Controls */}
+            <div className="flex items-center gap-1">
+              <Link
+                to="/"
+                className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+                title="Trang chủ"
+              >
+                <Home className="size-4" />
+              </Link>
+              {isAuthenticated && (
+                <Link
+                  to="/search"
+                  className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+                  title="Tìm kiếm mới"
+                >
+                  <Search className="size-4" />
+                </Link>
+              )}
+              <ThemeToggle menuAlign="right" menuPosition="bottom" />
+              {isAuthenticated ? (
+                <button
+                  type="button"
+                  onClick={handleLogout}
+                  className="p-2 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                  title="Đăng xuất"
+                >
+                  <LogOut className="size-4" />
+                </button>
+              ) : (
+                <Link
+                  to="/login"
+                  className="p-2 rounded-xl text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+                  title="Đăng nhập"
+                >
+                  <LogIn className="size-4" />
+                </Link>
+              )}
+            </div>
+          </div>
+
           <ResultsSearchBar
             onSearch={handleSearch}
             isLoading={status === 'loading'}
@@ -687,6 +772,7 @@ export function ResultsPage() {
         result={selectedResult}
         onClose={handleModalClose}
         onSearchSimilar={handleSearchSimilar}
+        onDeleteSuccess={handleDeleteSuccess}
       />
 
       {/* ── Change Query Image Modal (from QueryImagePanel "Đổi ảnh" button) ── */}

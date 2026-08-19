@@ -5,7 +5,7 @@ import { z } from 'zod'
 
 // ── Query params schema ───────────────────────────────────────
 const resultsSearchSchema = z.object({
-  mode: z.enum(['image', 'semantic', 'ocr']).catch('semantic'),
+  mode: z.enum(['image', 'semantic', 'ocr', 'prompt']).catch('semantic'),
   q: z.string().optional().default(''),
   query_id: z.string().optional(),
   // `page` is removed — infinite scroll manages page internally in ResultsPage

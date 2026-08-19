@@ -1,5 +1,6 @@
 import axiosClient from './axiosClient'
 import type { SearchResult } from '@/components/results/MasonryGrid'
+import { getThumbnailUrl } from '@/lib/imageUtils'
 
 // ============================================================
 // searchService.ts — Visual Search API integration
@@ -84,7 +85,7 @@ export interface SearchByImageResult {
 function mapToSearchResult(item: SearchImageResultItem): SearchResult {
   return {
     id: item.id,
-    thumbnailUrl: item.imageUrl,
+    thumbnailUrl: getThumbnailUrl(item.imageUrl),
     fullUrl: item.imageUrl,
     title: undefined,
     // similarityScore is undefined for USER role (backend omits it)
@@ -299,7 +300,7 @@ export interface SearchByTextResult {
 function mapSemanticItem(item: TextSemanticResultItem): SearchResult {
   return {
     id: item.id,
-    thumbnailUrl: item.imageUrl,
+    thumbnailUrl: getThumbnailUrl(item.imageUrl),
     fullUrl: item.imageUrl,
     title: undefined,
     // similarityScore is undefined for USER role (backend omits it)
@@ -318,7 +319,7 @@ function mapOcrItem(item: TextOcrResultItem): SearchResult {
 
   return {
     id: item.id,
-    thumbnailUrl: item.imageUrl,
+    thumbnailUrl: getThumbnailUrl(item.imageUrl),
     fullUrl: item.imageUrl,
     title: undefined,
     // OCR results never carry a similarity score — leave it undefined
@@ -361,7 +362,7 @@ export function resetTextSearchDeduplication() {
  * @throws on HTTP error or AI/backend failure
  */
 export async function searchByTextNew(
-  mode: 'semantic' | 'ocr',
+  mode: 'semantic' | 'ocr' | 'prompt',
   q: string,
   limit = 20,
   signal?: AbortSignal,
@@ -380,10 +381,10 @@ export async function searchByTextNew(
 
   const searchPromise = (async () => {
     try {
-      if (mode === 'semantic') {
-        console.log(`[searchByTextNew] [API Request] GET /search/text (mode: semantic, q: "${q}", page: 1)`);
+      if (mode === 'semantic' || mode === 'prompt') {
+        console.log(`[searchByTextNew] [API Request] GET /search/text (mode: ${mode}, q: "${q}", page: 1)`);
         const { data } = await axiosClient.get<TextSemanticApiResponse>('/search/text', {
-          params: { q, mode: 'semantic', page: 1, limit: 20 },
+          params: { q, mode, page: 1, limit: 20 },
           signal,
           timeout: 30_000,
         })
@@ -432,7 +433,7 @@ export async function searchByTextNew(
  * Sends `searchHistoryId` (UUID from the first search) + desired `page`.
  * Backend does NOT create a new history record.
  *
- * @param mode            'semantic' | 'ocr'
+ * @param mode            'semantic' | 'ocr' | 'prompt'
  * @param searchHistoryId UUID returned by the initial searchByTextNew() call
  * @param page            Target page number (≥ 1)
  * @param limit           Must match the limit used in the original search
@@ -440,7 +441,7 @@ export async function searchByTextNew(
  * @throws on HTTP error, 404 (history not found), 400 (page out of range)
  */
 export async function searchByTextPage(
-  mode: 'semantic' | 'ocr',
+  mode: 'semantic' | 'ocr' | 'prompt',
   searchHistoryId: string,
   page: number,
   limit = 20,
@@ -448,10 +449,10 @@ export async function searchByTextPage(
 ): Promise<SearchByTextResult> {
   console.log(`[searchByTextPage] Called. Mode: ${mode}, searchHistoryId: ${searchHistoryId}, Page: ${page}, Limit: ${limit}`);
   try {
-    if (mode === 'semantic') {
-      console.log(`[searchByTextPage] [API Request] GET /search/text (mode: semantic, searchHistoryId: ${searchHistoryId}, page: ${page})`);
+    if (mode === 'semantic' || mode === 'prompt') {
+      console.log(`[searchByTextPage] [API Request] GET /search/text (mode: ${mode}, searchHistoryId: ${searchHistoryId}, page: ${page})`);
       const { data } = await axiosClient.get<TextSemanticApiResponse>('/search/text', {
-        params: { searchHistoryId, mode: 'semantic', page, limit: 20 },
+        params: { searchHistoryId, mode, page, limit: 20 },
         signal,
         timeout: 30_000,
       })

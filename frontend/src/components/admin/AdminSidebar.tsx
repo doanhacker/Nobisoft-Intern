@@ -1,11 +1,13 @@
 import * as React from 'react'
 import { Link, useRouterState } from '@tanstack/react-router'
 import {
-  LayoutDashboard,
-  Users,
+  UserCheck,
   Images,
   ScanSearch,
   ChevronRight,
+  History,
+  Trash2,
+  Home,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
@@ -16,18 +18,23 @@ import { cn } from '@/lib/utils'
 const NAV_ITEMS = [
   {
     to: '/admin/dashboard',
-    label: 'Dashboard',
-    icon: LayoutDashboard,
-  },
-  {
-    to: '/admin/users',
-    label: 'Người dùng',
-    icon: Users,
+    label: 'Tổng quan cá nhân',
+    icon: UserCheck,
   },
   {
     to: '/admin/images',
     label: 'Kho ảnh',
     icon: Images,
+  },
+  {
+    to: '/admin/history',
+    label: 'Lịch sử',
+    icon: History,
+  },
+  {
+    to: '/admin/trash',
+    label: 'Thùng rác',
+    icon: Trash2,
   },
 ] as const
 
@@ -93,7 +100,7 @@ export function AdminSidebar({ onClose }: AdminSidebarProps) {
               Nobisoft
             </span>
             <span className="text-[10px] block text-muted-foreground font-semibold tracking-widest uppercase leading-tight">
-              Admin Panel
+              Quản lý cá nhân
             </span>
           </div>
         </Link>
@@ -114,6 +121,20 @@ export function AdminSidebar({ onClose }: AdminSidebarProps) {
           />
         ))}
       </nav>
+
+      {/* ── Trang chủ ── */}
+      <div className="px-3 py-3 border-t border-border/50">
+        <Link
+          to="/search"
+          onClick={onClose}
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-muted/70 transition-all duration-150 group"
+        >
+          <span className="flex items-center justify-center size-8 rounded-lg bg-muted/50 group-hover:bg-muted transition-colors">
+            <Home className="size-4" />
+          </span>
+          <span className="flex-1">Trang chủ</span>
+        </Link>
+      </div>
     </aside>
   )
 }

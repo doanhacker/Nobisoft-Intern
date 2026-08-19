@@ -79,8 +79,8 @@ export function ResultsSidebar({ className }: ResultsSidebarProps) {
   return (
     <aside
       className={cn(
-        'fixed left-0 top-0 h-screen z-40',
-        'flex flex-col items-center py-4 gap-2',
+        'hidden md:flex fixed left-0 top-0 h-screen z-40',
+        'flex-col items-center py-4 gap-2',
         'w-[68px] shrink-0',
         'bg-background/95 backdrop-blur-xl',
         'border-r border-border/50',
@@ -150,9 +150,9 @@ export function ResultsSidebar({ className }: ResultsSidebarProps) {
 
         {isAuthenticated && (
           <Link
-            to="/dashboard"
+            to="/search"
             className="size-9 rounded-full gradient-brand flex items-center justify-center text-white text-xs font-bold shadow-sm hover:scale-110 transition-transform duration-200"
-            title={`Dashboard (${user?.name ?? 'User'})`}
+            title={user?.name ?? 'User'}
           >
             {user?.name?.charAt(0).toUpperCase() ?? <UserCircle2 className="size-4" />}
           </Link>

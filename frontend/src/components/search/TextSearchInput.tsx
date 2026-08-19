@@ -23,6 +23,13 @@ const PLACEHOLDERS: Record<SearchMode, string[]> = {
     'Open 24 Hours',
     'Coca-Cola',
   ],
+  prompt: [
+    'chú mèo đen nằm ngủ dưới nắng...',
+    'bãi biển hoàng hôn tuyệt đẹp có cây dừa...',
+    'xe hơi thể thao màu đỏ chạy trên đường phố ban đêm...',
+    'phong cảnh núi rừng sương mờ buổi sáng...',
+    'tách cà phê nóng trên bàn gỗ...',
+  ],
 }
 
 interface TextSearchInputProps {
@@ -79,6 +86,11 @@ export function TextSearchInput({
       label: 'Nhập chữ trong ảnh',
       hint: 'OCR Text Search',
       color: 'oklch(0.72 0.15 200)',
+    },
+    prompt: {
+      label: 'Nhập prompt mô tả bằng tiếng Việt',
+      hint: 'Prompt AI — Ollama Translate & Semantic Search',
+      color: 'oklch(0.65 0.22 160)',
     },
   }
 

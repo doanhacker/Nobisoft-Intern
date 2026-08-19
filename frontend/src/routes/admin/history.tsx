@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { AdminUserDetailPage } from '@/pages/admin/AdminUserDetailPage'
+import { AdminHistoryPage } from '@/pages/admin/AdminHistoryPage'
 
-export const Route = createFileRoute('/admin/users/$userId')({
-  component: AdminUserDetailPage,
+export const Route = createFileRoute('/admin/history')({
+  component: AdminHistoryPage,
   validateSearch: (
     search: Record<string, unknown>,
   ): { page?: number; searchType?: string; fromDate?: string; toDate?: string } => ({
@@ -12,4 +12,3 @@ export const Route = createFileRoute('/admin/users/$userId')({
     toDate: (search.toDate as string) ?? '',
   }),
 })
-

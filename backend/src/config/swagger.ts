@@ -8,7 +8,7 @@ const options: swaggerJsdoc.Options = {
       version: '1.0.0',
     },
     servers: [
-      { url: '/' },
+      { url: '/api' },
     ],
     components: {
       securitySchemes: {
@@ -282,7 +282,7 @@ const options: swaggerJsdoc.Options = {
 
         SearchType: {
           type: 'string',
-          enum: ['IMAGE_ONLY', 'TEXT_SEMANTIC', 'TEXT_OCR'],
+          enum: ['IMAGE_ONLY', 'TEXT_SEMANTIC', 'TEXT_OCR', 'TEXT_PROMPT'],
         },
 
         HistoryQueryImage: {
