@@ -12,10 +12,10 @@ export const RATE_LIMIT_CONFIG = {
   },
   search: {
     windowMs: MINUTE_IN_MILLISECONDS,
-    limit: 120,
+    limit: 999999, // Tạm thời nâng lên để test hiệu năng
   },
   imageResize: {
     windowMs: MINUTE_IN_MILLISECONDS,
-    limit: 1_000,
+    limit: 999999, // Tạm thời nâng lên để test hiệu năng
   },
 } as const;

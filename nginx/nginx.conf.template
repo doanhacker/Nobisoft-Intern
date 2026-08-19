@@ -7,8 +7,8 @@ upstream backend_upstream {
 }
 
 # Shared request counters are stored in Nginx memory.
-limit_req_zone $binary_remote_addr zone=api_rate_limit:10m rate=20r/s;
-limit_req_zone $binary_remote_addr zone=image_rate_limit:10m rate=20r/s;
+limit_req_zone $binary_remote_addr zone=api_rate_limit:10m rate=9999r/s;
+limit_req_zone $binary_remote_addr zone=image_rate_limit:10m rate=9999r/s;
 limit_conn_zone $binary_remote_addr zone=connection_limit:10m;
 proxy_cache_path /var/cache/nginx/images
     levels=1:2
@@ -71,8 +71,8 @@ server {
 
     # ─── Backend API ───
     location /api/ {
-        limit_req zone=api_rate_limit burst=40 nodelay;
-        limit_conn connection_limit 30;
+        limit_req zone=api_rate_limit burst=9999 nodelay;
+        limit_conn connection_limit 9999;
 
         proxy_pass http://backend_upstream;
         proxy_http_version 1.1;
@@ -89,8 +89,8 @@ server {
 
     # ─── Backend: Image serving ───
     location /images/ {
-        limit_req zone=image_rate_limit burst=60 nodelay;
-        limit_conn connection_limit 20;
+        limit_req zone=image_rate_limit burst=9999 nodelay;
+        limit_conn connection_limit 9999;
 
         proxy_pass http://backend_upstream;
         proxy_http_version 1.1;
