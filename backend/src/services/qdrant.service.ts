@@ -23,8 +23,6 @@ const DEFAULT_SEARCH_MIN_SCORES: Record<VectorSearchMode, number> = {
   image: 0.3,
   semantic: 0.1,
 };
-const DEFAULT_SEARCH_MAX_RESULTS = 2000;
-
 function getSearchMinScore(mode: VectorSearchMode): number {
   const environmentVariable = mode === 'image'
     ? process.env.SEARCH_MIN_SCORE_IMAGE
@@ -36,13 +34,6 @@ function getSearchMinScore(mode: VectorSearchMode): number {
   return Number.isFinite(configuredScore) && configuredScore >= 0 && configuredScore <= 1
     ? configuredScore
     : DEFAULT_SEARCH_MIN_SCORES[mode];
-}
-
-function getSearchMaxResults(): number {
-  const configuredMaxResults = Number(process.env.SEARCH_MAX_RESULTS);
-  return Number.isInteger(configuredMaxResults) && configuredMaxResults > 0
-    ? configuredMaxResults
-    : DEFAULT_SEARCH_MAX_RESULTS;
 }
 
 export async function upsertImageVector(
@@ -110,11 +101,11 @@ export async function searchSimilarExcluding(
   limit: number,
 ): Promise<SimilarImageSearchResult> {
   const offset = (page - 1) * limit;
-  const maxResults = getSearchMaxResults();
 
   const queryParams: Parameters<typeof qdrantClient.query>[1] = {
     query: vector,
-    limit: maxResults,
+    limit: limit + 1,
+    offset,
     score_threshold: getSearchMinScore('image'),
     with_payload: false,
     with_vector: false,
@@ -132,14 +123,23 @@ export async function searchSimilarExcluding(
 
   const queryResult = await qdrantClient.query(QDRANT_COLLECTION_NAME, queryParams);
 
-  const matchedPoints = queryResult.points.map((point) => ({
+  const hasMore = queryResult.points.length > limit;
+  const returnedPoints = hasMore
+    ? queryResult.points.slice(0, limit)
+    : queryResult.points;
+
+  const points = returnedPoints.map((point) => ({
     imageId: String(point.id),
     score: point.score,
   }));
 
+  const total = hasMore
+    ? offset + limit + 1
+    : (points.length === 0 && offset > 0 ? Math.max(0, offset - limit) : offset + points.length);
+
   return {
-    points: matchedPoints.slice(offset, offset + limit),
-    total: matchedPoints.length,
+    points,
+    total,
   };
 }
 
@@ -150,10 +150,11 @@ export async function searchSimilarImageVectors(
   mode: VectorSearchMode,
 ): Promise<SimilarImageSearchResult> {
   const offset = (page - 1) * limit;
-  const maxResults = getSearchMaxResults();
+
   const queryResult = await qdrantClient.query(QDRANT_COLLECTION_NAME, {
     query: vector,
-    limit: maxResults,
+    limit: limit + 1,
+    offset,
     score_threshold: getSearchMinScore(mode),
     with_payload: false,
     with_vector: false,
@@ -167,13 +168,22 @@ export async function searchSimilarImageVectors(
     },
   });
 
-  const matchedPoints = queryResult.points.map((point) => ({
+  const hasMore = queryResult.points.length > limit;
+  const returnedPoints = hasMore
+    ? queryResult.points.slice(0, limit)
+    : queryResult.points;
+
+  const points = returnedPoints.map((point) => ({
     imageId: String(point.id),
     score: point.score,
   }));
 
+  const total = hasMore
+    ? offset + limit + 1
+    : (points.length === 0 && offset > 0 ? Math.max(0, offset - limit) : offset + points.length);
+
   return {
-    points: matchedPoints.slice(offset, offset + limit),
-    total: matchedPoints.length,
+    points,
+    total,
   };
 }
