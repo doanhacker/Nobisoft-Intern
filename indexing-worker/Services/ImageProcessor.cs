@@ -37,32 +37,73 @@ public class ImageProcessor
         );
     }
 
+    private int _consecutiveAiFailures = 0;
+    private const int CircuitBreakerThreshold = 3;
+    private const int HealthCheckIntervalSeconds = 5;
+    private const int MaxHealthCheckAttempts = 60; // 60 * 5s = 5 phút
+
+    private async Task WaitForAiServiceHealthyAsync(CancellationToken ct)
+    {
+        _logger.LogWarning("Circuit Breaker kích hoạt: AI Service đã lỗi {Count} lần liên tiếp. Tạm dừng gửi ảnh và kiểm tra sức khỏe AI Service...", _consecutiveAiFailures);
+
+        for (var attempt = 1; attempt <= MaxHealthCheckAttempts; attempt++)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            try
+            {
+                var client = _httpClientFactory.CreateClient();
+                var response = await client.GetAsync($"{_aiServiceUrl}/api/health", ct);
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation("AI Service đã healthy trở lại sau {Attempt} lần kiểm tra. Khôi phục xử lý.", attempt);
+                    _consecutiveAiFailures = 0;
+                    return;
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                // Health check request failed, tiếp tục chờ
+            }
+
+            _logger.LogWarning("AI Service chưa sẵn sàng (lần kiểm tra {Attempt}/{Max}). Chờ {Seconds}s...",
+                attempt, MaxHealthCheckAttempts, HealthCheckIntervalSeconds);
+
+            await Task.Delay(TimeSpan.FromSeconds(HealthCheckIntervalSeconds), ct);
+        }
+
+        throw new AiServiceUnavailableException("AI Service không phục hồi sau thời gian chờ tối đa (5 phút).");
+    }
+
     /// Xử lý danh sách ảnh: gom batch tối đa 4 ảnh, gọi AI Service 1 lần,
     /// rồi lưu từng kết quả vào Qdrant + PostgreSQL.
     /// Sau khi xử lý xong, kiểm tra và cập nhật trạng thái batch.
-    public async Task<(int Success, int Failed)> ProcessBatchAsync(string batchId, List<ImageItem> images, CancellationToken ct)
+    public async Task<ProcessBatchResult> ProcessBatchAsync(string batchId, List<ImageItem> images, CancellationToken ct)
     {
         var totalSuccess = 0;
         var totalFailed = 0;
+        var allAiFailedImages = new List<ImageItem>();
 
         // Chia danh sách thành các batch nhỏ tối đa 4 ảnh
         for (var i = 0; i < images.Count; i += BatchSize)
         {
             var batch = images.Skip(i).Take(BatchSize).ToList();
-            var (s, f) = await ProcessSingleBatchAsync(batchId, batch, ct);
+            var (s, f, aiFailed) = await ProcessSingleBatchAsync(batchId, batch, ct);
             totalSuccess += s;
             totalFailed += f;
+            allAiFailedImages.AddRange(aiFailed);
         }
 
-        return (totalSuccess, totalFailed);
+        return new ProcessBatchResult(totalSuccess, totalFailed, allAiFailedImages);
     }
 
     /// Xử lý theo batch: resize → gọi AI batch endpoint → lưu kết quả.
-    private async Task<(int Success, int Failed)> ProcessSingleBatchAsync(string batchId, List<ImageItem> batch, CancellationToken ct)
+    private async Task<(int Success, int Failed, List<ImageItem> AiFailedImages)> ProcessSingleBatchAsync(string batchId, List<ImageItem> batch, CancellationToken ct)
     {
         var stopwatch = Stopwatch.StartNew();
         var success = 0;
         var failed = 0;
+        var aiFailedImages = new List<ImageItem>();
 
         // 1. Resize tất cả ảnh và chuẩn bị dữ liệu
         var preparedImages = new List<(ImageItem Message, byte[] Bytes, int OrigWidth, int OrigHeight, string Ext)>();
@@ -81,8 +122,9 @@ public class ImageProcessor
                 }
                 catch (Exception ex)
                 {
+                    // Lỗi không thể khắc phục (URL hỏng, tải thất bại) → ERROR
                     _logger.LogError(ex, "Lỗi download/resize ảnh URL {Id}: {Url}", image.Id, image.Path);
-                    await UpdateIndexStatus(image.Id, "FAILED");
+                    await UpdateIndexStatus(image.Id, "ERROR");
                     await IncrementBatchProgressAsync(batchId, 0, 1);
                     failed++;
                 }
@@ -93,8 +135,9 @@ public class ImageProcessor
                 var filePath = ResolveFilePath(image.Path);
                 if (!File.Exists(filePath))
                 {
+                    // Lỗi không thể khắc phục (file không tồn tại) → ERROR
                     _logger.LogError("File không tồn tại: {Path}", filePath);
-                    await UpdateIndexStatus(image.Id, "FAILED");
+                    await UpdateIndexStatus(image.Id, "ERROR");
                     await IncrementBatchProgressAsync(batchId, 0, 1);
                     failed++;
                     continue;
@@ -113,13 +156,13 @@ public class ImageProcessor
                     {
                         var rawBytes = await File.ReadAllBytesAsync(filePath, ct);
                         var ext = Path.GetExtension(filePath).TrimStart('.');
-                        // Width/Height = 0 → sẽ được AI hoặc bước sau cập nhật nếu cần
                         preparedImages.Add((image, rawBytes, 0, 0, ext));
                     }
                     catch (Exception readEx)
                     {
+                        // Lỗi không thể khắc phục (không đọc được file gốc) → ERROR
                         _logger.LogError(readEx, "Không thể đọc file gốc {Id}, bỏ qua", image.Id);
-                        await UpdateIndexStatus(image.Id, "FAILED");
+                        await UpdateIndexStatus(image.Id, "ERROR");
                         await IncrementBatchProgressAsync(batchId, 0, 1);
                         failed++;
                     }
@@ -128,9 +171,15 @@ public class ImageProcessor
         }
 
         if (preparedImages.Count == 0)
-            return (success, failed);
+            return (success, failed, aiFailedImages);
 
-        // 2. Gọi AI Service batch endpoint
+        // 2. Kiểm tra Circuit Breaker trước khi gọi AI Service
+        if (_consecutiveAiFailures >= CircuitBreakerThreshold)
+        {
+            await WaitForAiServiceHealthyAsync(ct);
+        }
+
+        // 3. Gọi AI Service batch endpoint
         BatchIndexingResponse? batchResponse;
         try
         {
@@ -138,32 +187,38 @@ public class ImageProcessor
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "AI Service batch call thất bại");
+            // Lỗi kết nối / timeout từ AI Service → FAILED, gom vào danh sách retry
+            _logger.LogError(ex, "AI Service batch call thất bại cho {Count} ảnh", preparedImages.Count);
+            _consecutiveAiFailures++;
             foreach (var img in preparedImages)
             {
                 await UpdateIndexStatus(img.Message.Id, "FAILED");
-                await IncrementBatchProgressAsync(batchId, 0, 1);
+                aiFailedImages.Add(img.Message);
                 failed++;
             }
-            return (success, failed);
+            return (success, failed, aiFailedImages);
         }
 
         if (batchResponse == null || batchResponse.Results.Count == 0)
         {
-            _logger.LogError("AI Service trả về response rỗng");
+            _logger.LogError("AI Service trả về response rỗng cho {Count} ảnh", preparedImages.Count);
+            _consecutiveAiFailures++;
             foreach (var img in preparedImages)
             {
                 await UpdateIndexStatus(img.Message.Id, "FAILED");
-                await IncrementBatchProgressAsync(batchId, 0, 1);
+                aiFailedImages.Add(img.Message);
                 failed++;
             }
-            return (success, failed);
+            return (success, failed, aiFailedImages);
         }
+
+        // Gọi AI thành công → Reset đếm lỗi liên tiếp của Circuit Breaker
+        _consecutiveAiFailures = 0;
 
         // Lấy tổng thời gian xử lý AI cho batch này
         var batchDurationMs = (int)batchResponse.ProcessingTimeMs;
 
-        // 3. Xử lý từng kết quả: lưu Qdrant + PostgreSQL
+        // 4. Xử lý từng kết quả: lưu Qdrant + PostgreSQL
         var imageLookup = preparedImages.ToDictionary(p => p.Message.Id);
 
         foreach (var result in batchResponse.Results)
@@ -172,7 +227,14 @@ public class ImageProcessor
             {
                 _logger.LogError("AI thất bại cho ảnh {Id}: {Err}", result.ImageId, result.Error);
                 await UpdateIndexStatus(result.ImageId, "FAILED");
-                await IncrementBatchProgressAsync(batchId, 0, 1);
+                if (imageLookup.TryGetValue(result.ImageId, out var prepared))
+                {
+                    aiFailedImages.Add(prepared.Message);
+                }
+                else
+                {
+                    aiFailedImages.Add(new ImageItem { Id = result.ImageId });
+                }
                 failed++;
                 continue;
             }
@@ -216,7 +278,10 @@ public class ImageProcessor
             {
                 _logger.LogError(ex, "Lỗi lưu kết quả ảnh {Id}", result.ImageId);
                 await UpdateIndexStatus(result.ImageId, "FAILED");
-                await IncrementBatchProgressAsync(batchId, 0, 1);
+                if (imageLookup.TryGetValue(result.ImageId, out var prepared))
+                {
+                    aiFailedImages.Add(prepared.Message);
+                }
                 failed++;
             }
         }
@@ -224,7 +289,7 @@ public class ImageProcessor
         // Cập nhật tổng thời gian cho batch này vào database
         await UpdateBatchDurationAsync(batchId, batchDurationMs);
 
-        return (success, failed);
+        return (success, failed, aiFailedImages);
     }
 
     // ── Cập nhật tiến độ batch cộng dồn (Real-time) & check hoàn thành ──
@@ -612,6 +677,13 @@ public class ImageProcessor
         return $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]}";
     }
 
+    // Đánh dấu ảnh thành ERROR khi hết lượt retry hoặc lỗi không thể phục hồi
+    public async Task MarkImageAsErrorAsync(string batchId, string imageId)
+    {
+        await UpdateIndexStatus(imageId, "ERROR");
+        await IncrementBatchProgressAsync(batchId, 0, 1);
+    }
+
     private static string NormalizeText(string input)
     {
         if (string.IsNullOrWhiteSpace(input)) return string.Empty;
@@ -630,4 +702,11 @@ public class ImageProcessor
 
         return stringBuilder.ToString().Normalize(System.Text.NormalizationForm.FormC).ToLowerInvariant();
     }
+}
+
+public record ProcessBatchResult(int Success, int Failed, List<ImageItem> AiFailedImages);
+
+public class AiServiceUnavailableException : Exception
+{
+    public AiServiceUnavailableException(string message) : base(message) { }
 }

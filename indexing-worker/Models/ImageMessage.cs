@@ -5,6 +5,7 @@ public class IndexingMessage
 {
     public string BatchId { get; set; } = string.Empty;
     public List<ImageItem> Images { get; set; } = [];
+    public int RetryCount { get; set; } = 0;
 }
 
 public class ImageItem

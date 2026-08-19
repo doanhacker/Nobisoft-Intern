@@ -67,13 +67,16 @@ public class Worker : BackgroundService
         }
     }
 
+    private const int MaxRetryCount = 3;
+
     private async Task HandleMessageAsync(BasicDeliverEventArgs ea, CancellationToken ct)
     {
         var body = Encoding.UTF8.GetString(ea.Body.ToArray());
+        IndexingMessage? message = null;
 
         try
         {
-            var message = JsonSerializer.Deserialize<IndexingMessage>(body, JsonOptions);
+            message = JsonSerializer.Deserialize<IndexingMessage>(body, JsonOptions);
 
             if (message == null || message.Images.Count == 0 || string.IsNullOrEmpty(message.BatchId))
             {
@@ -83,23 +86,69 @@ public class Worker : BackgroundService
                 return;
             }
 
-            _logger.LogInformation("Nhận {Count} ảnh (batch {BatchId}) từ RabbitMQ.",
-                message.Images.Count, message.BatchId);
+            if (message.RetryCount > 0)
+            {
+                _logger.LogInformation("Retry lần {Retry}/{Max} cho {Count} ảnh (batch {BatchId}).",
+                    message.RetryCount, MaxRetryCount, message.Images.Count, message.BatchId);
+            }
+            else
+            {
+                _logger.LogInformation("Nhận {Count} ảnh (batch {BatchId}) từ RabbitMQ.",
+                    message.Images.Count, message.BatchId);
+            }
 
             // ProcessBatchAsync xử lý lỗi ở cấp độ từng ảnh:
-            // ảnh lỗi được đánh dấu FAILED riêng, các ảnh khác vẫn tiếp tục xử lý.
-            var (success, failed) = await _processor.ProcessBatchAsync(message.BatchId, message.Images, ct);
+            // - Lỗi không thể khắc phục (file hỏng/thiếu/URL lỗi) -> ERROR trong DB, tính vào failedCount
+            // - Lỗi từ AI Service -> FAILED trong DB, gom vào danh sách AiFailedImages để retry
+            var result = await _processor.ProcessBatchAsync(message.BatchId, message.Images, ct);
 
             _logger.LogInformation("Hoàn tất {Count} ảnh (batch {BatchId}): {Success} thành công, {Failed} thất bại.",
-                message.Images.Count, message.BatchId, success, failed);
+                message.Images.Count, message.BatchId, result.Success, result.Failed);
 
-            // ACK vì mọi ảnh đã được xử lý (thành công hoặc đánh dấu FAILED trong DB)
+            // Xử lý các ảnh bị lỗi do AI Service (cần retry)
+            if (result.AiFailedImages.Count > 0)
+            {
+                if (message.RetryCount < MaxRetryCount)
+                {
+                    var nextRetry = message.RetryCount + 1;
+                    _logger.LogWarning("Republish {Count} ảnh AI-failed (retry {Retry}/{Max}) cho batch {BatchId}.",
+                        result.AiFailedImages.Count, nextRetry, MaxRetryCount, message.BatchId);
+
+                    PublishRetryMessage(message.BatchId, result.AiFailedImages, nextRetry);
+                }
+                else
+                {
+                    _logger.LogError("{Count} ảnh trong batch {BatchId} đã retry {Max} lần thất bại. Đổi status thành ERROR.",
+                        result.AiFailedImages.Count, MaxRetryCount, message.BatchId);
+
+                    foreach (var img in result.AiFailedImages)
+                    {
+                        await _processor.MarkImageAsErrorAsync(message.BatchId, img.Id);
+                    }
+                }
+            }
+
+            // ACK message hiện tại sau khi đã xử lý xong và republish các ảnh cần retry
             _channel?.BasicAck(ea.DeliveryTag, multiple: false);
         }
         catch (JsonException ex)
         {
             // Message sai format JSON → không thể parse → ACK và bỏ qua
             _logger.LogError(ex, "Lỗi parse JSON (bỏ qua message): {Body}", body);
+            _channel?.BasicAck(ea.DeliveryTag, multiple: false);
+        }
+        catch (AiServiceUnavailableException ex)
+        {
+            // AI Service không phục hồi sau thời gian chờ tối đa (5 phút)
+            // Phương án B: Republish lại danh sách ảnh với retryCount giữ nguyên để xử lý sau khi AI sống lại
+            _logger.LogError(ex, "AI Service không khả dụng sau thời gian chờ tối đa. Trả {Count} ảnh vào queue với retry giữ nguyên.",
+                message?.Images.Count ?? 0);
+
+            if (message != null && message.Images.Count > 0)
+            {
+                PublishRetryMessage(message.BatchId, message.Images, message.RetryCount);
+            }
+
             _channel?.BasicAck(ea.DeliveryTag, multiple: false);
         }
         catch (OperationCanceledException)
@@ -110,10 +159,33 @@ public class Worker : BackgroundService
         }
         catch (Exception ex)
         {
-            // Lỗi không mong đợi (rất hiếm vì ProcessBatchAsync đã xử lý lỗi từng ảnh).
-            _logger.LogError(ex, "Lỗi không mong đợi khi xử lý message. ACK để tránh re-process ảnh đã thành công.");
+            // Lỗi không mong đợi
+            _logger.LogError(ex, "Lỗi không mong đợi khi xử lý message. ACK để tránh duplicate.");
             _channel?.BasicAck(ea.DeliveryTag, multiple: false);
         }
+    }
+
+    private void PublishRetryMessage(string batchId, List<ImageItem> images, int retryCount)
+    {
+        if (_channel == null || images.Count == 0) return;
+
+        var retryMessage = new IndexingMessage
+        {
+            BatchId = batchId,
+            Images = images,
+            RetryCount = retryCount
+        };
+
+        var body = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(retryMessage, JsonOptions));
+        var properties = _channel.CreateBasicProperties();
+        properties.Persistent = true;
+
+        _channel.BasicPublish(
+            exchange: "",
+            routingKey: QueueName,
+            basicProperties: properties,
+            body: body
+        );
     }
 
     // Kết nối với RabbitMQ
