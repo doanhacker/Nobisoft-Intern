@@ -1,6 +1,6 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Request
 
 from app.api.indexing import router as indexing_router
 from app.api.search import router as search_router
@@ -30,6 +30,21 @@ app = FastAPI(
 
 # Swagger UI hiện ổn định hơn với multipart array trên OpenAPI 3.0.3.
 app.openapi_version = "3.0.3"
+
+
+@app.get("/api/health", tags=["Health"])
+@app.get("/health", tags=["Health"])
+async def health_check(request: Request) -> dict[str, str]:
+    """Kiểm tra AI Service và các model đã sẵn sàng."""
+    service = getattr(request.app.state, "indexing_service", None)
+    if (
+        not service
+        or not hasattr(service, "clip_service")
+        or getattr(service.clip_service, "model", None) is None
+    ):
+        raise HTTPException(status_code=503, detail="AI Service chưa sẵn sàng")
+    return {"status": "ok"}
+
 
 app.include_router(indexing_router)
 app.include_router(search_router)
